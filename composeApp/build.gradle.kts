@@ -79,10 +79,6 @@ android {
         versionName = "1.0.0"
     }
 
-    sourceSets["main"].manifest.srcFile("src/androidMain/AndroidManifest.xml")
-    sourceSets["main"].res.srcDirs("src/androidMain/res")
-    sourceSets["main"].resources.srcDirs("src/commonMain/resources")
-
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"

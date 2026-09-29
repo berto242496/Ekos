@@ -16,14 +16,18 @@ kotlin {
         }
     }
     
-    listOf(
-        iosX64(),
-        iosArm64(),
-        iosSimulatorArm64()
-    ).forEach { iosTarget ->
-        iosTarget.binaries.framework {
-            baseName = "ComposeApp"
-            isStatic = true
+    // Only configure iOS targets if running on macOS with Xcode available
+    val isMac = System.getProperty("os.name").contains("Mac", ignoreCase = true)
+    if (isMac) {
+        listOf(
+            iosX64(),
+            iosArm64(),
+            iosSimulatorArm64()
+        ).forEach { iosTarget ->
+            iosTarget.binaries.framework {
+                baseName = "ComposeApp"
+                isStatic = true
+            }
         }
     }
     
@@ -41,15 +45,15 @@ kotlin {
                 implementation(compose.materialIconsExtended)
                 
                 // Coroutines & Lifecycle
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.1")
-                implementation("org.jetbrains.androidx.lifecycle:lifecycle-viewmodel-compose:2.8.0")
-                implementation("org.jetbrains.androidx.navigation:navigation-compose:2.8.0-alpha10")
+                implementation(libs.kotlinx.coroutines.core)
+                implementation(libs.lifecycle.viewmodel.compose)
+                implementation(libs.navigation.compose)
             }
         }
         
         val androidMain by getting {
             dependencies {
-                implementation("androidx.activity:activity-compose:1.9.1")
+                implementation(libs.androidx.activity.compose)
                 implementation("androidx.appcompat:appcompat:1.7.0")
                 implementation("androidx.core:core-ktx:1.13.1")
             }
@@ -74,6 +78,10 @@ android {
         versionCode = 1
         versionName = "1.0.0"
     }
+
+    sourceSets["main"].manifest.srcFile("src/androidMain/AndroidManifest.xml")
+    sourceSets["main"].res.srcDirs("src/androidMain/res")
+    sourceSets["main"].resources.srcDirs("src/commonMain/resources")
 
     packaging {
         resources {

@@ -1,0 +1,85 @@
+@import "tailwindcss";
+
+@theme {
+  --font-serif: 'Playfair Display', Georgia, serif;
+  --font-sans: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+
+  --color-surface: #fcf9f2;
+  --color-surface-dim: #dcdad3;
+  --color-surface-bright: #fcf9f2;
+  --color-surface-container-lowest: #ffffff;
+  --color-surface-container-low: #f6f3ec;
+  --color-surface-container: #f1eee7;
+  --color-surface-container-high: #ebe8e1;
+  --color-surface-container-highest: #e5e2db;
+  --color-on-surface: #1c1c18;
+  --color-on-surface-variant: #434843;
+  --color-inverse-surface: #31312c;
+  --color-inverse-on-surface: #f3f0e9;
+
+  --color-primary: #061b0e;
+  --color-primary-container: #1b3022;
+  --color-on-primary: #ffffff;
+  --color-on-primary-container: #819986;
+  --color-primary-fixed: #d0e9d4;
+  --color-primary-fixed-dim: #b4cdb8;
+
+  --color-secondary: #47654e;
+  --color-secondary-container: #c5e8ca;
+  --color-on-secondary-container: #4b6a52;
+  --color-secondary-fixed: #c8ebcd;
+
+  --color-tertiary: #251300;
+  --color-tertiary-container: #412500;
+  --color-tertiary-fixed: #ffddba;
+  --color-tertiary-fixed-dim: #faba71;
+  --color-on-tertiary-container: #c08744;
+
+  --color-outline: #737973;
+  --color-outline-variant: #c3c8c1;
+  --color-error: #ba1a1a;
+  --color-error-container: #ffdad6;
+}
+
+@layer base {
+  :root {
+    --font-serif: 'Playfair Display', Georgia, serif;
+    --font-sans: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+  }
+
+  html, body {
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    background-color: #fcf9f2;
+    color: #1c1c18;
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  .pt-safe {
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+}
+
+/* Custom Typography Utility Classes matching the Design System */
+.font-title-editorial, .font-headline-lg, .font-headline-md, .font-headline-sm, .font-display-hero, .font-display-hero-mobile {
+  font-family: 'Playfair Display', Georgia, serif;
+}
+
+.font-body-lg, .font-body-md, .font-body-sm, .font-label-prominent, .font-label-caption {
+  font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+}
+
+/* Hide scrollbars on horizontal carousels while keeping scrollability */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}

@@ -2,6 +2,37 @@
 <html lang="es">
   <head>
     <meta charset="UTF-8" />
+    <script>
+      (function() {
+        try {
+          var originalFetch = window.fetch;
+          var currentFetch = typeof originalFetch === 'function' ? originalFetch : null;
+          var descriptor = {
+            configurable: true,
+            enumerable: true,
+            get: function() {
+              return currentFetch;
+            },
+            set: function(val) {
+              currentFetch = val;
+            }
+          };
+          try {
+            Object.defineProperty(window, 'fetch', descriptor);
+          } catch (_) {}
+          if (typeof Window !== 'undefined' && Window.prototype) {
+            try {
+              Object.defineProperty(Window.prototype, 'fetch', descriptor);
+            } catch (_) {}
+          }
+          if (typeof globalThis !== 'undefined' && globalThis !== window) {
+            try {
+              Object.defineProperty(globalThis, 'fetch', descriptor);
+            } catch (_) {}
+          }
+        } catch (e) {}
+      })();
+    </script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <meta name="theme-color" content="#061b0e" />
     <meta name="apple-mobile-web-app-capable" content="yes" />

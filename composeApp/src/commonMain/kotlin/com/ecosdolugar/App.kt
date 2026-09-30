@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoStories
-import androidx.compose.material.icons.filled.CompassCalibration
 import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.Map
 import androidx.compose.material3.*
@@ -14,14 +13,11 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.ecosdolugar.data.RoutesRepository
 import com.ecosdolugar.data.CharactersRepository
+import com.ecosdolugar.data.RoutesRepository
 import com.ecosdolugar.model.RouteItem
 import com.ecosdolugar.model.UserProfile
-import com.ecosdolugar.ui.screens.CharacterSelectionScreen
-import com.ecosdolugar.ui.screens.RouteDetailScreen
-import com.ecosdolugar.ui.screens.RoutesCatalogScreen
-import com.ecosdolugar.ui.screens.WelcomeScreen
+import com.ecosdolugar.ui.screens.*
 import com.ecosdolugar.ui.theme.EcosDoLugarTheme
 import com.ecosdolugar.ui.theme.PineDeep
 import com.ecosdolugar.ui.theme.SurfaceCream
@@ -33,7 +29,8 @@ enum class NavigationScreen {
     DETAIL,
     EXPEDITION,
     MAP,
-    JOURNAL
+    JOURNAL,
+    GUIDE_DASHBOARD
 }
 
 @Composable
@@ -44,16 +41,23 @@ fun App() {
         var userProfile by remember { mutableStateOf(UserProfile()) }
         var activeBottomTab by remember { mutableStateOf(0) }
 
+        val showBottomBar = currentScreen == NavigationScreen.CATALOG ||
+            currentScreen == NavigationScreen.MAP ||
+            currentScreen == NavigationScreen.JOURNAL
+
         Scaffold(
             bottomBar = {
-                if (currentScreen == NavigationScreen.CATALOG) {
+                if (showBottomBar) {
                     NavigationBar(
                         containerColor = SurfaceCream,
                         tonalElevation = 8.dp
                     ) {
                         NavigationBarItem(
-                            selected = activeBottomTab == 0,
-                            onClick = { activeBottomTab = 0 },
+                            selected = activeBottomTab == 0 && currentScreen == NavigationScreen.CATALOG,
+                            onClick = {
+                                activeBottomTab = 0
+                                currentScreen = NavigationScreen.CATALOG
+                            },
                             icon = { Icon(Icons.Default.Explore, contentDescription = "Rutas") },
                             label = { Text("Rutas", fontSize = 11.sp) },
                             colors = NavigationBarItemDefaults.colors(
@@ -63,8 +67,11 @@ fun App() {
                             )
                         )
                         NavigationBarItem(
-                            selected = activeBottomTab == 1,
-                            onClick = { activeBottomTab = 1 },
+                            selected = activeBottomTab == 1 && currentScreen == NavigationScreen.MAP,
+                            onClick = {
+                                activeBottomTab = 1
+                                currentScreen = NavigationScreen.MAP
+                            },
                             icon = { Icon(Icons.Default.Map, contentDescription = "Mapa") },
                             label = { Text("Mapa", fontSize = 11.sp) },
                             colors = NavigationBarItemDefaults.colors(
@@ -74,10 +81,13 @@ fun App() {
                             )
                         )
                         NavigationBarItem(
-                            selected = activeBottomTab == 2,
-                            onClick = { activeBottomTab = 2 },
-                            icon = { Icon(Icons.Default.AutoStories, contentDescription = "Mi aventura") },
-                            label = { Text("Mi aventura", fontSize = 11.sp) },
+                            selected = activeBottomTab == 2 && currentScreen == NavigationScreen.JOURNAL,
+                            onClick = {
+                                activeBottomTab = 2
+                                currentScreen = NavigationScreen.JOURNAL
+                            },
+                            icon = { Icon(Icons.Default.AutoStories, contentDescription = "Cuaderno") },
+                            label = { Text("Cuaderno", fontSize = 11.sp) },
                             colors = NavigationBarItemDefaults.colors(
                                 indicatorColor = PineDeep.copy(alpha = 0.12f),
                                 selectedIconColor = PineDeep,
@@ -105,7 +115,6 @@ fun App() {
                                         isGoogleAuthenticated = true,
                                         googleId = "google_user_89127"
                                     )
-                                    // Proceed to choose character after Google Sign-In
                                     currentScreen = NavigationScreen.CHARACTER_SELECTION
                                 },
                                 onEnterGuest = {
@@ -150,8 +159,7 @@ fun App() {
                                     userProfile = userProfile.copy(savedRouteIds = newSaved)
                                 },
                                 onOpenProfile = {
-                                    // Open Profile or switch to Welcome
-                                    currentScreen = NavigationScreen.WELCOME
+                                    currentScreen = NavigationScreen.GUIDE_DASHBOARD
                                 }
                             )
                         }
@@ -169,18 +177,77 @@ fun App() {
                                     userProfile = userProfile.copy(savedRouteIds = newSaved)
                                 },
                                 onOpenMap = {
-                                    // Map view
+                                    activeBottomTab = 1
+                                    currentScreen = NavigationScreen.MAP
                                 },
                                 onStartRoute = { route ->
-                                    // Start expedition mode
+                                    selectedRoute = route
+                                    currentScreen = NavigationScreen.EXPEDITION
                                 },
                                 onOpenProfile = {
-                                    currentScreen = NavigationScreen.WELCOME
+                                    currentScreen = NavigationScreen.JOURNAL
                                 }
                             )
                         }
-                        else -> {
-                            // Other views
+                        NavigationScreen.EXPEDITION -> {
+                            ActiveExpeditionScreen(
+                                route = selectedRoute,
+                                userProfile = userProfile,
+                                onBack = { currentScreen = NavigationScreen.DETAIL },
+                                onCheckInStop = { stopId ->
+                                    userProfile = userProfile.copy(
+                                        visitedStopIds = userProfile.visitedStopIds + stopId
+                                    )
+                                },
+                                onSolveEnigma = { stopId ->
+                                    userProfile = userProfile.copy(
+                                        solvedEnigmaIds = userProfile.solvedEnigmaIds + stopId
+                                    )
+                                },
+                                onAddNote = {
+                                    // Add to notes
+                                },
+                                onCompleteRoute = { routeId ->
+                                    userProfile = userProfile.copy(
+                                        completedRouteIds = userProfile.completedRouteIds + routeId
+                                    )
+                                    currentScreen = NavigationScreen.JOURNAL
+                                }
+                            )
+                        }
+                        NavigationScreen.MAP -> {
+                            InteractiveMapScreen(
+                                routes = RoutesRepository.routes,
+                                onSelectRoute = { route ->
+                                    selectedRoute = route
+                                    currentScreen = NavigationScreen.DETAIL
+                                },
+                                onStartExpedition = { route ->
+                                    selectedRoute = route
+                                    currentScreen = NavigationScreen.EXPEDITION
+                                }
+                            )
+                        }
+                        NavigationScreen.JOURNAL -> {
+                            JournalScreen(
+                                userProfile = userProfile,
+                                onBack = { currentScreen = NavigationScreen.CATALOG },
+                                onOpenRoute = { routeId ->
+                                    val r = RoutesRepository.routes.find { it.id == routeId }
+                                    if (r != null) {
+                                        selectedRoute = r
+                                        currentScreen = NavigationScreen.DETAIL
+                                    }
+                                }
+                            )
+                        }
+                        NavigationScreen.GUIDE_DASHBOARD -> {
+                            GuideDashboardScreen(
+                                onBack = { currentScreen = NavigationScreen.CATALOG },
+                                onCreateNewRoute = {
+                                    // Future create route form
+                                }
+                            )
                         }
                     }
                 }

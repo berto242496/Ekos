@@ -36,7 +36,8 @@ enum class NavigationScreen {
 @Composable
 fun App() {
     EcosDoLugarTheme {
-        var currentScreen by remember { mutableStateOf(NavigationScreen.WELCOME) }
+        // Arranca directamente en CATALOG (Home) como en la app web
+        var currentScreen by remember { mutableStateOf(NavigationScreen.CATALOG) }
         var selectedRoute by remember { mutableStateOf<RouteItem>(RoutesRepository.routes.first()) }
         var userProfile by remember { mutableStateOf(UserProfile()) }
         var activeBottomTab by remember { mutableStateOf(0) }
@@ -110,12 +111,12 @@ fun App() {
                                 onSignInWithGoogle = {
                                     userProfile = userProfile.copy(
                                         name = "Explorador da Raia",
-                                        email = "bert2424.b2@gmail.com",
+                                        email = "explorador@ecosdolugar.gal",
                                         isVisitor = false,
                                         isGoogleAuthenticated = true,
                                         googleId = "google_user_89127"
                                     )
-                                    currentScreen = NavigationScreen.CHARACTER_SELECTION
+                                    currentScreen = NavigationScreen.CATALOG
                                 },
                                 onEnterGuest = {
                                     userProfile = userProfile.copy(isVisitor = true)
@@ -138,7 +139,7 @@ fun App() {
                                     currentScreen = NavigationScreen.CATALOG
                                 },
                                 onBack = {
-                                    currentScreen = NavigationScreen.WELCOME
+                                    currentScreen = NavigationScreen.CATALOG
                                 }
                             )
                         }
@@ -146,6 +147,7 @@ fun App() {
                             RoutesCatalogScreen(
                                 routes = RoutesRepository.routes,
                                 savedRouteIds = userProfile.savedRouteIds,
+                                userProfile = userProfile,
                                 onSelectRoute = { route ->
                                     selectedRoute = route
                                     currentScreen = NavigationScreen.DETAIL
@@ -159,6 +161,12 @@ fun App() {
                                     userProfile = userProfile.copy(savedRouteIds = newSaved)
                                 },
                                 onOpenProfile = {
+                                    currentScreen = NavigationScreen.JOURNAL
+                                },
+                                onOpenCharacterSelection = {
+                                    currentScreen = NavigationScreen.CHARACTER_SELECTION
+                                },
+                                onOpenGuideMode = {
                                     currentScreen = NavigationScreen.GUIDE_DASHBOARD
                                 }
                             )
@@ -205,7 +213,7 @@ fun App() {
                                     )
                                 },
                                 onAddNote = {
-                                    // Add to notes
+                                    // Add to field notes
                                 },
                                 onCompleteRoute = { routeId ->
                                     userProfile = userProfile.copy(
@@ -245,7 +253,7 @@ fun App() {
                             GuideDashboardScreen(
                                 onBack = { currentScreen = NavigationScreen.CATALOG },
                                 onCreateNewRoute = {
-                                    // Future create route form
+                                    // Future route creator in Kotlin
                                 }
                             )
                         }

@@ -20,7 +20,7 @@ interface AuthModalProps {
   user: UserProfile;
   isOpen: boolean;
   onClose: () => void;
-  onSaveProfile: (profile: Partial<UserProfile>) => void;
+  onGoogleSignIn: () => Promise<void>;
   onLogoutToWelcome: () => void;
   onOpenCharacterSelection?: () => void;
   onOpenApkModal?: () => void;
@@ -34,7 +34,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   user,
   isOpen,
   onClose,
-  onSaveProfile,
+  onGoogleSignIn,
   onLogoutToWelcome,
   onOpenCharacterSelection,
   onOpenApkModal,
@@ -42,8 +42,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   allRoutes = [],
   fieldNotesCount = 0,
 }) => {
-  const [googleAccount, setGoogleAccount] = useState('bert2424.b2@gmail.com');
   const [isSigningIn, setIsSigningIn] = useState(false);
+  const [signInError, setSignInError] = useState<string | null>(null);
 
   const activeChar = getCharacterById(user.characterId || 'meiga');
   const achievements = getUserAchievements(user, fieldNotesCount, allRoutes);
@@ -51,19 +51,15 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
   if (!isOpen) return null;
 
-  const handleGoogleSignIn = () => {
+  const handleGoogleSignIn = async () => {
     setIsSigningIn(true);
-    setTimeout(() => {
-      onSaveProfile({
-        name: 'Explorador de Galicia',
-        email: googleAccount.trim() || 'bert2424.b2@gmail.com',
-        isVisitor: false,
-        isGoogleAuthenticated: true,
-        googleId: `google_${Date.now()}`,
-      });
+    setSignInError(null);
+    try {
+      await onGoogleSignIn();
+    } catch (error) {
+      setSignInError(error instanceof Error ? error.message : 'No se pudo iniciar sesión con Google.');
       setIsSigningIn(false);
-      onClose();
-    }, 500);
+    }
   };
 
   const handleSignOut = () => {
@@ -134,29 +130,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               </p>
             </div>
 
-            <div className="p-3.5 rounded-2xl bg-white border border-[#c3c8c1]/70 shadow-sm flex flex-col gap-2">
-              <label className="text-[11px] font-semibold uppercase tracking-wider text-[#47654e]">
-                Cuenta de Google:
-              </label>
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-emerald-800 text-white font-bold flex items-center justify-center text-sm shadow-inner shrink-0">
-                  {googleAccount.charAt(0).toUpperCase()}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <input
-                    type="email"
-                    value={googleAccount}
-                    onChange={(e) => setGoogleAccount(e.target.value)}
-                    placeholder="tucorreo@gmail.com"
-                    className="w-full text-xs font-semibold text-[#1c1c18] bg-transparent border-b border-dashed border-[#c3c8c1] focus:outline-none focus:border-[#1b3022] pb-0.5"
-                  />
-                  <span className="text-[10px] text-[#434843]/80">
-                    Conexión segura oficial
-                  </span>
-                </div>
-              </div>
-            </div>
-
             <button
               onClick={handleGoogleSignIn}
               disabled={isSigningIn}
@@ -188,6 +161,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 </>
               )}
             </button>
+
+            {signInError && (
+              <p role="alert" className="text-xs text-red-700 bg-red-50 border border-red-200 rounded-xl p-3">
+                {signInError}
+              </p>
+            )}
 
             <div className="flex items-center gap-2 p-2.5 rounded-xl bg-[#ebe8e1]/60 text-[11px] text-[#434843]">
               <ShieldCheck className="w-4 h-4 text-emerald-700 shrink-0" />

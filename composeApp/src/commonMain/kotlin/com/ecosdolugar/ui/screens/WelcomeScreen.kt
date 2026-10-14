@@ -1,296 +1,396 @@
 package com.ecosdolugar.ui.screens
 
-import androidx.compose.animation.core.*
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowForward
-import androidx.compose.material.icons.filled.AutoStories
 import androidx.compose.material.icons.filled.Explore
+import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.Map
+import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import ecosdolugar.composeapp.generated.resources.Res
+import ecosdolugar.composeapp.generated.resources.hero_forest
+import org.jetbrains.compose.resources.painterResource
 import com.ecosdolugar.ui.theme.*
 
 @Composable
 fun WelcomeScreen(
     onSignInWithGoogle: () -> Unit,
-    onEnterGuest: () -> Unit,
-    onOpenCharacterSelect: () -> Unit
+    isSignInLoading: Boolean,
+    signInError: String?,
+    onOpenGuideMode: () -> Unit,
+    onOpenMap: () -> Unit
 ) {
-    val infiniteTransition = rememberInfiniteTransition()
-    val compassAngle by infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = 360f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(90000, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
-        )
-    )
-
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(PineDeep)
     ) {
-        // Multi-tier Atmospheric Gradient Scrim
+        Image(
+            painter = painterResource(Res.drawable.hero_forest),
+            contentDescription = null,
+            contentScale = ContentScale.Crop,
+            modifier = Modifier.fillMaxSize()
+        )
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .background(
                     Brush.verticalGradient(
-                        colors = listOf(
-                            PineDeep.copy(alpha = 0.85f),
-                            PineDeep.copy(alpha = 0.45f),
-                            PineDeep
+                        colorStops = arrayOf(
+                            0f to PineDeep.copy(alpha = 0.78f),
+                            0.42f to PineDeep.copy(alpha = 0.48f),
+                            1f to PineDeep
+                        )
+                    )
+                )
+        )
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.verticalGradient(
+                        colorStops = arrayOf(
+                            0f to Color.Transparent,
+                            0.5f to Color.Transparent,
+                            1f to PineDeep.copy(alpha = 0.94f)
                         )
                     )
                 )
         )
 
-        // Editorial Ambient Compass Watermark
-        Box(
-            modifier = Modifier
-                .size(260.dp)
-                .align(Alignment.TopEnd)
-                .offset(x = 60.dp, y = 60.dp)
-                .rotate(compassAngle),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                imageVector = Icons.Default.Explore,
-                contentDescription = null,
-                tint = TerracottaFixedDim.copy(alpha = 0.12f),
-                modifier = Modifier.fillMaxSize()
+        Column(modifier = Modifier.fillMaxSize()) {
+            WelcomeHeader(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 18.dp)
+                    .padding(top = 28.dp)
             )
-        }
 
-        // Screen Content Column
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 24.dp)
-                .padding(top = 48.dp, bottom = 32.dp),
-            verticalArrangement = Arrangement.SpaceBetween,
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            // Header Tier: Logo & Region Subtitle
-            Surface(
-                shape = CircleShape,
-                color = Color.White.copy(alpha = 0.12f),
-                modifier = Modifier.border(1.dp, Color.White.copy(alpha = 0.15f), CircleShape)
+            BoxWithConstraints(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
             ) {
                 Column(
-                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Text(
-                        text = "ECOS DO LUGAR",
-                        color = Color.White,
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = 2.sp
-                    )
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        modifier = Modifier.padding(top = 2.dp)
-                    ) {
-                        Box(modifier = Modifier.size(4.dp).background(TerracottaFixedDim, CircleShape))
-                        Text(
-                            text = "RUTAS & PATRIMONIO OCULTO",
-                            color = SurfaceContainerHigh,
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Medium,
-                            letterSpacing = 1.5.sp
-                        )
-                        Box(modifier = Modifier.size(4.dp).background(TerracottaFixedDim, CircleShape))
-                    }
-                }
-            }
-
-            // Narrative & Tactical Micro-Metrics Foundation
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                // Cultural Heritage Pill
-                Surface(
-                    shape = CircleShape,
-                    color = SurfaceContainerHighest.copy(alpha = 0.20f),
-                    modifier = Modifier.border(1.dp, Color.White.copy(alpha = 0.12f), CircleShape)
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Explore,
-                            contentDescription = null,
-                            tint = TerracottaFixedDim,
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Text(
-                            text = "TURISMO CULTURAL VIVO",
-                            color = TerracottaFixed,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            letterSpacing = 1.sp
-                        )
-                    }
-                }
-
-                // Poetic Headline
-                Text(
-                    text = "Haz visitable\nlo invisible",
-                    color = Color.White,
-                    style = MaterialTheme.typography.displayLarge.copy(
-                        fontStyle = FontStyle.Italic,
-                        fontWeight = FontWeight.SemiBold
-                    ),
-                    lineHeight = 40.sp
-                )
-
-                // Editorial Excerpt
-                Text(
-                    text = "Descubre historias, leyendas y patrimonio oculto a través de rutas digitales interactivas.",
-                    color = SurfaceContainerHigh,
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontSize = 15.sp,
-                    lineHeight = 22.sp
-                )
-
-                // Tactical Micro-Metrics of the Borderland
-                Surface(
-                    shape = RoundedCornerShape(16.dp),
-                    color = Color.White.copy(alpha = 0.10f),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(16.dp))
+                        .heightIn(min = maxHeight)
+                        .verticalScroll(rememberScrollState())
+                        .padding(horizontal = 20.dp)
+                        .padding(top = 38.dp, bottom = 22.dp),
+                    verticalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(14.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Column {
-                            Text("RUTAS SECRETAS", color = SurfaceContainerHighest, fontSize = 10.sp, letterSpacing = 1.sp)
-                            Text("42", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold)
-                        }
-                        Column {
-                            Text("LEYENDAS ORALES", color = SurfaceContainerHighest, fontSize = 10.sp, letterSpacing = 1.sp)
-                            Text("118", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold)
-                        }
-                        Column {
-                            Text("FRONTERA VIVA", color = SurfaceContainerHighest, fontSize = 10.sp, letterSpacing = 1.sp)
-                            Text("A Raia", color = TerracottaFixedDim, fontSize = 20.sp, fontWeight = FontWeight.Bold)
-                        }
-                    }
-                }
-
-                // Action Stack - Exclusivo Google Sign-In & Elige tu personaje
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    // Primary Action: Exclusively Google Sign-In
-                    Surface(
-                        onClick = onSignInWithGoogle,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(52.dp),
-                        shape = RoundedCornerShape(14.dp),
-                        color = Color.White,
-                        shadowElevation = 4.dp
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding(horizontal = 16.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.Center
-                        ) {
-                            Text(
-                                text = "G",
-                                fontWeight = FontWeight.Black,
-                                fontSize = 18.sp,
-                                color = Color(0xFF4285F4)
-                            )
-                            Spacer(Modifier.width(10.dp))
-                            Text(
-                                text = "Continuar con Google",
-                                fontWeight = FontWeight.SemiBold,
-                                fontSize = 15.sp,
-                                color = Color(0xFF1F1F1F)
-                            )
-                        }
-                    }
-
-                    // Secondary Action: Choose Character Button
-                    OutlinedButton(
-                        onClick = onOpenCharacterSelect,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(50.dp),
-                        shape = RoundedCornerShape(14.dp),
-                        border = ButtonDefaults.outlinedButtonBorder.copy(
-                            brush = Brush.horizontalGradient(
-                                listOf(TerracottaFixedDim.copy(alpha = 0.6f), Color.White.copy(alpha = 0.2f))
-                            )
-                        ),
-                        colors = ButtonDefaults.outlinedButtonColors(
-                            contentColor = Color.White,
-                            containerColor = SurfaceContainerHighest.copy(alpha = 0.15f)
-                        )
-                    ) {
-                        Text("✨", fontSize = 16.sp)
-                        Spacer(Modifier.width(8.dp))
-                        Text(
-                            text = "Elige o teu personaxe (Meiga, Trasno...)",
-                            fontWeight = FontWeight.SemiBold,
-                            fontSize = 14.sp
-                        )
-                    }
-
-                    // Subtle Guest Access
-                    TextButton(
-                        onClick = onEnterGuest,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text("Entrar como visitante libre", color = SurfaceContainerHighest, fontSize = 13.sp)
-                        Spacer(Modifier.width(4.dp))
-                        Icon(
-                            Icons.Default.ArrowForward,
-                            contentDescription = null,
-                            tint = SurfaceContainerHighest,
-                            modifier = Modifier.size(16.dp)
-                        )
-                    }
-                }
-
-                // Fine Print Coordinates
                 Text(
-                    text = "Galicia • Norte de Portugal — Arquivo Vivo",
-                    color = OutlineVariant.copy(alpha = 0.65f),
-                    fontSize = 11.sp,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.fillMaxWidth()
+                    text = "Haz visitable\nlo invisible",
+                    color = SurfaceCream,
+                    fontFamily = FontFamily.Serif,
+                    fontSize = 33.sp,
+                    lineHeight = 37.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+
+                Spacer(Modifier.height(11.dp))
+                Text(
+                    text = "Descubre la historia, mitología y tesoros ocultos de toda Galicia a través de rutas digitales interactivas y relatos sonoros.",
+                    color = SurfaceContainerHigh,
+                    fontSize = 14.sp,
+                    lineHeight = 21.sp
+                )
+
+                Spacer(Modifier.height(20.dp))
+                WelcomeMetrics()
+                Spacer(Modifier.height(20.dp))
+                GoogleSignInButton(onClick = onSignInWithGoogle, isLoading = isSignInLoading)
+                Spacer(Modifier.height(8.dp))
+                PublicMapButton(onClick = onOpenMap)
+                if (signInError != null) {
+                    Text(
+                        text = signInError,
+                        color = Color(0xFFFFD5D5),
+                        fontSize = 11.sp,
+                        lineHeight = 15.sp
+                    )
+                }
+                Spacer(Modifier.height(9.dp))
+                WelcomeTrustNotice()
+                Spacer(Modifier.height(14.dp))
+                GuideDivider()
+                Spacer(Modifier.height(10.dp))
+                GuideCallToAction(onClick = onOpenGuideMode)
+                Spacer(Modifier.height(13.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    Icon(
+                        Icons.Default.LocationOn,
+                        contentDescription = null,
+                        tint = TerracottaFixedDim,
+                        modifier = Modifier.size(13.dp)
+                    )
+                    Spacer(Modifier.width(5.dp))
+                    Text(
+                        "A Coruña · Lugo · Ourense · Pontevedra — Arquivo Vivo",
+                        color = OutlineVariant.copy(alpha = 0.8f),
+                        fontSize = 9.sp,
+                        textAlign = TextAlign.Center
+                    )
+                }
+            }
+        }
+    }
+}
+}
+
+@Composable
+private fun PublicMapButton(onClick: () -> Unit) {
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(12.dp),
+        color = Color.White.copy(alpha = 0.12f),
+        border = ButtonDefaults.outlinedButtonBorder.copy(
+            brush = androidx.compose.ui.graphics.SolidColor(Color.White.copy(alpha = 0.3f))
+        ),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 18.dp, vertical = 13.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center
+        ) {
+            Icon(Icons.Default.Map, contentDescription = null, tint = TerracottaFixedDim)
+            Spacer(Modifier.width(10.dp))
+            Text(
+                "Explorar el mapa sin registrarme",
+                color = SurfaceCream,
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 13.sp
+            )
+        }
+    }
+}
+
+@Composable
+private fun WelcomeHeader(
+    modifier: Modifier = Modifier
+) {
+    Box(modifier = modifier, contentAlignment = Alignment.Center) {
+        Surface(
+            shape = CircleShape,
+            color = Color.White.copy(alpha = 0.12f),
+            border = ButtonDefaults.outlinedButtonBorder.copy(
+                brush = androidx.compose.ui.graphics.SolidColor(Color.White.copy(alpha = 0.13f))
+            ),
+            modifier = Modifier.padding(horizontal = 8.dp)
+        ) {
+            Column(
+                modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    "ECOS DO LUGAR",
+                    color = Color.White,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 0.6.sp,
+                    maxLines = 1
+                )
+                Text(
+                    "RUTAS & PATRIMONIO DE TODA GALICIA",
+                    color = SurfaceContainerHigh,
+                    fontSize = 7.sp,
+                    fontWeight = FontWeight.Medium,
+                    letterSpacing = 0.35.sp,
+                    maxLines = 1
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun WelcomeMetrics() {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(Color.White.copy(alpha = 0.12f))
+            .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(12.dp))
+            .padding(vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        MetricColumn("PROVINCIAS", "4", Modifier.weight(1f).padding(start = 11.dp))
+        Box(Modifier.width(1.dp).height(38.dp).background(Color.White.copy(alpha = 0.12f)))
+        MetricColumn("RUTAS MÍTICAS", "7", Modifier.weight(1f).padding(start = 11.dp))
+        Box(Modifier.width(1.dp).height(38.dp).background(Color.White.copy(alpha = 0.12f)))
+        MetricColumn("GEOGRAFÍA", "Toda Galicia", Modifier.weight(1.18f).padding(start = 11.dp))
+    }
+}
+
+@Composable
+private fun MetricColumn(label: String, value: String, modifier: Modifier = Modifier) {
+    Column(modifier = modifier) {
+        Text(label, color = SurfaceContainerHigh, fontSize = 9.sp, maxLines = 1)
+        Text(
+            value,
+            color = if (value == "Toda Galicia") TerracottaFixedDim else Color.White,
+            fontFamily = FontFamily.Serif,
+            fontSize = if (value == "Toda Galicia") 15.sp else 18.sp,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 1
+        )
+    }
+}
+
+@Composable
+private fun GoogleSignInButton(onClick: () -> Unit, isLoading: Boolean) {
+    Surface(
+        onClick = onClick,
+        enabled = !isLoading,
+        shape = RoundedCornerShape(12.dp),
+        color = Color.White,
+        border = ButtonDefaults.outlinedButtonBorder.copy(
+            brush = androidx.compose.ui.graphics.SolidColor(Color(0xFFE2E8F0))
+        ),
+        shadowElevation = 5.dp,
+        modifier = Modifier.fillMaxWidth().height(52.dp)
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center
+        ) {
+            if (isLoading) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(20.dp),
+                    color = PineDeep,
+                    strokeWidth = 2.dp
+                )
+                Spacer(Modifier.width(11.dp))
+                Text(
+                    "Conectando con Google...",
+                    color = Color(0xFF1F1F1F),
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+            } else {
+                Text("G", color = Color(0xFF4285F4), fontSize = 21.sp, fontWeight = FontWeight.Black)
+                Spacer(Modifier.width(11.dp))
+                Column {
+                    Text(
+                        "Entrar con Google para elegir personaje",
+                        color = Color(0xFF1F1F1F),
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        lineHeight = 15.sp
+                    )
+                    Text(
+                        "Esencial para despertar tu don mágico y resolver las pruebas",
+                        color = Color(0xFF666666),
+                        fontSize = 8.sp,
+                        lineHeight = 11.sp
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun WelcomeTrustNotice() {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(9.dp))
+            .background(Color(0xFF032A1D).copy(alpha = 0.86f))
+            .border(1.dp, Color(0xFF10B981).copy(alpha = 0.25f), RoundedCornerShape(9.dp))
+            .padding(horizontal = 10.dp, vertical = 9.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Icon(
+            Icons.Default.Shield,
+            contentDescription = null,
+            tint = Color(0xFF34D399),
+            modifier = Modifier.size(15.dp)
+        )
+        Text(
+            "Cada ruta requiere la sintonía de un personaje mitológico para desvelar sus secretos.",
+            color = Color(0xFFD1FAE5),
+            fontSize = 10.sp,
+            lineHeight = 13.sp
+        )
+    }
+}
+
+@Composable
+private fun GuideDivider() {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        HorizontalDivider(modifier = Modifier.weight(1f), color = Color.White.copy(alpha = 0.16f))
+        Text(
+            "¿ERES GUÍA LOCAL?",
+            modifier = Modifier.padding(horizontal = 10.dp),
+            color = TerracottaFixed.copy(alpha = 0.75f),
+            fontSize = 9.sp,
+            fontFamily = FontFamily.Serif,
+            letterSpacing = 0.5.sp
+        )
+        HorizontalDivider(modifier = Modifier.weight(1f), color = Color.White.copy(alpha = 0.16f))
+    }
+}
+
+@Composable
+private fun GuideCallToAction(onClick: () -> Unit) {
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(12.dp),
+        color = TerracottaGold.copy(alpha = 0.2f),
+        border = ButtonDefaults.outlinedButtonBorder.copy(
+            brush = androidx.compose.ui.graphics.SolidColor(TerracottaGold.copy(alpha = 0.48f))
+        ),
+        modifier = Modifier.fillMaxWidth().height(44.dp)
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center
+        ) {
+            Icon(
+                Icons.Default.Explore,
+                contentDescription = null,
+                tint = TerracottaFixedDim,
+                modifier = Modifier.size(15.dp)
+            )
+            Spacer(Modifier.width(8.dp))
+            Text(
+                "Soy guía · Crea y monetiza tus rutas",
+                color = SurfaceCream,
+                fontFamily = FontFamily.Serif,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.SemiBold
+            )
         }
     }
 }

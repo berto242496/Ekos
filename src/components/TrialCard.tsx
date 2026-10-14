@@ -24,7 +24,7 @@ interface TrialCardProps {
   };
   isSolved: boolean;
   characterId: string;
-  onSolve: () => void;
+  onSolve: (attempts: number) => void;
   onUseDon?: () => void;
   isDonActive?: boolean;
 }
@@ -44,6 +44,7 @@ export const TrialCard: React.FC<TrialCardProps> = ({
   // State for 'acertijo':
   const [selectedOption, setSelectedOption] = useState<number | null>(null);
   const [showAcertijoError, setShowAcertijoError] = useState(false);
+  const [attemptCount, setAttemptCount] = useState(0);
 
   // State for 'puzle_runico':
   const [selectedRunes, setSelectedRunes] = useState<string[]>([]);
@@ -60,6 +61,12 @@ export const TrialCard: React.FC<TrialCardProps> = ({
   const [fluvialCantigaActive, setFluvialCantigaActive] = useState(false);
   const [caminanteChronicleActive, setCaminanteChronicleActive] = useState(false);
   const [donMessage, setDonMessage] = useState<string | null>(null);
+
+  const completeAttempt = () => {
+    const attempts = attemptCount + 1;
+    setAttemptCount(attempts);
+    onSolve(attempts);
+  };
 
   // General toggles:
   const [showGeneralHint, setShowGeneralHint] = useState(false);
@@ -143,6 +150,7 @@ export const TrialCard: React.FC<TrialCardProps> = ({
   useEffect(() => {
     setSelectedOption(null);
     setShowAcertijoError(false);
+    setAttemptCount(0);
     setSelectedRunes([]);
     setRuneFeedback('idle');
     setTypedLetters([]);
@@ -164,8 +172,9 @@ export const TrialCard: React.FC<TrialCardProps> = ({
 
     if (idx === trial?.correctOptionIndex) {
       soundEngine.playMysticChime('success');
-      onSolve();
+      completeAttempt();
     } else {
+      setAttemptCount(count => count + 1);
       setShowAcertijoError(true);
       setTimeout(() => setShowAcertijoError(false), 1800);
     }
@@ -185,8 +194,9 @@ export const TrialCard: React.FC<TrialCardProps> = ({
       if (isCorrect) {
         setRuneFeedback('success');
         soundEngine.playMysticChime('success');
-        onSolve();
+        completeAttempt();
       } else {
+        setAttemptCount(count => count + 1);
         setRuneFeedback('error');
         setTimeout(() => {
           setSelectedRunes([]);
@@ -214,8 +224,9 @@ export const TrialCard: React.FC<TrialCardProps> = ({
       if (nextLetters.join('') === targetWord) {
         setCipherFeedback('success');
         soundEngine.playMysticChime('success');
-        onSolve();
+        completeAttempt();
       } else {
+        setAttemptCount(count => count + 1);
         setCipherFeedback('error');
         setTimeout(() => {
           setTypedLetters([]);
@@ -243,8 +254,9 @@ export const TrialCard: React.FC<TrialCardProps> = ({
     if (cipherInput.toUpperCase().trim() === targetWord) {
       setCipherFeedback('success');
       soundEngine.playMysticChime('success');
-      onSolve();
+      completeAttempt();
     } else {
+      setAttemptCount(count => count + 1);
       setCipherFeedback('error');
       setTimeout(() => setCipherFeedback('idle'), 1600);
     }
@@ -281,7 +293,7 @@ export const TrialCard: React.FC<TrialCardProps> = ({
           <button
             onClick={() => {
               soundEngine.playMysticChime('success');
-              onSolve();
+              completeAttempt();
             }}
             className="w-full py-2 bg-[#1b3022] text-white text-xs font-semibold rounded-xl active:scale-95 transition-all cursor-pointer"
           >
@@ -712,7 +724,7 @@ export const TrialCard: React.FC<TrialCardProps> = ({
               type="button"
               onClick={() => {
                 soundEngine.playMysticChime('success');
-                onSolve();
+                completeAttempt();
               }}
               className="text-[#b45309] hover:underline font-sans cursor-pointer font-medium"
             >

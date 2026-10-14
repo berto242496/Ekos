@@ -7,6 +7,13 @@ plugins {
     alias(libs.plugins.composeCompiler)
 }
 
+fun readLocalEnv(key: String): String =
+    rootProject.file(".env.local").takeIf { it.isFile }?.useLines { lines ->
+        lines.firstOrNull { it.startsWith("$key=") }?.substringAfter('=')?.trim()
+            ?.trim('"', '\'')
+            .orEmpty()
+    }.orEmpty()
+
 kotlin {
     androidTarget {
         compilations.all {
@@ -56,6 +63,9 @@ kotlin {
                 implementation(libs.androidx.activity.compose)
                 implementation("androidx.appcompat:appcompat:1.7.0")
                 implementation("androidx.core:core-ktx:1.13.1")
+                implementation(libs.androidx.credentials)
+                implementation(libs.androidx.credentials.play.services.auth)
+                implementation(libs.googleid)
             }
         }
         
@@ -77,6 +87,25 @@ android {
         targetSdk = 34
         versionCode = 1
         versionName = "1.0.0"
+        resValue(
+            "string",
+            "google_web_client_id",
+            providers.provider { readLocalEnv("GOOGLE_WEB_CLIENT_ID") }
+                .filter { it.isNotBlank() }
+                .orElse(providers.gradleProperty("GOOGLE_WEB_CLIENT_ID"))
+                .orElse(providers.environmentVariable("GOOGLE_WEB_CLIENT_ID"))
+                .get()
+        )
+        val supabaseUrl = providers.gradleProperty("SUPABASE_URL")
+            .orElse(providers.environmentVariable("SUPABASE_URL"))
+            .orElse(readLocalEnv("VITE_SUPABASE_URL"))
+            .get()
+        val supabaseKey = providers.gradleProperty("SUPABASE_PUBLISHABLE_KEY")
+            .orElse(providers.environmentVariable("SUPABASE_PUBLISHABLE_KEY"))
+            .orElse(readLocalEnv("VITE_SUPABASE_ANON_KEY"))
+            .get()
+        resValue("string", "supabase_url", supabaseUrl)
+        resValue("string", "supabase_publishable_key", supabaseKey)
     }
 
     packaging {

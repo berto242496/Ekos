@@ -20,6 +20,13 @@ import { GuideCreateRouteScreen } from './components/GuideCreateRouteScreen';
 import { RoutePublishedSuccessScreen } from './components/RoutePublishedSuccessScreen';
 import { GuideProfileModal } from './components/GuideProfileModal';
 import { useI18n } from './services/i18n';
+import {
+  getMyRoutes,
+  getPublishedRoutes,
+  saveChallengeProgress,
+  saveRoute,
+} from './services/routesRepository';
+import { getSupabaseClient, signInWithGoogle, signOut } from './services/supabaseClient';
 import { Compass, Map as MapIcon, BookOpen } from 'lucide-react';
 
 type Screen =
@@ -36,20 +43,7 @@ type BottomTab = 'rutas' | 'mapa' | 'mi-aventura';
 
 export default function App() {
   const { t } = useI18n();
-  const [currentScreen, setCurrentScreen] = useState<Screen>(() => {
-    const saved = localStorage.getItem('ecos_user');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        if (parsed && parsed.isGoogleAuthenticated && parsed.characterId) {
-          return 'catalog';
-        }
-      } catch {
-        // fallback
-      }
-    }
-    return 'welcome';
-  });
+  const [currentScreen, setCurrentScreen] = useState<Screen>('welcome');
   const [activeTab, setActiveTab] = useState<BottomTab>('rutas');
 
   // Dynamic routes collection allowing guides to add and publish routes
@@ -70,11 +64,13 @@ export default function App() {
     }
     return ROUTES;
   });
+  const [catalogRoutes, setCatalogRoutes] = useState<RouteItem[]>([]);
 
   const [selectedRoute, setSelectedRoute] = useState<RouteItem>(() => allRoutes[0] || ROUTES[0]);
   const [isMapModalOpen, setIsMapModalOpen] = useState(false);
   const [isKmpModalOpen, setIsKmpModalOpen] = useState(false);
   const [isApkModalOpen, setIsApkModalOpen] = useState(false);
+  const [routeStorageError, setRouteStorageError] = useState<string | null>(null);
 
   // Guide Simulation State
   const [currentGuideId, setCurrentGuideId] = useState<string>(() => {
@@ -84,7 +80,7 @@ export default function App() {
   const [lastCreatedRoute, setLastCreatedRoute] = useState<RouteItem | null>(null);
   const [profileModalGuide, setProfileModalGuide] = useState<GuideAuthor | null>(null);
 
-  // Sync routes to localStorage
+  // Cache the catalog locally; Supabase remains the source for shared, user-created routes.
   useEffect(() => {
     localStorage.setItem('ecos_routes_v3_es', JSON.stringify(allRoutes));
     localStorage.setItem('ecos_routes', JSON.stringify(allRoutes));
@@ -95,15 +91,32 @@ export default function App() {
     localStorage.setItem('ecos_active_guide', guideId);
   };
 
-  const handlePublishRoute = (newRoute: RouteItem) => {
-    setAllRoutes(prev => [newRoute, ...prev]);
-    setLastCreatedRoute(newRoute);
-    setCurrentScreen('guide-success');
+  const handlePublishRoute = async (newRoute: RouteItem) => {
+    try {
+      const savedRoute = await saveRoute(newRoute);
+      setAllRoutes(prev => [savedRoute, ...prev.filter(route => route.id !== savedRoute.id)]);
+      setCatalogRoutes(prev =>
+        savedRoute.status === 'publicada'
+          ? [savedRoute, ...prev.filter(route => route.id !== savedRoute.id)]
+          : prev,
+      );
+      setLastCreatedRoute(savedRoute);
+      setRouteStorageError(null);
+      setCurrentScreen('guide-success');
+    } catch (error) {
+      setRouteStorageError(error instanceof Error ? error.message : 'No se pudo publicar la ruta.');
+    }
   };
 
-  const handleSaveDraft = (draftRoute: RouteItem) => {
-    setAllRoutes(prev => [draftRoute, ...prev]);
-    setCurrentScreen('guide-dashboard');
+  const handleSaveDraft = async (draftRoute: RouteItem) => {
+    try {
+      const savedRoute = await saveRoute(draftRoute);
+      setAllRoutes(prev => [savedRoute, ...prev.filter(route => route.id !== savedRoute.id)]);
+      setRouteStorageError(null);
+      setCurrentScreen('guide-dashboard');
+    } catch (error) {
+      setRouteStorageError(error instanceof Error ? error.message : 'No se pudo guardar el borrador.');
+    }
   };
 
   // Auth modal state
@@ -118,15 +131,17 @@ export default function App() {
   // Achievement unlock notification toast
   const [unlockedAchievementToast, setUnlockedAchievementToast] = useState<Achievement | null>(null);
 
-  // User Profile with localStorage persistence
+  // User Profile with localStorage persistence for local gameplay preferences.
   const [user, setUser] = useState<UserProfile>(() => {
     const saved = localStorage.getItem('ecos_user');
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        if (parsed && parsed.isGoogleAuthenticated) {
+        if (parsed && typeof parsed === 'object') {
           return {
             ...parsed,
+            isGoogleAuthenticated: false,
+            googleId: undefined,
             purchasedRouteIds: parsed.purchasedRouteIds || [],
             purchaseHistory: parsed.purchaseHistory || [],
             completedRouteIds: parsed.completedRouteIds || [],
@@ -155,6 +170,93 @@ export default function App() {
       achievementsUnlockedAt: {},
     };
   });
+
+  useEffect(() => {
+    let subscription: ReturnType<ReturnType<typeof getSupabaseClient>['auth']['onAuthStateChange']>['data']['subscription'] | undefined;
+    try {
+      const client = getSupabaseClient();
+      const { data } = client.auth.onAuthStateChange((_event, session) => {
+        if (!session?.user) {
+          setUser(previous => ({
+            ...previous,
+            name: '',
+            email: '',
+            avatarUrl: undefined,
+            isVisitor: false,
+            isGoogleAuthenticated: false,
+            googleId: undefined,
+          }));
+          setCurrentScreen('welcome');
+          return;
+        }
+
+        const metadata = session.user.user_metadata;
+        setUser(previous => ({
+          ...previous,
+          name: metadata.full_name || metadata.name || session.user.email || 'Explorador',
+          email: session.user.email || '',
+          avatarUrl: metadata.avatar_url,
+          isVisitor: false,
+          isGoogleAuthenticated: true,
+          googleId: session.user.id,
+        }));
+        const requestedTarget = sessionStorage.getItem('ecos_post_auth_screen');
+        sessionStorage.removeItem('ecos_post_auth_screen');
+        const validTargets: Screen[] = [
+          'welcome',
+          'character-selection',
+          'catalog',
+          'detail',
+          'expedition',
+          'guide-landing',
+          'guide-dashboard',
+          'guide-create',
+          'guide-success',
+        ];
+        if (requestedTarget && validTargets.includes(requestedTarget as Screen)) {
+          setCurrentScreen(requestedTarget as Screen);
+        } else {
+          setCurrentScreen(previous => previous === 'welcome' ? 'catalog' : previous);
+        }
+      });
+      subscription = data.subscription;
+    } catch (error) {
+      setRouteStorageError(error instanceof Error ? error.message : 'No se pudo configurar la autenticación.');
+    }
+    return () => subscription?.unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    let isActive = true;
+    const loadRoutes = async () => {
+      const published = await getPublishedRoutes();
+      const owned = user.isGoogleAuthenticated ? await getMyRoutes() : [];
+      return { published, routes: [...owned, ...published] };
+    };
+
+    loadRoutes()
+      .then(({ published, routes }) => {
+        if (!isActive) return;
+        setCatalogRoutes(published);
+        setAllRoutes(previous => {
+          const defaultIds = new Set(ROUTES.map(route => route.id));
+          const remoteIds = new Set(routes.map(route => route.id));
+          const localRoutes = previous.filter(
+            route => !defaultIds.has(route.id) && !remoteIds.has(route.id),
+          );
+          return [...routes, ...localRoutes, ...ROUTES];
+        });
+      })
+      .catch(error => {
+        if (isActive) {
+          setRouteStorageError(error instanceof Error ? error.message : 'No se pudieron cargar las rutas compartidas.');
+        }
+      });
+
+    return () => {
+      isActive = false;
+    };
+  }, [user.isGoogleAuthenticated, user.googleId]);
 
   // Field Notes with localStorage persistence
   const [fieldNotes, setFieldNotes] = useState<FieldNote[]>(() => {
@@ -241,7 +343,13 @@ export default function App() {
   };
 
   // Handler to mark enigma solved
-  const handleSolveEnigma = (stopId: string) => {
+  const handleSolveEnigma = (stopId: string, attempts = 1) => {
+    const stop = selectedRoute.stops.find(item => item.id === stopId);
+    if (stop?.challengeId && user.isGoogleAuthenticated) {
+      saveChallengeProgress(stop.challengeId, attempts, 100, true).catch(error => {
+        setRouteStorageError(error instanceof Error ? error.message : 'No se pudo guardar el progreso del reto.');
+      });
+    }
     setUser(prev => {
       if (prev.solvedEnigmaIds.includes(stopId)) return prev;
       const nextUser = { ...prev, solvedEnigmaIds: [...prev.solvedEnigmaIds, stopId] };
@@ -281,25 +389,20 @@ export default function App() {
   };
 
   // Welcome Screen Navigation Actions
+  const beginGoogleSignIn = async (target: Screen) => {
+    try {
+      sessionStorage.setItem('ecos_post_auth_screen', target);
+      await signInWithGoogle();
+    } catch (error) {
+      sessionStorage.removeItem('ecos_post_auth_screen');
+      throw error;
+    }
+  };
+
   const handleSignInWithGoogle = () => {
-    setUser(prev => {
-      const updated: UserProfile = {
-        ...prev,
-        name: 'Explorador de Galicia',
-        email: 'bert2424.b2@gmail.com',
-        isVisitor: false,
-        isGoogleAuthenticated: true,
-        googleId: `google_${Date.now()}`,
-      };
-      try {
-        localStorage.setItem('ecos_user', JSON.stringify(updated));
-      } catch {
-        // ignore
-      }
-      return updated;
+    beginGoogleSignIn('character-selection').catch(error => {
+      setRouteStorageError(error instanceof Error ? error.message : 'No se pudo iniciar sesión con Google.');
     });
-    // Immediately navigate to Character Selection post-login
-    setCurrentScreen('character-selection');
   };
 
   const handleConfirmCharacter = (characterId: string) => {
@@ -337,48 +440,17 @@ export default function App() {
     setAuthModal({ isOpen: true, mode: 'profile' });
   };
 
-  const handleSaveProfile = (updates: Partial<UserProfile>) => {
-    const wasJustGoogleAuth = updates.isGoogleAuthenticated && !user.isGoogleAuthenticated;
-    setUser(prev => {
-      const updated = { ...prev, ...updates };
-      try {
-        localStorage.setItem('ecos_user', JSON.stringify(updated));
-      } catch {
-        // ignore
-      }
-      return updated;
-    });
-    if (wasJustGoogleAuth) {
-      setCurrentScreen('character-selection');
-    } else if (currentScreen === 'welcome') {
-      setCurrentScreen('catalog');
-      setActiveTab('rutas');
-    }
-  };
-
-  const handleLogoutToWelcome = () => {
-    setUser({
-      name: '',
-      email: '',
-      isVisitor: false,
-      isGoogleAuthenticated: false,
-      savedRouteIds: ['ribeira-sacra'],
-      visitedStopIds: [],
-      solvedEnigmaIds: [],
-      characterId: 'meiga',
-      characterDonUsedCount: 0,
-      purchasedRouteIds: [],
-      purchaseHistory: [],
-    });
-    setFieldNotes([]);
+  const handleLogoutToWelcome = async () => {
     try {
+      await signOut();
+      setFieldNotes([]);
       localStorage.removeItem('ecos_user');
       localStorage.removeItem('ecos_field_notes');
-    } catch {
-      // ignore
+      setCurrentScreen('welcome');
+      setActiveTab('rutas');
+    } catch (error) {
+      setRouteStorageError(error instanceof Error ? error.message : 'No se pudo cerrar sesión.');
     }
-    setCurrentScreen('welcome');
-    setActiveTab('rutas');
   };
 
   // Navigation handlers
@@ -436,6 +508,19 @@ export default function App() {
       <div className="w-full max-w-[430px] min-h-screen sm:min-h-[844px] sm:max-h-[915px] bg-[#fcf9f2] text-[#1c1c18] font-sans antialiased flex flex-col relative sm:rounded-[44px] sm:shadow-[0_25px_70px_rgba(0,0,0,0.95)] sm:border-[8px] sm:border-[#132218] overflow-y-auto overflow-x-hidden">
         {/* Dynamic Island / Mobile Camera Notch on desktop frame */}
         <div className="hidden sm:block absolute top-2.5 left-1/2 -translate-x-1/2 w-24 h-4 bg-[#132218] rounded-full z-50 pointer-events-none" />
+        {routeStorageError && (
+          <div role="alert" className="sticky top-0 z-[60] flex items-start justify-between gap-3 bg-red-50 border-b border-red-200 px-4 py-3 text-xs text-red-800">
+            <span>{routeStorageError}</span>
+            <button
+              type="button"
+              aria-label="Cerrar aviso"
+              onClick={() => setRouteStorageError(null)}
+              className="font-bold text-red-900"
+            >
+              ×
+            </button>
+          </div>
+        )}
 
         {/* 1. Welcome Screen */}
         {currentScreen === 'welcome' && (
@@ -458,8 +543,14 @@ export default function App() {
       {/* 3. Guide Screens */}
       {currentScreen === 'guide-landing' && (
         <GuideLandingScreen
-          onStartCreateRoute={() => setCurrentScreen('guide-create')}
-          onGoToDashboard={() => setCurrentScreen('guide-dashboard')}
+        onStartCreateRoute={() => {
+          if (user.isGoogleAuthenticated) setCurrentScreen('guide-create');
+          else setAuthModal({ isOpen: true, mode: 'login' });
+        }}
+        onGoToDashboard={() => {
+          if (user.isGoogleAuthenticated) setCurrentScreen('guide-dashboard');
+          else setAuthModal({ isOpen: true, mode: 'login' });
+        }}
           onBackToVisitor={() => {
             setCurrentScreen(user.isGoogleAuthenticated ? 'catalog' : 'welcome');
           }}
@@ -555,7 +646,7 @@ export default function App() {
         <>
           {activeTab === 'rutas' && (
             <RoutesCatalog
-              routes={allRoutes}
+              routes={catalogRoutes}
               savedRouteIds={user.savedRouteIds}
               user={user}
               onSelectRoute={handleSelectRoute}
@@ -697,7 +788,13 @@ export default function App() {
         allRoutes={allRoutes}
         fieldNotesCount={fieldNotes.length}
         onClose={() => setAuthModal(prev => ({ ...prev, isOpen: false }))}
-        onSaveProfile={handleSaveProfile}
+        onGoogleSignIn={() => beginGoogleSignIn(
+          currentScreen === 'guide-landing'
+            ? 'guide-create'
+            : currentScreen === 'character-selection'
+              ? 'character-selection'
+              : 'catalog',
+        )}
         onLogoutToWelcome={handleLogoutToWelcome}
         onOpenCharacterSelection={handleOpenCharacterSelection}
         onOpenApkModal={() => setIsApkModalOpen(true)}

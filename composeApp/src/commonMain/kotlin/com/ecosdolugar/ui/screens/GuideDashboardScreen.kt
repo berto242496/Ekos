@@ -26,8 +26,11 @@ import com.ecosdolugar.ui.theme.*
 
 @Composable
 fun GuideDashboardScreen(
+    routes: List<RouteItem>,
     onBack: () -> Unit,
-    onCreateNewRoute: () -> Unit
+    onCreateNewRoute: () -> Unit,
+    onEditDraft: (RouteItem) -> Unit,
+    onPublishDraft: (RouteItem) -> Unit
 ) {
     val scrollState = rememberScrollState()
 
@@ -94,7 +97,27 @@ fun GuideDashboardScreen(
                 ) {
                     Column(modifier = Modifier.padding(12.dp)) {
                         Text("RUTAS PUBLICADAS", fontSize = 10.sp, color = TerracottaFixedDim)
-                        Text("3", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                        Text(
+                            routes.count { it.status == "publicada" }.toString(),
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        )
+                    }
+                }
+                Surface(
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(14.dp),
+                    color = Color.Black.copy(alpha = 0.3f)
+                ) {
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        Text("PENDIENTES DE REVISIÓN", fontSize = 10.sp, color = TerracottaFixedDim)
+                        Text(
+                            routes.count { it.status == "pendiente" }.toString(),
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        )
                     }
                 }
                 Surface(
@@ -109,7 +132,6 @@ fun GuideDashboardScreen(
                 }
             }
 
-            // Create New Route Action Card
             Surface(
                 onClick = onCreateNewRoute,
                 shape = RoundedCornerShape(16.dp),
@@ -130,6 +152,55 @@ fun GuideDashboardScreen(
                         Text("Define paradas, enigmas, audionarraciones y precio", fontSize = 12.sp, color = SurfaceContainerHighest)
                     }
                     Icon(Icons.Default.ChevronRight, contentDescription = null, tint = Color.White)
+                }
+            }
+
+            if (routes.isNotEmpty()) {
+                Text("TUS RUTAS", fontSize = 11.sp, color = TerracottaGold, fontWeight = FontWeight.Bold)
+                routes.forEach { route ->
+                    Surface(
+                        shape = RoundedCornerShape(14.dp),
+                        color = Color.Black.copy(alpha = 0.3f),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(14.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Text(route.title, color = Color.White, fontWeight = FontWeight.Bold)
+                            Text(
+                                "${route.stops.size} paradas · ${route.location} · " +
+                                    when (route.status) {
+                                        "borrador" -> "Borrador"
+                                        "pendiente" -> "Pendiente de verificación"
+                                        else -> "Publicada"
+                                    },
+                                color = SurfaceContainerHighest,
+                                fontSize = 12.sp
+                            )
+                            if (route.status == "borrador") {
+                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    OutlinedButton(
+                                        onClick = { onEditDraft(route) },
+                                        colors = ButtonDefaults.outlinedButtonColors(
+                                            contentColor = SurfaceCream
+                                        )
+                                    ) {
+                                        Text("Continuar borrador")
+                                    }
+                                    Button(
+                                        onClick = { onPublishDraft(route) },
+                                        colors = ButtonDefaults.buttonColors(
+                                            containerColor = TerracottaGold,
+                                            contentColor = PineDeep
+                                        )
+                                    ) {
+                                        Text("Publicar")
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }

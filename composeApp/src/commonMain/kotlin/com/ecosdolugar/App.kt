@@ -13,7 +13,12 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.CancellationException
+import com.ecosdolugar.auth.GoogleAuthResult
+import com.ecosdolugar.auth.GoogleAuthService
 import com.ecosdolugar.data.CharactersRepository
+import com.ecosdolugar.data.RouteDataSource
 import com.ecosdolugar.data.RoutesRepository
 import com.ecosdolugar.model.RouteItem
 import com.ecosdolugar.model.UserProfile
@@ -30,23 +35,69 @@ enum class NavigationScreen {
     EXPEDITION,
     MAP,
     JOURNAL,
-    GUIDE_DASHBOARD
+    GUIDE_DASHBOARD,
+    ROUTE_EDITOR
 }
 
 @Composable
-fun App() {
+fun App(
+    googleAuthService: GoogleAuthService,
+    routeDataSource: RouteDataSource
+) {
     EcosDoLugarTheme {
-        // Arranca directamente en CATALOG (Home) como en la app web
-        var currentScreen by remember { mutableStateOf(NavigationScreen.CATALOG) }
-        var selectedRoute by remember { mutableStateOf<RouteItem>(RoutesRepository.routes.first()) }
+        var currentScreen by remember { mutableStateOf(NavigationScreen.WELCOME) }
+        var routes by remember { mutableStateOf(RoutesRepository.routes) }
+        var selectedRoute by remember { mutableStateOf<RouteItem>(routes.first()) }
+        var editingRoute by remember { mutableStateOf<RouteItem?>(null) }
         var userProfile by remember { mutableStateOf(UserProfile()) }
+        var accessToken by remember { mutableStateOf<String?>(null) }
         var activeBottomTab by remember { mutableStateOf(0) }
+        var isGoogleSignInLoading by remember { mutableStateOf(false) }
+        var googleSignInError by remember { mutableStateOf<String?>(null) }
+        var dataError by remember { mutableStateOf<String?>(null) }
+        val coroutineScope = rememberCoroutineScope()
+        val snackbarHostState = remember { SnackbarHostState() }
+
+        LaunchedEffect(accessToken) {
+            try {
+                val remoteRoutes = routeDataSource.loadRoutes(accessToken)
+                val completedChallengeIds = accessToken
+                    ?.let { routeDataSource.loadCompletedChallenges(it) }
+                    .orEmpty()
+                val completedStopIds = remoteRoutes
+                    .flatMap { it.stops }
+                    .filter { it.challengeId in completedChallengeIds }
+                    .map { it.id }
+                val remoteIds = remoteRoutes.mapTo(mutableSetOf()) { it.id }
+                val localRoutes = RoutesRepository.routes.filterNot { it.id in remoteIds }
+                val mergedRoutes = remoteRoutes + localRoutes
+                routes = mergedRoutes
+                selectedRoute = remoteRoutes.firstOrNull { it.id == selectedRoute.id }
+                    ?: mergedRoutes.firstOrNull { it.id == selectedRoute.id }
+                    ?: remoteRoutes.firstOrNull()
+                    ?: mergedRoutes.first()
+                userProfile = userProfile.copy(
+                    solvedEnigmaIds = userProfile.solvedEnigmaIds + completedStopIds
+                )
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Exception) {
+                dataError = error.message ?: "No se pudieron cargar las rutas de Supabase."
+            }
+        }
+
+        LaunchedEffect(dataError) {
+            val message = dataError ?: return@LaunchedEffect
+            snackbarHostState.showSnackbar(message)
+            dataError = null
+        }
 
         val showBottomBar = currentScreen == NavigationScreen.CATALOG ||
             currentScreen == NavigationScreen.MAP ||
             currentScreen == NavigationScreen.JOURNAL
 
         Scaffold(
+            snackbarHost = { SnackbarHost(snackbarHostState) },
             bottomBar = {
                 if (showBottomBar) {
                     NavigationBar(
@@ -109,21 +160,42 @@ fun App() {
                         NavigationScreen.WELCOME -> {
                             WelcomeScreen(
                                 onSignInWithGoogle = {
-                                    userProfile = userProfile.copy(
-                                        name = "Explorador da Raia",
-                                        email = "explorador@ecosdolugar.gal",
-                                        isVisitor = false,
-                                        isGoogleAuthenticated = true,
-                                        googleId = "google_user_89127"
-                                    )
-                                    currentScreen = NavigationScreen.CATALOG
+                                    if (!isGoogleSignInLoading) {
+                                        coroutineScope.launch {
+                                            isGoogleSignInLoading = true
+                                            googleSignInError = null
+                                            try {
+                                                when (val result = googleAuthService.signInWithGoogle()) {
+                                                    is GoogleAuthResult.Success -> {
+                                                        accessToken = result.accessToken
+                                                        userProfile = userProfile.copy(
+                                                            name = result.displayName.ifBlank { result.email },
+                                                            email = result.email,
+                                                            isVisitor = false,
+                                                            isGoogleAuthenticated = true,
+                                                            googleId = result.googleId
+                                                        )
+                                                        currentScreen = NavigationScreen.CHARACTER_SELECTION
+                                                    }
+                                                    is GoogleAuthResult.Error -> {
+                                                        googleSignInError = result.message
+                                                    }
+                                                    GoogleAuthResult.Cancelled -> Unit
+                                                }
+                                            } finally {
+                                                isGoogleSignInLoading = false
+                                            }
+                                        }
+                                    }
                                 },
-                                onEnterGuest = {
-                                    userProfile = userProfile.copy(isVisitor = true)
-                                    currentScreen = NavigationScreen.CATALOG
+                                isSignInLoading = isGoogleSignInLoading,
+                                signInError = googleSignInError,
+                                onOpenGuideMode = {
+                                    currentScreen = NavigationScreen.GUIDE_DASHBOARD
                                 },
-                                onOpenCharacterSelect = {
-                                    currentScreen = NavigationScreen.CHARACTER_SELECTION
+                                onOpenMap = {
+                                    activeBottomTab = 1
+                                    currentScreen = NavigationScreen.MAP
                                 }
                             )
                         }
@@ -145,7 +217,7 @@ fun App() {
                         }
                         NavigationScreen.CATALOG -> {
                             RoutesCatalogScreen(
-                                routes = RoutesRepository.routes,
+                                routes = routes.filter { it.status == "publicada" },
                                 savedRouteIds = userProfile.savedRouteIds,
                                 userProfile = userProfile,
                                 onSelectRoute = { route ->
@@ -207,10 +279,32 @@ fun App() {
                                         visitedStopIds = userProfile.visitedStopIds + stopId
                                     )
                                 },
-                                onSolveEnigma = { stopId ->
+                                onSolveEnigma = { stopId, attempts ->
                                     userProfile = userProfile.copy(
                                         solvedEnigmaIds = userProfile.solvedEnigmaIds + stopId
                                     )
+                                    val challengeId = selectedRoute.stops
+                                        .firstOrNull { it.id == stopId }
+                                        ?.challengeId
+                                    val token = accessToken
+                                    if (challengeId != null && token != null) {
+                                        coroutineScope.launch {
+                                            try {
+                                                routeDataSource.saveChallengeProgress(
+                                                    challengeId = challengeId,
+                                                    attempts = attempts,
+                                                    score = 100,
+                                                    completed = true,
+                                                    accessToken = token
+                                                )
+                                            } catch (error: CancellationException) {
+                                                throw error
+                                            } catch (error: Exception) {
+                                                dataError = error.message
+                                                    ?: "No se pudo sincronizar el progreso del reto."
+                                            }
+                                        }
+                                    }
                                 },
                                 onAddNote = {
                                     // Add to field notes
@@ -225,14 +319,10 @@ fun App() {
                         }
                         NavigationScreen.MAP -> {
                             InteractiveMapScreen(
-                                routes = RoutesRepository.routes,
+                                routes = routes,
                                 onSelectRoute = { route ->
                                     selectedRoute = route
                                     currentScreen = NavigationScreen.DETAIL
-                                },
-                                onStartExpedition = { route ->
-                                    selectedRoute = route
-                                    currentScreen = NavigationScreen.EXPEDITION
                                 }
                             )
                         }
@@ -241,19 +331,100 @@ fun App() {
                                 userProfile = userProfile,
                                 onBack = { currentScreen = NavigationScreen.CATALOG },
                                 onOpenRoute = { routeId ->
-                                    val r = RoutesRepository.routes.find { it.id == routeId }
+                                    val r = routes.find { it.id == routeId }
                                     if (r != null) {
                                         selectedRoute = r
                                         currentScreen = NavigationScreen.DETAIL
+                                    }
+                                },
+                                onSignOut = {
+                                    coroutineScope.launch {
+                                        try {
+                                            googleAuthService.signOut(accessToken)
+                                            accessToken = null
+                                            userProfile = userProfile.copy(
+                                                isVisitor = true,
+                                                isGoogleAuthenticated = false,
+                                                googleId = null
+                                            )
+                                            currentScreen = NavigationScreen.WELCOME
+                                        } catch (error: CancellationException) {
+                                            throw error
+                                        } catch (error: Exception) {
+                                            dataError = error.message ?: "No se pudo cerrar sesión."
+                                        }
                                     }
                                 }
                             )
                         }
                         NavigationScreen.GUIDE_DASHBOARD -> {
                             GuideDashboardScreen(
+                                routes = routes.filter { it.guide.id == userProfile.googleId },
                                 onBack = { currentScreen = NavigationScreen.CATALOG },
                                 onCreateNewRoute = {
-                                    // Future route creator in Kotlin
+                                    if (accessToken == null) {
+                                        dataError = "Inicia sesión con Google antes de crear una ruta."
+                                        currentScreen = NavigationScreen.WELCOME
+                                    } else {
+                                        editingRoute = null
+                                        currentScreen = NavigationScreen.ROUTE_EDITOR
+                                    }
+                                },
+                                onEditDraft = { draft ->
+                                    editingRoute = draft
+                                    currentScreen = NavigationScreen.ROUTE_EDITOR
+                                },
+                                onPublishDraft = { draft ->
+                                    val token = accessToken
+                                    if (token == null) {
+                                        dataError = "La sesión ha caducado. Inicia sesión de nuevo."
+                                    } else {
+                                        coroutineScope.launch {
+                                            try {
+                                                val published = routeDataSource.saveRoute(
+                                                    draft,
+                                                    "publicada",
+                                                    token
+                                                )
+                                                routes = listOf(published) + routes.filterNot { it.id == published.id }
+                                                currentScreen = NavigationScreen.GUIDE_DASHBOARD
+                                            } catch (error: CancellationException) {
+                                                throw error
+                                            } catch (error: Exception) {
+                                                dataError = error.message ?: "No se pudo publicar el borrador."
+                                            }
+                                        }
+                                    }
+                                }
+                            )
+                        }
+                        NavigationScreen.ROUTE_EDITOR -> {
+                            RouteEditorScreen(
+                                userProfile = userProfile,
+                                initialRoute = editingRoute,
+                                onBack = { currentScreen = NavigationScreen.GUIDE_DASHBOARD },
+                                onSave = { route, status ->
+                                    val token = accessToken
+                                    if (token == null) {
+                                        dataError = "La sesión ha caducado. Inicia sesión de nuevo."
+                                    } else {
+                                        coroutineScope.launch {
+                                            try {
+                                                val savedRoute = routeDataSource.saveRoute(route, status, token)
+                                                routes = listOf(savedRoute) + routes.filterNot { it.id == savedRoute.id }
+                                                if (savedRoute.status == "publicada") {
+                                                    selectedRoute = savedRoute
+                                                    currentScreen = NavigationScreen.DETAIL
+                                                } else {
+                                                    currentScreen = NavigationScreen.GUIDE_DASHBOARD
+                                                }
+                                            } catch (error: CancellationException) {
+                                                throw error
+                                            } catch (error: Exception) {
+                                                dataError = error.message ?: "No se pudo guardar la ruta."
+                                            }
+                                        }
+                                    }
                                 }
                             )
                         }

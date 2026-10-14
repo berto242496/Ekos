@@ -1,6 +1,6 @@
 import React from 'react';
 import { RouteItem } from '../types';
-import { CheckCircle2, Sparkles, MapPin, Clock, Eye, ArrowRight, PlusCircle, Compass, LayoutDashboard } from 'lucide-react';
+import { Clock, Sparkles, MapPin, ArrowRight, PlusCircle, Compass, LayoutDashboard } from 'lucide-react';
 
 interface RoutePublishedSuccessScreenProps {
   route: RouteItem;
@@ -38,21 +38,21 @@ export const RoutePublishedSuccessScreen: React.FC<RoutePublishedSuccessScreenPr
 
       {/* Main Card */}
       <main className="max-w-xl mx-auto px-4 py-12 text-center w-full">
-        <div className="w-16 h-16 rounded-full bg-emerald-100 border border-emerald-300 text-emerald-800 flex items-center justify-center mx-auto mb-6 shadow-sm">
-          <CheckCircle2 className="w-9 h-9" />
+        <div className="w-16 h-16 rounded-full bg-amber-100 border border-amber-300 text-amber-800 flex items-center justify-center mx-auto mb-6 shadow-sm">
+          <Clock className="w-9 h-9" />
         </div>
 
         <div className="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-widest text-[#8c5717] px-3 py-1 rounded-full bg-[#c48b47]/15 border border-[#c48b47]/20 mb-3">
           <Sparkles className="w-3.5 h-3.5" />
-          Itinerario Verificado
+          Pendiente de verificación
         </div>
 
         <h1 className="text-3xl sm:text-4xl font-serif font-bold text-[#0f2416] mb-3">
-          Tu ruta ha sido publicada
+          Hemos recibido tu ruta
         </h1>
 
         <p className="text-sm sm:text-base text-[#47654e] font-serif max-w-md mx-auto mb-8 leading-relaxed">
-          Ya está disponible para que todos los visitantes de Ecos do Lugar descubran su historia, paradas y misterios.
+          El equipo administrador la revisará antes de publicarla. Mientras tanto, solo tú podrás verla desde tu panel.
         </p>
 
         {/* Route Preview Card */}
@@ -97,7 +97,7 @@ export const RoutePublishedSuccessScreen: React.FC<RoutePublishedSuccessScreenPr
             onClick={onViewInCatalog}
             className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl bg-[#1b3022] hover:bg-[#284632] text-[#fcf9f2] font-serif font-semibold text-sm shadow-sm transition-all"
           >
-            <span>Ver en catálogo</span>
+            <span>Volver al catálogo</span>
             <ArrowRight className="w-4 h-4 text-[#c48b47]" />
           </button>
 

@@ -31,7 +31,7 @@ interface ActiveExpeditionProps {
   solvedEnigmaIds: string[];
   onBack: () => void;
   onCheckInStop: (stopId: string) => void;
-  onSolveEnigma: (stopId: string) => void;
+  onSolveEnigma: (stopId: string, attempts: number) => void;
   onAddNote: (stop: RouteStop) => void;
   onUseCharacterDon?: () => void;
   onCompleteRoute?: (routeId: string) => void;
@@ -545,7 +545,7 @@ export const ActiveExpedition: React.FC<ActiveExpeditionProps> = ({
             characterId={character.id}
             isDonActive={isDonActive}
             onUseDon={handleTriggerDon}
-            onSolve={() => onSolveEnigma(currentStop.id)}
+            onSolve={attempts => onSolveEnigma(currentStop.id, attempts)}
           />
 
           {/* Action Row: Check-in & Notes */}

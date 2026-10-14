@@ -91,7 +91,7 @@ export const GuideDashboardScreen: React.FC<GuideDashboardScreenProps> = ({
 
   // Compute metrics from current guide's routes
   const publishedRoutes = guideRoutes.filter((r) => (r.status || 'publicada') === 'publicada');
-  const draftRoutes = guideRoutes.filter((r) => r.status === 'borrador');
+  const pendingRoutes = guideRoutes.filter((r) => r.status === 'pendiente');
 
   const totalViews = guideRoutes.reduce((acc, r) => acc + (r.viewsCount || 0), 0);
   const totalStarted = guideRoutes.reduce((acc, r) => acc + (r.startedCount || 0), 0);
@@ -326,7 +326,7 @@ export const GuideDashboardScreen: React.FC<GuideDashboardScreenProps> = ({
         {activeTab === 'rutas' && (
           <div className="space-y-8">
             {/* Bento Metrics Grid */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5 sm:gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-3.5 sm:gap-4">
               {/* Published */}
               <div className="bg-white/70 border border-[#1b3022]/10 rounded-2xl p-4 sm:p-5 shadow-xs">
                 <div className="flex items-center justify-between mb-2">
@@ -337,6 +337,17 @@ export const GuideDashboardScreen: React.FC<GuideDashboardScreenProps> = ({
                   {publishedRoutes.length}
                 </div>
                 <p className="text-[11px] text-[#47654e] mt-1 font-serif">Dispoñibles no catálogo</p>
+              </div>
+
+              <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 sm:p-5 shadow-xs">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-serif uppercase tracking-wider text-amber-800">Pendientes de revisión</span>
+                  <Clock className="w-4 h-4 text-amber-700" />
+                </div>
+                <div className="text-2xl sm:text-3xl font-serif font-bold text-amber-900">
+                  {pendingRoutes.length}
+                </div>
+                <p className="text-[11px] text-amber-800 mt-1 font-serif">Ocultas del catálogo</p>
               </div>
 
               {/* Views */}
@@ -411,6 +422,7 @@ export const GuideDashboardScreen: React.FC<GuideDashboardScreenProps> = ({
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {guideRoutes.map((route) => {
                     const isDraft = route.status === 'borrador';
+                    const isPending = route.status === 'pendiente';
                     return (
                       <div
                         key={route.id}
@@ -423,10 +435,12 @@ export const GuideDashboardScreen: React.FC<GuideDashboardScreenProps> = ({
                               className={`text-[11px] font-semibold tracking-wider uppercase px-2.5 py-0.5 rounded-full border ${
                                 isDraft
                                   ? 'bg-amber-50 text-amber-800 border-amber-300'
-                                  : 'bg-emerald-50 text-emerald-800 border-emerald-300'
+                                  : isPending
+                                    ? 'bg-orange-50 text-orange-800 border-orange-300'
+                                    : 'bg-emerald-50 text-emerald-800 border-emerald-300'
                               }`}
                             >
-                              {isDraft ? 'Borrador' : 'Publicada'}
+                              {isDraft ? 'Borrador' : isPending ? 'Pendiente de verificación' : 'Publicada'}
                             </span>
 
                             <span className="text-xs font-serif font-bold px-2.5 py-1 rounded-lg bg-[#1b3022]/5 text-[#1b3022] border border-[#1b3022]/10">

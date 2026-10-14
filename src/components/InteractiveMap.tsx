@@ -1,16 +1,13 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { RouteItem, RouteStop } from '../types';
 import { getCharacterById } from '../data/charactersData';
 import {
-  Navigation,
-  Compass,
   Layers,
-  MapPin,
   Play,
   Volume2,
   X,
-  ChevronRight,
-  Sparkles,
+  Plus,
+  Minus,
 } from 'lucide-react';
 
 interface InteractiveMapProps {
@@ -32,18 +29,107 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   onClose,
   isModal = false,
 }) => {
-  const [activeFilter, setActiveFilter] = useState<string>(selectedRouteId || 'all');
+  const [activeFilter, setActiveFilter] = useState<string>(
+    isModal ? selectedRouteId || 'all' : 'all',
+  );
   const [selectedStop, setSelectedStop] = useState<{
     stop: RouteStop;
     route: RouteItem;
   } | null>(null);
-  const [gpsLocked, setGpsLocked] = useState(true);
+  const [zoom, setZoom] = useState(8);
+  const [mapReady, setMapReady] = useState(false);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const mapRef = useRef<HTMLDivElement>(null);
+  const dragStart = useRef<{
+    pointerId: number;
+    x: number;
+    y: number;
+    panX: number;
+    panY: number;
+  } | null>(null);
+  const [mapSize, setMapSize] = useState({ width: 0, height: 0 });
   const activeChar = getCharacterById(characterId);
 
   const activeRoutes =
     activeFilter === 'all'
       ? routes
       : routes.filter(r => r.id === activeFilter);
+
+  const visibleStops = useMemo(
+    () =>
+      activeRoutes.flatMap(route =>
+        route.stops
+          .filter(
+            stop =>
+              Number.isFinite(stop.coordinates.lat) &&
+              Number.isFinite(stop.coordinates.lng),
+          )
+          .map(stop => ({ stop, route })),
+      ),
+    [activeRoutes],
+  );
+
+  const mapCenter = useMemo(() => {
+    if (visibleStops.length === 0) return { lat: 42.65, lng: -8.2 };
+
+    const latitudes = visibleStops.map(({ stop }) => stop.coordinates.lat);
+    const longitudes = visibleStops.map(({ stop }) => stop.coordinates.lng);
+    return {
+      lat: (Math.min(...latitudes) + Math.max(...latitudes)) / 2,
+      lng: (Math.min(...longitudes) + Math.max(...longitudes)) / 2,
+    };
+  }, [visibleStops]);
+
+  useEffect(() => {
+    const element = mapRef.current;
+    if (!element) return;
+
+    const observer = new ResizeObserver(([entry]) => {
+      setMapSize({
+        width: entry.contentRect.width,
+        height: entry.contentRect.height,
+      });
+    });
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    if (mapSize.width === 0 || mapSize.height === 0) return;
+    if (visibleStops.length < 2) {
+      setMapReady(true);
+      return;
+    }
+
+    const zoomZeroPoints = visibleStops.map(({ stop }) => {
+      const latitude = Math.max(-85.0511, Math.min(85.0511, stop.coordinates.lat));
+      const sinLatitude = Math.sin((latitude * Math.PI) / 180);
+      return {
+        x: ((stop.coordinates.lng + 180) / 360) * 256,
+        y:
+          (0.5 -
+            Math.log((1 + sinLatitude) / (1 - sinLatitude)) / (4 * Math.PI)) *
+          256,
+      };
+    });
+    const spanX =
+      Math.max(...zoomZeroPoints.map(point => point.x)) -
+      Math.min(...zoomZeroPoints.map(point => point.x));
+    const spanY =
+      Math.max(...zoomZeroPoints.map(point => point.y)) -
+      Math.min(...zoomZeroPoints.map(point => point.y));
+    const scaleX = spanX === 0 ? Number.POSITIVE_INFINITY : (mapSize.width - 100) / spanX;
+    const scaleY = spanY === 0 ? Number.POSITIVE_INFINITY : (mapSize.height - 100) / spanY;
+    const fittedZoom = Math.floor(Math.log2(Math.min(scaleX, scaleY)));
+
+    setZoom(Math.max(6, Math.min(15, fittedZoom)));
+    setMapReady(true);
+  }, [mapSize, visibleStops]);
+
+  useEffect(() => {
+    setSelectedStop(null);
+    setPan({ x: 0, y: 0 });
+  }, [activeFilter]);
 
   const getRouteColor = (routeId: string) => {
     switch (routeId) {
@@ -65,6 +151,51 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
         return '#1b3022';
     }
   };
+
+  const worldSize = 256 * 2 ** zoom;
+  const project = (lat: number, lng: number) => {
+    const latitude = Math.max(-85.0511, Math.min(85.0511, lat));
+    const sinLatitude = Math.sin((latitude * Math.PI) / 180);
+    return {
+      x: ((lng + 180) / 360) * worldSize,
+      y:
+        ((0.5 -
+          Math.log((1 + sinLatitude) / (1 - sinLatitude)) / (4 * Math.PI)) *
+          worldSize),
+    };
+  };
+  const centerPoint = project(mapCenter.lat, mapCenter.lng);
+  const toMapPosition = (lat: number, lng: number) => {
+    const point = project(lat, lng);
+    return {
+      x: point.x - centerPoint.x + mapSize.width / 2 + pan.x,
+      y: point.y - centerPoint.y + mapSize.height / 2 + pan.y,
+    };
+  };
+  const mapTiles = useMemo(() => {
+    if (!mapReady || mapSize.width === 0 || mapSize.height === 0) return [];
+
+    const center = project(mapCenter.lat, mapCenter.lng);
+    const tileCount = 2 ** zoom;
+    const firstX = Math.floor((center.x - mapSize.width / 2 - pan.x) / 256) - 1;
+    const lastX = Math.floor((center.x + mapSize.width / 2 - pan.x) / 256) + 1;
+    const firstY = Math.floor((center.y - mapSize.height / 2 - pan.y) / 256) - 1;
+    const lastY = Math.floor((center.y + mapSize.height / 2 - pan.y) / 256) + 1;
+    const tiles: { x: number; y: number; left: number; top: number }[] = [];
+
+    for (let x = firstX; x <= lastX; x += 1) {
+      for (let y = firstY; y <= lastY; y += 1) {
+        if (x < 0 || x >= tileCount || y < 0 || y >= tileCount) continue;
+        tiles.push({
+          x,
+          y,
+          left: x * 256 - center.x + mapSize.width / 2 + pan.x,
+          top: y * 256 - center.y + mapSize.height / 2 + pan.y,
+        });
+      }
+    }
+    return tiles;
+  }, [mapCenter, mapReady, mapSize, pan, zoom]);
 
   return (
     <div className={`flex flex-col w-full bg-[#fcf9f2] text-[#1c1c18] ${isModal ? 'h-[85vh]' : 'min-h-screen pb-24'}`}>
@@ -91,17 +222,22 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
             </span>
           </div>
 
-          <button
-            onClick={() => setGpsLocked(!gpsLocked)}
-            className={`px-3 py-1.5 rounded-full font-sans text-[12px] font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
-              gpsLocked
-                ? 'bg-[#c5e8ca] text-[#03210e]'
-                : 'bg-[#f1eee7] text-[#434843] hover:bg-[#ebe8e1]'
-            }`}
-          >
-            <Navigation className={`w-3.5 h-3.5 ${gpsLocked ? 'fill-current' : ''}`} />
-            <span>{gpsLocked ? 'GPS Conectado' : 'Calibrar GPS'}</span>
-          </button>
+          <div className="flex items-center rounded-full border border-[#1b3022]/15 bg-white">
+            <button
+              onClick={() => setZoom(current => Math.max(6, current - 1))}
+              aria-label="Alejar mapa"
+              className="p-2 text-[#1b3022] hover:bg-[#f1eee7] rounded-l-full cursor-pointer"
+            >
+              <Minus className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => setZoom(current => Math.min(15, current + 1))}
+              aria-label="Acercar mapa"
+              className="p-2 text-[#1b3022] hover:bg-[#f1eee7] rounded-r-full cursor-pointer"
+            >
+              <Plus className="w-4 h-4" />
+            </button>
+          </div>
 
           {isModal && onClose && (
             <button
@@ -124,7 +260,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
               : 'bg-white text-[#434843] border border-[#c3c8c1]/40 hover:bg-[#ebe8e1]'
           }`}
         >
-          Toda Galicia (7 rutas)
+          Toda Galicia ({routes.length} rutas)
         </button>
 
         {routes.map(r => {
@@ -145,281 +281,165 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
         })}
       </div>
 
-      {/* Map Canvas / Stylized Topographical Visualizer */}
-      <div className="relative flex-1 w-full min-h-[420px] bg-[#eef1ed] overflow-hidden select-none">
-        {/* Cartographic SVG of Galicia */}
-        <svg
-          className="absolute inset-0 w-full h-full"
-          viewBox="0 0 1000 700"
-          preserveAspectRatio="none"
-        >
-          <defs>
-            <linearGradient id="seaGrad" x1="0" y1="0" x2="1" y2="1">
-              <stop offset="0%" stopColor="#d5e3e8" stopOpacity="0.8" />
-              <stop offset="100%" stopColor="#bdd3dd" stopOpacity="0.6" />
-            </linearGradient>
-
-            <linearGradient id="galiciaGrad" x1="0" y1="0" x2="1" y2="1">
-              <stop offset="0%" stopColor="#f3f6ee" />
-              <stop offset="50%" stopColor="#eaf1e7" />
-              <stop offset="100%" stopColor="#e3ede0" />
-            </linearGradient>
-
-            <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
-              <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#d5dcce" strokeWidth="0.5" />
-            </pattern>
-          </defs>
-
-          {/* Sea background */}
-          <rect width="1000" height="700" fill="url(#seaGrad)" />
-          <rect width="1000" height="700" fill="url(#grid)" />
-
-          {/* Galicia Landmass Outline (Stylized polygon shape) */}
-          <path
-            d="M 480,50 C 580,40 700,70 780,110 C 850,150 920,280 920,380 C 910,500 870,620 780,660 C 650,670 420,680 250,670 C 180,630 180,560 210,500 C 190,440 130,400 130,340 C 140,240 220,180 320,130 C 380,90 420,60 480,50 Z"
-            fill="url(#galiciaGrad)"
-            stroke="#9eb39e"
-            strokeWidth="2.5"
-          />
-
-          {/* Mountain elevations in Courel and Macizo Central */}
-          <path
-            d="M 720,280 Q 820,320 860,450 Q 810,520 740,480 Z"
-            fill="#dbe4d5"
-            fillOpacity="0.7"
-            stroke="#819986"
-            strokeWidth="1"
-            strokeDasharray="3 3"
-          />
-          <text
-            x="760"
-            y="390"
-            fill="#556b5b"
-            fontSize="12"
-            fontFamily="Playfair Display"
-            fontStyle="italic"
-            fontWeight="bold"
-            letterSpacing="2"
-          >
-            Serra do Courel
-          </text>
-
-          {/* Mountain elevations in Fragas do Eume (North) */}
-          <path
-            d="M 440,110 Q 550,120 570,200 Q 480,210 440,150 Z"
-            fill="#cbe3cb"
-            fillOpacity="0.6"
-          />
-          <text
-            x="465"
-            y="170"
-            fill="#2d5a27"
-            fontSize="11"
-            fontFamily="Playfair Display"
-            fontStyle="italic"
-            fontWeight="bold"
-          >
-            Fragas do Eume
-          </text>
-
-          {/* Rivers: Miño and Sil */}
-          {/* Sil joining Miño */}
-          <path
-            d="M 850,440 Q 720,450 630,480 Q 520,520 400,560 Q 300,620 240,670"
-            fill="none"
-            stroke="#457b9d"
-            strokeWidth="3.5"
-            strokeLinecap="round"
-          />
-          <text
-            x="580"
-            y="470"
-            fill="#1d3557"
-            fontSize="11"
-            fontFamily="Playfair Display"
-            fontStyle="italic"
-            fontWeight="600"
-          >
-            Canón do Sil & Miño
-          </text>
-
-          {/* River Ulla towards Ría de Arousa */}
-          <path
-            d="M 520,380 Q 420,390 320,430 Q 240,460 200,470"
-            fill="none"
-            stroke="#457b9d"
-            strokeWidth="2"
-            strokeLinecap="round"
-          />
-
-          {/* Ocean Labels */}
-          <text
-            x="60"
-            y="220"
-            fill="#5b7f95"
-            fontSize="15"
-            fontFamily="Playfair Display"
-            fontStyle="italic"
-            fontWeight="600"
-            letterSpacing="5"
-          >
-            OCÉANO ATLÁNTICO
-          </text>
-          <text
-            x="580"
-            y="50"
-            fill="#5b7f95"
-            fontSize="13"
-            fontFamily="Playfair Display"
-            fontStyle="italic"
-            fontWeight="600"
-            letterSpacing="3"
-          >
-            MAR CANTÁBRICO
-          </text>
-
-          {/* The 4 Provinces Subtle Labels */}
-          <text
-            x="360"
-            y="250"
-            fill="#7b997e"
-            fontSize="18"
-            fontFamily="Playfair Display"
-            fontWeight="bold"
-            letterSpacing="4"
-            opacity="0.5"
-          >
-            A CORUÑA
-          </text>
-          <text
-            x="650"
-            y="260"
-            fill="#7b997e"
-            fontSize="18"
-            fontFamily="Playfair Display"
-            fontWeight="bold"
-            letterSpacing="4"
-            opacity="0.5"
-          >
-            LUGO
-          </text>
-          <text
-            x="300"
-            y="560"
-            fill="#7b997e"
-            fontSize="18"
-            fontFamily="Playfair Display"
-            fontWeight="bold"
-            letterSpacing="4"
-            opacity="0.5"
-          >
-            PONTEVEDRA
-          </text>
-          <text
-            x="620"
-            y="570"
-            fill="#7b997e"
-            fontSize="18"
-            fontFamily="Playfair Display"
-            fontWeight="bold"
-            letterSpacing="4"
-            opacity="0.5"
-          >
-            OURENSE
-          </text>
-        </svg>
-
-        {/* Interactive Waypoint Pins Overlay across all Galicia */}
-        {activeRoutes.map(route => {
-          const routeColor = getRouteColor(route.id);
-          return route.stops.map(stop => {
-            const isSelected = selectedStop?.stop.id === stop.id;
-            return (
-              <button
-                key={stop.id}
-                onClick={() => setSelectedStop({ stop, route })}
-                style={{
-                  left: `${stop.coordinates.x}%`,
-                  top: `${stop.coordinates.y}%`,
-                }}
-                className={`absolute -translate-x-1/2 -translate-y-1/2 transition-all duration-300 z-20 group cursor-pointer ${
-                  isSelected ? 'scale-125 z-30' : 'hover:scale-110'
-                }`}
-                title={`${route.title}: ${stop.title}`}
-              >
-                <div
-                  className={`relative flex items-center justify-center rounded-full shadow-md border-2 ${
-                    isSelected ? 'w-10 h-10 ring-4 ring-[#faba71]/70' : 'w-8 h-8'
-                  }`}
-                  style={{
-                    backgroundColor: routeColor,
-                    borderColor: '#ffffff',
-                    color: '#ffffff',
-                  }}
-                >
-                  <span className="font-serif text-[12px] font-bold">
-                    {stop.order}
-                  </span>
-                  {isSelected && (
-                    <span className="absolute -top-1 -right-1 w-3 h-3 bg-[#faba71] rounded-full animate-ping" />
-                  )}
-                </div>
-
-                {/* Micro tooltip */}
-                <div className="absolute top-full left-1/2 -translate-x-1/2 mt-1 px-2 py-0.5 rounded bg-black/80 backdrop-blur-xs text-white text-[10px] font-sans whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-40">
-                  {stop.title}
-                </div>
-              </button>
-            );
+      <div
+        ref={mapRef}
+        className="relative flex-1 w-full min-h-[420px] bg-[#e8eee8] overflow-hidden select-none cursor-grab active:cursor-grabbing"
+        role="region"
+        aria-label="Mapa de rutas de Galicia"
+        style={{ touchAction: 'none' }}
+        onPointerDown={event => {
+          if (event.button !== 0) return;
+          if (event.target instanceof Element && event.target.closest('button, a')) return;
+          dragStart.current = {
+            pointerId: event.pointerId,
+            x: event.clientX,
+            y: event.clientY,
+            panX: pan.x,
+            panY: pan.y,
+          };
+          event.currentTarget.setPointerCapture(event.pointerId);
+        }}
+        onPointerMove={event => {
+          const start = dragStart.current;
+          if (!start || start.pointerId !== event.pointerId) return;
+          setPan({
+            x: start.panX + event.clientX - start.x,
+            y: start.panY + event.clientY - start.y,
           });
+        }}
+        onPointerUp={event => {
+          if (dragStart.current?.pointerId === event.pointerId) {
+            dragStart.current = null;
+          }
+        }}
+        onPointerCancel={() => {
+          dragStart.current = null;
+        }}
+      >
+        {mapTiles.map(tile => (
+          <img
+            key={`${zoom}-${tile.x}-${tile.y}`}
+            src={`https://tile.openstreetmap.org/${zoom}/${tile.x}/${tile.y}.png`}
+            alt=""
+            draggable={false}
+            className="absolute max-w-none"
+            style={{ left: tile.left, top: tile.top, width: 256, height: 256 }}
+          />
+        ))}
+
+        {mapSize.width > 0 && mapSize.height > 0 && (
+          <svg
+            className="absolute inset-0 w-full h-full pointer-events-none"
+            viewBox={`0 0 ${mapSize.width} ${mapSize.height}`}
+            preserveAspectRatio="none"
+            aria-hidden="true"
+          >
+            {activeRoutes.map(route => {
+              const routeStops = route.stops.filter(
+                stop =>
+                  Number.isFinite(stop.coordinates.lat) &&
+                  Number.isFinite(stop.coordinates.lng),
+              );
+              if (routeStops.length < 2) return null;
+
+              const points = routeStops
+                .map(stop => {
+                  const point = toMapPosition(
+                    stop.coordinates.lat,
+                    stop.coordinates.lng,
+                  );
+                  return `${point.x},${point.y}`;
+                })
+                .join(' ');
+
+              return (
+                <polyline
+                  key={route.id}
+                  points={points}
+                  fill="none"
+                  stroke={getRouteColor(route.id)}
+                  strokeWidth="4"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeOpacity="0.85"
+                  vectorEffect="non-scaling-stroke"
+                />
+              );
+            })}
+          </svg>
+        )}
+
+        {visibleStops.map(({ stop, route }) => {
+          const isSelected = selectedStop?.stop.id === stop.id;
+          const point = toMapPosition(stop.coordinates.lat, stop.coordinates.lng);
+          return (
+            <button
+              key={`${route.id}-${stop.id}`}
+              onClick={() => setSelectedStop({ stop, route })}
+              style={{
+                left: point.x,
+                top: point.y,
+                backgroundColor: getRouteColor(route.id),
+              }}
+              className={`absolute -translate-x-1/2 -translate-y-1/2 flex items-center justify-center rounded-full border-2 border-white text-white shadow-md transition-transform z-20 cursor-pointer ${
+                isSelected
+                  ? 'w-10 h-10 ring-4 ring-[#faba71]/70 scale-110'
+                  : 'w-8 h-8 hover:scale-110'
+              }`}
+              title={`${route.title}: ${stop.title}`}
+              aria-label={`${route.title}, parada ${stop.order}: ${stop.title}`}
+            >
+              <span className="font-serif text-[12px] font-bold">{stop.order}</span>
+            </button>
+          );
         })}
 
-        {/* GPS user position pulse (Santiago / Center of Galicia) */}
-        {gpsLocked && (
-          <div
-            className="absolute left-[41%] top-[46%] -translate-x-1/2 -translate-y-1/2 z-20 pointer-events-none"
-            title="Posición calibrada en Galicia"
-          >
-            <div className="w-5 h-5 bg-emerald-600 rounded-full border-2 border-white shadow-md flex items-center justify-center">
-              <div className="w-2 h-2 bg-white rounded-full" />
-            </div>
-            <div className="absolute inset-0 w-5 h-5 rounded-full bg-emerald-400 animate-ping opacity-75" />
+        {visibleStops.length === 0 && (
+          <div className="absolute inset-0 flex items-center justify-center p-6 pointer-events-none">
+            <p className="rounded-xl bg-white/95 px-4 py-3 text-center text-sm text-[#434843] shadow-md">
+              Esta ruta todavía no tiene paradas con coordenadas.
+            </p>
           </div>
         )}
 
-        {/* Map Legend Overlay for All Galicia */}
-        <div className="absolute bottom-4 left-4 z-10 bg-white/95 backdrop-blur-md rounded-xl p-3 border border-[#1b3022]/10 shadow-md max-w-xs text-[11px] font-sans">
-          <div className="flex items-center gap-1.5 font-semibold text-[#061b0e] mb-1.5">
+        <div className="absolute bottom-4 left-4 z-10 max-w-[min(24rem,calc(100%-2rem))] rounded-xl border border-[#1b3022]/10 bg-white/95 p-3 shadow-md">
+          <div className="mb-1.5 flex items-center gap-1.5 font-sans text-[11px] font-semibold text-[#061b0e]">
             <Layers className="w-3.5 h-3.5 text-[#47654e]" />
-            <span>Rutas en Toda Galicia</span>
+            <span>Paradas de las rutas visibles</span>
           </div>
-          <div className="grid grid-cols-2 gap-x-2 gap-y-1 text-[#434843]">
-            <div className="flex items-center gap-1.5">
-              <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: '#8b263e' }} />
-              <span className="truncate">Ribeira Sacra</span>
+          {visibleStops.length > 0 ? (
+            <div className="flex max-h-16 flex-wrap gap-x-3 gap-y-1 overflow-y-auto text-[11px] text-[#434843]">
+              {activeRoutes
+                .filter(route =>
+                  route.stops.some(
+                    stop =>
+                      Number.isFinite(stop.coordinates.lat) &&
+                      Number.isFinite(stop.coordinates.lng),
+                  ),
+                )
+                .map(route => (
+                  <div key={route.id} className="flex items-center gap-1.5">
+                    <span
+                      className="h-2.5 w-2.5 shrink-0 rounded-full"
+                      style={{ backgroundColor: getRouteColor(route.id) }}
+                    />
+                    <span className="max-w-36 truncate">{route.title}</span>
+                  </div>
+                ))}
             </div>
-            <div className="flex items-center gap-1.5">
-              <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: '#1b4965' }} />
-              <span className="truncate">Costa da Morte</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: '#2d5a27' }} />
-              <span className="truncate">Fragas do Eume</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: '#4a5759' }} />
-              <span className="truncate">Serra do Courel</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: '#d4a373' }} />
-              <span className="truncate">Santiago</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: '#0077b6' }} />
-              <span className="truncate">Rías Baixas</span>
-            </div>
-          </div>
+          ) : (
+            <span className="text-[11px] text-[#737973]">Sin puntos para mostrar</span>
+          )}
         </div>
+
+        <a
+          href="https://www.openstreetmap.org/copyright"
+          target="_blank"
+          rel="noreferrer"
+          className="absolute bottom-1 right-1 z-10 rounded bg-white/90 px-1.5 py-0.5 font-sans text-[10px] text-[#434843] shadow-sm"
+        >
+          © OpenStreetMap
+        </a>
       </div>
 
       {/* Selected Stop Drawer Sheet */}

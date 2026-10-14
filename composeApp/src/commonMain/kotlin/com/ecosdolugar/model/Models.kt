@@ -63,6 +63,7 @@ data class RouteStop(
     val historicalNote: String,
     val enigma: FieldEnigma,
     val trial: StopTrial? = null,
+    val challengeId: String? = null,
     val audioDuration: String,
     val audioNarration: String? = null,
     val latitude: Double,
@@ -116,7 +117,8 @@ data class RouteItem(
         bio = "Especialistas na memoria oral, arquivos transfronteirizos e camiños clandestinos."
     ),
     val overviewFeatures: List<OverviewFeature>,
-    val stops: List<RouteStop>
+    val stops: List<RouteStop>,
+    val status: String = "publicada"
 )
 
 data class FieldNote(

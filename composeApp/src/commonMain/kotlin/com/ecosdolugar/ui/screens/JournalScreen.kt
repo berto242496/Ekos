@@ -27,7 +27,8 @@ import com.ecosdolugar.ui.theme.*
 fun JournalScreen(
     userProfile: UserProfile,
     onBack: () -> Unit,
-    onOpenRoute: (String) -> Unit
+    onOpenRoute: (String) -> Unit,
+    onSignOut: () -> Unit
 ) {
     val character = remember(userProfile.characterId) {
         CharactersRepository.getById(userProfile.characterId)
@@ -92,6 +93,17 @@ fun JournalScreen(
                                 color = SurfaceContainerHighest
                             )
                         }
+                    }
+                }
+            }
+
+            if (userProfile.isGoogleAuthenticated) {
+                item {
+                    OutlinedButton(
+                        onClick = onSignOut,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Cerrar sesión")
                     }
                 }
             }

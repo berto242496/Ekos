@@ -68,6 +68,7 @@ export interface RouteStop {
     hint: string;
     answer: string;
   };
+  challengeId?: string;
   trial?: StopTrial;
   audioDuration: string;
   ambientSoundName?: string;
@@ -120,7 +121,7 @@ export interface RouteItem {
   price: string;
   isFree?: boolean;
   guide: GuideAuthor;
-  status?: 'publicada' | 'borrador';
+  status?: 'publicada' | 'pendiente' | 'borrador';
   defaultVoiceId?: VoicePersonaId;
   defaultAudioMode?: 'tts' | 'recorded' | 'written';
   viewsCount?: number;

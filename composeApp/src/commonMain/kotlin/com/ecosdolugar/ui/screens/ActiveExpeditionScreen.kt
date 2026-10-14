@@ -37,7 +37,7 @@ fun ActiveExpeditionScreen(
     userProfile: UserProfile,
     onBack: () -> Unit,
     onCheckInStop: (String) -> Unit,
-    onSolveEnigma: (String) -> Unit,
+    onSolveEnigma: (String, Int) -> Unit,
     onAddNote: (RouteStop) -> Unit,
     onCompleteRoute: (String) -> Unit
 ) {
@@ -45,6 +45,7 @@ fun ActiveExpeditionScreen(
     var isPlayingAudio by remember { mutableStateOf(false) }
     var isDonActive by remember { mutableStateOf(false) }
     var selectedOptionIndex by remember { mutableStateOf<Int?>(null) }
+    var attempts by remember(currentStopIndex) { mutableIntStateOf(0) }
     var showExplanation by remember { mutableStateOf(false) }
     var isAnswerCorrect by remember { mutableStateOf(false) }
 
@@ -441,11 +442,12 @@ fun ActiveExpeditionScreen(
                                 onClick = {
                                     if (!isSolved) {
                                         selectedOptionIndex = optIndex
+                                        attempts += 1
                                         val correct = optIndex == trial.correctOptionIndex
                                         isAnswerCorrect = correct
                                         showExplanation = true
                                         if (correct) {
-                                            onSolveEnigma(currentStop.id)
+                                            onSolveEnigma(currentStop.id, attempts)
                                         }
                                     }
                                 },
@@ -505,7 +507,10 @@ fun ActiveExpeditionScreen(
 
                         if (!isSolved) {
                             Button(
-                                onClick = { onSolveEnigma(currentStop.id) },
+                                onClick = {
+                                    attempts += 1
+                                    onSolveEnigma(currentStop.id, attempts)
+                                },
                                 modifier = Modifier.fillMaxWidth(),
                                 colors = ButtonDefaults.buttonColors(containerColor = TerracottaGold, contentColor = PineDeep)
                             ) {

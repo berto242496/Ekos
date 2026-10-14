@@ -754,7 +754,7 @@ export const GuideCreateRouteScreen: React.FC<GuideCreateRouteScreenProps> = ({
   };
 
   // Compile full RouteItem
-  const assembleRoute = (status: 'publicada' | 'borrador'): RouteItem => {
+  const assembleRoute = (status: 'pendiente' | 'borrador'): RouteItem => {
     const generatedId = `route-${Date.now()}`;
     return {
       id: generatedId,
@@ -830,7 +830,7 @@ export const GuideCreateRouteScreen: React.FC<GuideCreateRouteScreenProps> = ({
 
   const handlePublish = () => {
     if (!validate()) return;
-    const item = assembleRoute('publicada');
+    const item = assembleRoute('pendiente');
     soundEngine.stopSpeech();
     onPublishRoute(item);
   };

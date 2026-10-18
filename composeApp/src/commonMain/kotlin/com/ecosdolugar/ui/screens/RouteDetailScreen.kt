@@ -2,6 +2,7 @@ package com.ecosdolugar.ui.screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
@@ -13,14 +14,25 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.ecosdolugar.model.OverviewFeature
+import com.ecosdolugar.data.formatRating
+import com.ecosdolugar.model.Category
+import com.ecosdolugar.model.GuideAuthor
 import com.ecosdolugar.model.RouteItem
+import com.ecosdolugar.platform.rememberShareText
+import com.ecosdolugar.ui.components.GuideAvatar
 import com.ecosdolugar.ui.components.RouteCoverImage
 import com.ecosdolugar.ui.theme.*
+
+// Public web address used to build shareable route links.
+private const val APP_SHARE_BASE_URL = "https://ekosdolugar.com"
+
+private fun routeShareMessage(route: RouteItem): String =
+    "${route.title}\n$APP_SHARE_BASE_URL/?ruta=${route.id}"
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -31,8 +43,10 @@ fun RouteDetailScreen(
     onToggleSaved: (String) -> Unit,
     onOpenMap: () -> Unit,
     onStartRoute: (RouteItem) -> Unit,
-    onOpenProfile: () -> Unit
+    onOpenProfile: () -> Unit,
+    onOpenGuideProfile: (GuideAuthor) -> Unit = {}
 ) {
+    val shareText = rememberShareText()
     Scaffold(
         topBar = {
             TopAppBar(
@@ -99,13 +113,19 @@ fun RouteDetailScreen(
                     ) {
                         Icon(Icons.Default.Map, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(6.dp))
-                        Text("Ver mapa", fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                        Text(
+                            "Ver mapa",
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                            softWrap = false
+                        )
                     }
 
                     Button(
                         onClick = { onStartRoute(route) },
                         modifier = Modifier
-                            .weight(1.3f)
+                            .weight(1f)
                             .height(48.dp),
                         shape = RoundedCornerShape(14.dp),
                         colors = ButtonDefaults.buttonColors(
@@ -113,9 +133,15 @@ fun RouteDetailScreen(
                             contentColor = Color.White
                         )
                     ) {
-                        Text("Empezar ruta", fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                        Text(
+                            "Empezar ruta",
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                            softWrap = false
+                        )
                         Spacer(Modifier.width(6.dp))
-                        Icon(Icons.Default.ArrowForward, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Icon(Icons.Default.ArrowForward, contentDescription = null, modifier = Modifier.size(22.dp))
                     }
                 }
             }
@@ -143,53 +169,66 @@ fun RouteDetailScreen(
                             url = route.imageUrl,
                             modifier = Modifier.fillMaxSize()
                         )
-                        // Badge Top Left
-                        Surface(
-                            shape = CircleShape,
-                            color = PineDeep.copy(alpha = 0.85f),
+                        // Actions Top Right
+                        Row(
                             modifier = Modifier
                                 .padding(14.dp)
-                                .align(Alignment.TopStart)
+                                .align(Alignment.TopEnd),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
-                            Text(
-                                text = "Ruta Fronteriza Histórica",
-                                color = TerracottaFixedDim,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 5.dp)
-                            )
+                            Surface(
+                                onClick = { onToggleSaved(route.id) },
+                                shape = CircleShape,
+                                color = Color.Black.copy(alpha = 0.4f),
+                                modifier = Modifier.size(40.dp)
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Icon(
+                                        imageVector = if (isSaved) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
+                                        contentDescription = "Guardar ruta",
+                                        tint = if (isSaved) TerracottaGold else Color.White,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                            }
+                            Surface(
+                                onClick = { shareText(routeShareMessage(route)) },
+                                shape = CircleShape,
+                                color = Color.Black.copy(alpha = 0.4f),
+                                modifier = Modifier.size(40.dp)
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Icon(
+                                        imageVector = Icons.Default.Share,
+                                        contentDescription = "Compartir ruta",
+                                        tint = Color.White,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                            }
                         }
 
-                        // Bookmark Action Top Right
-                        IconButton(
-                            onClick = { onToggleSaved(route.id) },
-                            modifier = Modifier
-                                .padding(14.dp)
-                                .align(Alignment.TopEnd)
-                                .size(38.dp)
-                                .background(Color.Black.copy(alpha = 0.4f), CircleShape)
-                        ) {
-                            Icon(
-                                imageVector = if (isSaved) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
-                                contentDescription = null,
-                                tint = if (isSaved) TerracottaGold else Color.White
-                            )
-                        }
-
-                        // Tomo reference badge bottom
-                        Surface(
-                            shape = RoundedCornerShape(8.dp),
-                            color = Color.Black.copy(alpha = 0.6f),
+                        // Route type tags (multi-select categories)
+                        Row(
                             modifier = Modifier
                                 .align(Alignment.BottomStart)
-                                .padding(14.dp)
+                                .padding(14.dp),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
-                            Text(
-                                text = route.tomoRef,
-                                color = Color.White,
-                                fontSize = 11.sp,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                            )
+                            route.categories.filter { it != Category.ALL }.forEach { category ->
+                                Surface(
+                                    shape = RoundedCornerShape(8.dp),
+                                    color = PineDeep.copy(alpha = 0.85f)
+                                ) {
+                                    Text(
+                                        text = category.displayName,
+                                        color = Color.White,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                    )
+                                }
+                            }
                         }
                     }
                 }
@@ -222,7 +261,24 @@ fun RouteDetailScreen(
                 }
             }
 
-            // Bento Grid Metrics (Duration, Distance, Stops, Difficulty)
+            // Route rating from user reviews
+            item {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Icon(Icons.Default.Star, contentDescription = null, tint = TerracottaGold, modifier = Modifier.size(18.dp))
+                    Text(
+                        text = if (route.reviewsCount > 0) {
+                            "${formatRating(route.rating)} · ${route.reviewsCount} valoraciones"
+                        } else {
+                            "Sin valoraciones todavía"
+                        },
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = OnSurfaceDark
+                    )
+                }
+            }
+
+            // Metrics Grid (icon + value, as in the web)
             item {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Row(
@@ -230,15 +286,13 @@ fun RouteDetailScreen(
                         horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
                         MetricCard(
-                            title = "DURACIÓN ESTIMADA",
+                            icon = Icons.Default.Schedule,
                             value = route.duration,
-                            subtitle = "A pie y descansos",
                             modifier = Modifier.weight(1f)
                         )
                         MetricCard(
-                            title = "DISTANCIA",
+                            icon = Icons.Default.Straighten,
                             value = route.distance,
-                            subtitle = "Trazado circular",
                             modifier = Modifier.weight(1f)
                         )
                     }
@@ -248,122 +302,104 @@ fun RouteDetailScreen(
                         horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
                         MetricCard(
-                            title = "PARADAS CLAVE",
-                            value = "${route.stopsCount} puntos",
-                            subtitle = "Con audio y enigmas",
+                            icon = Icons.Default.Explore,
+                            value = "${route.stopsCount} paradas",
                             modifier = Modifier.weight(1f)
                         )
                         MetricCard(
-                            title = "DIFICULTAD",
+                            icon = Icons.Default.DirectionsWalk,
                             value = route.difficulty.label,
-                            subtitle = "Apta para paseantes",
                             modifier = Modifier.weight(1f)
                         )
                     }
                 }
             }
 
-            // Cartographic Preview Strip
+            // Guide card (route author)
             item {
                 Surface(
                     shape = RoundedCornerShape(16.dp),
                     color = Color.White,
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { onOpenGuideProfile(route.guide) },
                     shadowElevation = 1.dp
                 ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(14.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
+                        Text(
+                            text = "GUÍA DE LA RUTA",
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                color = PineMoss,
+                                fontWeight = FontWeight.Bold,
+                                letterSpacing = 1.2.sp
+                            )
+                        )
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            horizontalArrangement = Arrangement.spacedBy(14.dp)
                         ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(40.dp)
-                                    .background(MossContainer, RoundedCornerShape(10.dp)),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(Icons.Default.Navigation, contentDescription = null, tint = PineDeep)
-                            }
-                            Column {
+                            GuideAvatar(name = route.guide.name, avatarUrl = route.guide.avatarUrl, size = 52.dp)
+                            Column(modifier = Modifier.weight(1f)) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text(
+                                        text = route.guide.name,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 16.sp,
+                                        color = OnSurfaceDark,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                        modifier = Modifier.weight(1f, fill = false)
+                                    )
+                                    if (route.guide.verified) {
+                                        Spacer(Modifier.width(6.dp))
+                                        Icon(
+                                            imageVector = Icons.Default.Verified,
+                                            contentDescription = "Guía verificado",
+                                            tint = TerracottaGold,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                    }
+                                }
                                 Text(
-                                    text = "Trazado cartográfico",
-                                    fontSize = 13.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = OnSurfaceDark
+                                    text = route.guide.title,
+                                    fontSize = 12.sp,
+                                    color = PineMoss,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
                                 )
-                                Text(
-                                    text = route.subtitle,
-                                    fontSize = 11.sp,
-                                    color = OnSurfaceVariant
-                                )
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Star,
+                                        contentDescription = null,
+                                        tint = TerracottaGold,
+                                        modifier = Modifier.size(14.dp)
+                                    )
+                                    Text(
+                                        text = if (route.guide.reviewsCount > 0) formatRating(route.guide.rating) else "Sin valoraciones",
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = OnSurfaceDark
+                                    )
+                                    if (route.guide.reviewsCount > 0) {
+                                        Text(
+                                            text = "(${route.guide.reviewsCount} reseñas)",
+                                            fontSize = 12.sp,
+                                            color = OnSurfaceVariant
+                                        )
+                                    }
+                                }
                             }
                         }
-
-                        TextButton(onClick = onOpenMap) {
-                            Text("Ver mapa", color = PineMoss, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                        }
-                    }
-                }
-            }
-
-            // "Qué descubrirás" Editorial Section
-            item {
-                Text(
-                    text = "Qué descubrirás",
-                    style = MaterialTheme.typography.headlineSmall.copy(
-                        fontStyle = FontStyle.Italic,
-                        color = OnSurfaceDark
-                    )
-                )
-            }
-
-            items(route.overviewFeatures.size) { index ->
-                val feature = route.overviewFeatures[index]
-                Surface(
-                    shape = RoundedCornerShape(16.dp),
-                    color = Color.White,
-                    modifier = Modifier.fillMaxWidth(),
-                    shadowElevation = 1.dp
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(14.dp),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        verticalAlignment = Alignment.Top
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(36.dp)
-                                .background(SurfaceContainerHigh, CircleShape),
-                            contentAlignment = Alignment.Center
-                        ) {
+                        if (route.guide.bio.isNotBlank()) {
+                            HorizontalDivider(color = PineContainer.copy(alpha = 0.1f))
                             Text(
-                                text = "${index + 1}",
-                                fontWeight = FontWeight.Bold,
-                                color = PineDeep,
-                                fontSize = 13.sp
-                            )
-                        }
-
-                        Column(
-                            modifier = Modifier.weight(1f),
-                            verticalArrangement = Arrangement.spacedBy(2.dp)
-                        ) {
-                            Text(
-                                text = feature.title,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 14.sp,
-                                color = OnSurfaceDark
-                            )
-                            Text(
-                                text = feature.description,
+                                text = route.guide.bio,
                                 fontSize = 13.sp,
                                 color = OnSurfaceVariant,
                                 lineHeight = 18.sp
@@ -382,9 +418,8 @@ fun RouteDetailScreen(
 
 @Composable
 fun MetricCard(
-    title: String,
+    icon: ImageVector,
     value: String,
-    subtitle: String,
     modifier: Modifier = Modifier
 ) {
     Surface(
@@ -393,28 +428,29 @@ fun MetricCard(
         modifier = modifier,
         shadowElevation = 1.dp
     ) {
-        Column(
+        Row(
             modifier = Modifier.padding(14.dp),
-            verticalArrangement = Arrangement.spacedBy(2.dp)
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            Text(
-                text = title,
-                fontSize = 10.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = PineMoss,
-                letterSpacing = 0.8.sp
-            )
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .background(MossContainer, RoundedCornerShape(10.dp)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(icon, contentDescription = null, tint = PineDeep, modifier = Modifier.size(20.dp))
+            }
             Text(
                 text = value,
-                fontSize = 18.sp,
+                fontSize = 15.sp,
                 fontWeight = FontWeight.Bold,
-                color = OnSurfaceDark
-            )
-            Text(
-                text = subtitle,
-                fontSize = 11.sp,
-                color = OutlineGrey
+                color = OnSurfaceDark,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f)
             )
         }
     }
 }
+

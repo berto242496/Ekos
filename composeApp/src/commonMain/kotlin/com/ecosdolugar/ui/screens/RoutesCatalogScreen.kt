@@ -48,9 +48,8 @@ fun RoutesCatalogScreen(
     onOpenGuideMode: () -> Unit = {}
 ) {
     var searchQuery by remember { mutableStateOf("") }
-    var selectedCategory by remember { mutableStateOf(Category.ALL) }
+    var selectedCategories by remember { mutableStateOf(emptySet<Category>()) }
     var onlySaved by remember { mutableStateOf(false) }
-    var isAmbientPlaying by remember { mutableStateOf(false) }
     val strings = routeCatalogStrings(language)
 
     val activeCharacter = remember(userProfile.characterId) {
@@ -58,9 +57,9 @@ fun RoutesCatalogScreen(
     }
     val charColor = Color(activeCharacter.accentColorHex)
 
-    val filteredRoutes = remember(searchQuery, selectedCategory, onlySaved, routes) {
+    val filteredRoutes = remember(searchQuery, selectedCategories, onlySaved, routes) {
         routes.filter { route ->
-            val matchesCategory = selectedCategory == Category.ALL || route.categories.contains(selectedCategory)
+            val matchesCategory = selectedCategories.isEmpty() || route.categories.any { it in selectedCategories }
             val matchesSearch = searchQuery.isBlank() ||
                 route.title.contains(searchQuery, ignoreCase = true) ||
                 route.location.contains(searchQuery, ignoreCase = true) ||
@@ -251,10 +250,10 @@ fun RoutesCatalogScreen(
                             )
                         )
 
-                        if (selectedCategory != Category.ALL || onlySaved || searchQuery.isNotBlank()) {
+                        if (selectedCategories.isNotEmpty() || onlySaved || searchQuery.isNotBlank()) {
                             TextButton(
                                 onClick = {
-                                    selectedCategory = Category.ALL
+                                    selectedCategories = emptySet()
                                     onlySaved = false
                                     searchQuery = ""
                                 }
@@ -301,10 +300,13 @@ fun RoutesCatalogScreen(
                 LazyRow(
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    items(Category.values()) { category ->
-                        val isSelected = selectedCategory == category
+                    items(Category.values().filter { it != Category.ALL }) { category ->
+                        val isSelected = category in selectedCategories
                         Surface(
-                            onClick = { selectedCategory = category },
+                            onClick = {
+                                selectedCategories = if (isSelected) selectedCategories - category
+                                else selectedCategories + category
+                            },
                             shape = RoundedCornerShape(20.dp),
                             color = if (isSelected) PineDeep else SurfaceContainerHigh,
                             border = ButtonDefaults.outlinedButtonBorder.copy(
@@ -319,52 +321,6 @@ fun RoutesCatalogScreen(
                                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                                 color = if (isSelected) Color.White else OnSurfaceVariant,
                                 modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp)
-                            )
-                        }
-                    }
-                }
-            }
-
-            // Soundscape Bar (Rías & Fragas)
-            item {
-                Surface(
-                    shape = RoundedCornerShape(16.dp),
-                    color = Color(0xFF132B1B),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(14.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(10.dp)
-                        ) {
-                            Icon(Icons.Default.Forest, contentDescription = null, tint = MossContainer, modifier = Modifier.size(24.dp))
-                            Column {
-                                Text(
-                                    text = strings.soundscapeTitle,
-                                    fontSize = 10.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = TerracottaFixedDim
-                                )
-                                Text(
-                                    text = if (isAmbientPlaying) strings.soundscapePlaying else strings.soundscapeEnable,
-                                    fontSize = 12.sp,
-                                    color = Color.White
-                                )
-                            }
-                        }
-
-                        IconButton(onClick = { isAmbientPlaying = !isAmbientPlaying }) {
-                            Icon(
-                                if (isAmbientPlaying) Icons.Default.PauseCircle else Icons.Default.PlayCircle,
-                                contentDescription = if (isAmbientPlaying) strings.soundscapePlaying else strings.soundscapeEnable,
-                                tint = TerracottaGold,
-                                modifier = Modifier.size(34.dp)
                             )
                         }
                     }

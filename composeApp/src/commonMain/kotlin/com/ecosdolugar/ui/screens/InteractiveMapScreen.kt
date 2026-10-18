@@ -1,5 +1,8 @@
 package com.ecosdolugar.ui.screens
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -7,9 +10,11 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -26,8 +31,10 @@ import com.ecosdolugar.localization.interactiveMapStrings
 import com.ecosdolugar.model.RouteItem
 import com.ecosdolugar.model.RouteStop
 import com.ecosdolugar.platform.PlatformBackHandler
+import com.ecosdolugar.ui.components.RouteCoverImage
 import com.ecosdolugar.ui.components.RouteMapView
 import com.ecosdolugar.ui.theme.*
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.atan2
 import kotlin.math.abs
@@ -43,6 +50,7 @@ fun InteractiveMapScreen(
     initialRouteId: String? = null,
     expeditionMode: Boolean = false,
     solvedStopIds: Set<String> = emptySet(),
+    triggeredStopIds: Set<String> = emptySet(),
     onBack: () -> Unit,
     onSelectRoute: (RouteItem) -> Unit,
     onStopReached: ((RouteStop) -> Unit)? = null,
@@ -56,9 +64,17 @@ fun InteractiveMapScreen(
     val selectedRoute = routes.firstOrNull { it.id == activeRouteId }
     val routeIds = routes.map { it.id }
     var userLocation by remember(activeRouteId) { mutableStateOf<Pair<Double, Double>?>(null) }
-    val triggeredStops = remember(activeRouteId) { mutableSetOf<String>() }
+    var showApproachBanner by remember { mutableStateOf(false) }
 
     PlatformBackHandler(onBack = onBack)
+
+    LaunchedEffect(expeditionMode) {
+        if (expeditionMode) {
+            showApproachBanner = true
+            delay(4000)
+            showApproachBanner = false
+        }
+    }
 
     LaunchedEffect(listState, routeIds) {
         var previousCenteredRouteId: String? = null
@@ -113,8 +129,15 @@ fun InteractiveMapScreen(
                 if (!expeditionMode) focusRoute(routeId)
             },
             onStopSelected = { stopId ->
-                selectedStop = selectedRoute?.stops?.firstOrNull { it.id == stopId }
+                val stop = selectedRoute?.stops?.firstOrNull { it.id == stopId }
+                if (stop != null) {
+                    val location = userLocation
+                    val isNear = expeditionMode && location != null &&
+                        distanceMeters(location.first, location.second, stop.latitude, stop.longitude) <= 10.0
+                    if (isNear) onStopReached?.invoke(stop) else selectedStop = stop
+                }
             },
+            completedStopIds = solvedStopIds,
             modifier = Modifier.fillMaxSize(),
             onUserLocationChanged = if (expeditionMode) {
                 { latitude, longitude -> userLocation = latitude to longitude }
@@ -124,54 +147,56 @@ fun InteractiveMapScreen(
             language = language
         )
 
-        LaunchedEffect(expeditionMode, selectedRoute, userLocation, solvedStopIds) {
+        LaunchedEffect(expeditionMode, selectedRoute, userLocation, solvedStopIds, triggeredStopIds) {
             val location = userLocation ?: return@LaunchedEffect
             val route = selectedRoute ?: return@LaunchedEffect
             if (!expeditionMode || onStopReached == null) return@LaunchedEffect
             val reached = route.stops.firstOrNull { stop ->
                 stop.id !in solvedStopIds &&
-                    stop.id !in triggeredStops &&
+                    stop.id !in triggeredStopIds &&
                     distanceMeters(location.first, location.second, stop.latitude, stop.longitude) <= 10.0
             } ?: return@LaunchedEffect
-            triggeredStops.add(reached.id)
             onStopReached(reached)
         }
 
         if (expeditionMode) {
-            Surface(
+            IconButton(
+                onClick = onBack,
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(12.dp)
+                    .statusBarsPadding()
+                    .size(44.dp)
+                    .background(PineContainer.copy(alpha = 0.92f), CircleShape)
+            ) {
+                Icon(
+                    Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = strings.back,
+                    tint = Color.White
+                )
+            }
+
+            AnimatedVisibility(
+                visible = showApproachBanner,
+                enter = fadeIn(),
+                exit = fadeOut(),
                 modifier = Modifier
                     .align(Alignment.TopCenter)
-                    .fillMaxWidth()
-                    .padding(12.dp),
-                shape = RoundedCornerShape(14.dp),
-                color = PineContainer.copy(alpha = 0.96f),
-                shadowElevation = 6.dp
+                    .statusBarsPadding()
+                    .padding(top = 12.dp)
             ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                Surface(
+                    shape = RoundedCornerShape(14.dp),
+                    color = PineContainer.copy(alpha = 0.96f),
+                    shadowElevation = 6.dp
                 ) {
-                    TextButton(onClick = onBack, contentPadding = PaddingValues(4.dp)) {
-                        Text(strings.back, color = TerracottaFixedDim)
-                    }
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            selectedRoute?.title.orEmpty(),
-                            color = Color.White,
-                            fontWeight = FontWeight.Bold,
-                            maxLines = 1
-                        )
-                        Text(
-                            if (userLocation == null) {
-                                strings.waitingLocation
-                            } else {
-                                strings.locationReady
-                            },
-                            color = SurfaceContainerHighest,
-                            fontSize = 11.sp
-                        )
-                    }
+                    Text(
+                        strings.approachStop,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 14.sp
+                    )
                 }
             }
         }
@@ -224,20 +249,25 @@ fun InteractiveMapScreen(
                                     brush = androidx.compose.ui.graphics.SolidColor(TerracottaGold.copy(alpha = 0.55f))
                                 )
                             ) {
-                                Row(
-                                    modifier = Modifier
-                                        .clickable { focusRoute(route.id) }
-                                        .padding(start = 16.dp, top = 12.dp, bottom = 12.dp, end = 8.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                ) {
-                                    Column(
-                                        modifier = Modifier
-                                            .weight(1f)
-                                            .clip(RoundedCornerShape(8.dp))
-                                            .padding(vertical = 2.dp),
-                                        verticalArrangement = Arrangement.spacedBy(4.dp)
-                                    ) {
+                        Row(
+                            modifier = Modifier
+                                .clickable { focusRoute(route.id) }
+                                .padding(start = 0.dp, top = 0.dp, bottom = 0.dp, end = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            RouteCoverImage(
+                                url = route.imageUrl,
+                                modifier = Modifier
+                                    .size(96.dp)
+                                    .clip(RoundedCornerShape(topStart = 18.dp, bottomStart = 18.dp))
+                            )
+                            Column(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .padding(vertical = 12.dp),
+                                verticalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
                                         Text(
                                             route.title,
                                             color = textColor,
@@ -286,18 +316,7 @@ fun InteractiveMapScreen(
                         Text(stop.locationName, color = TerracottaFixedDim, fontSize = 13.sp)
                     }
                 },
-                text = {
-                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Text(stop.story)
-                        if (stop.historicalNote.isNotBlank()) {
-                            Text(
-                                stop.historicalNote,
-                                color = SurfaceContainerHighest,
-                                fontSize = 13.sp
-                            )
-                        }
-                    }
-                },
+                text = null,
                 confirmButton = {
                     TextButton(onClick = { selectedStop = null }) {
                         Text(strings.close)

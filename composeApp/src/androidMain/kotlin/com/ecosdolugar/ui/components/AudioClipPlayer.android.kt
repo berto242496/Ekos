@@ -30,6 +30,10 @@ private class AndroidAudioClipPlayer(private val context: Context) : AudioClipPl
 
     override fun play(dataUrl: String) {
         stop()
+        if (dataUrl.startsWith("http://") || dataUrl.startsWith("https://")) {
+            playRemote(dataUrl)
+            return
+        }
         val base64 = dataUrl.substringAfter("base64,", "")
         if (base64.isEmpty()) return
         val file = File(context.cacheDir, "playback-${UUID.randomUUID()}.m4a")
@@ -43,6 +47,27 @@ private class AndroidAudioClipPlayer(private val context: Context) : AudioClipPl
             player.start()
             mediaPlayer = player
             playing.value = true
+        } catch (error: Exception) {
+            player.release()
+            stop()
+        }
+    }
+
+    private fun playRemote(url: String) {
+        val player = MediaPlayer()
+        try {
+            player.setDataSource(url)
+            player.setOnPreparedListener {
+                it.start()
+                playing.value = true
+            }
+            player.setOnCompletionListener { stop() }
+            player.setOnErrorListener { _, _, _ ->
+                stop()
+                true
+            }
+            mediaPlayer = player
+            player.prepareAsync()
         } catch (error: Exception) {
             player.release()
             stop()

@@ -22,11 +22,18 @@ import com.ecosdolugar.auth.GoogleAuthService
 import com.ecosdolugar.data.CharactersRepository
 import com.ecosdolugar.data.RouteDataSource
 import com.ecosdolugar.data.RoutesRepository
+import com.ecosdolugar.data.enrichGuide
+import com.ecosdolugar.data.enrichRoutes
+import com.ecosdolugar.data.withRouteTitles
 import com.ecosdolugar.localization.appLanguageStrings
 import com.ecosdolugar.localization.rememberAppLanguageController
+import com.ecosdolugar.model.GuideAuthor
+import com.ecosdolugar.model.GuideProfileInfo
 import com.ecosdolugar.model.RouteItem
+import com.ecosdolugar.model.RouteReview
 import com.ecosdolugar.model.UserProfile
 import com.ecosdolugar.ui.screens.*
+import com.ecosdolugar.util.ProfanityFilter
 import com.ecosdolugar.ui.theme.EcosDoLugarTheme
 import com.ecosdolugar.ui.theme.PineDeep
 import com.ecosdolugar.ui.theme.SurfaceCream
@@ -37,10 +44,13 @@ enum class NavigationScreen {
     CHARACTER_SELECTION,
     CATALOG,
     DETAIL,
+    GUIDE_PROFILE,
     EXPEDITION,
     MAP,
     JOURNAL,
     DISPLAY_NAME,
+    GUIDE_WELCOME,
+    GUIDE_PROFILE_SETUP,
     GUIDE_DASHBOARD,
     ROUTE_EDITOR
 }
@@ -52,8 +62,11 @@ fun App(
 ) {
     EcosDoLugarTheme {
         var currentScreen by remember { mutableStateOf(NavigationScreen.RESTORING_SESSION) }
-        var routes by remember { mutableStateOf(RoutesRepository.routes) }
-        var selectedRoute by remember { mutableStateOf<RouteItem>(routes.first()) }
+        var routes by remember { mutableStateOf<List<RouteItem>>(emptyList()) }
+        var routeReviews by remember { mutableStateOf<List<RouteReview>>(emptyList()) }
+        var guideProfiles by remember { mutableStateOf<List<GuideProfileInfo>>(emptyList()) }
+        var selectedRoute by remember { mutableStateOf<RouteItem>(RoutesRepository.routes.first()) }
+        var selectedGuide by remember { mutableStateOf<GuideAuthor?>(null) }
         var mapRouteToFocus by remember { mutableStateOf<String?>(null) }
         var mapReturnScreen by remember { mutableStateOf(NavigationScreen.CATALOG) }
         var mapIsExpedition by remember { mutableStateOf(false) }
@@ -72,6 +85,8 @@ fun App(
         var googleSignInError by remember { mutableStateOf<String?>(null) }
         var guideSignInError by remember { mutableStateOf<String?>(null) }
         var dataError by remember { mutableStateOf<String?>(null) }
+        var isSavingRoute by remember { mutableStateOf(false) }
+        var triggeredStopIds by remember { mutableStateOf<Set<String>>(emptySet()) }
         val appLanguage = rememberAppLanguageController()
         val welcomeStrings = appLanguageStrings(appLanguage.current)
         val coroutineScope = rememberCoroutineScope()
@@ -139,20 +154,10 @@ fun App(
                             displayNameDraft = displayName
                             displayNameError = null
                             currentScreen = when {
-                                result.profileComplete -> if (
-                                    destination == NavigationScreen.GUIDE_DASHBOARD
-                                ) NavigationScreen.GUIDE_DASHBOARD else NavigationScreen.CATALOG
-                                result.displayNameSet && destination == NavigationScreen.GUIDE_DASHBOARD -> {
-                                    val characterId = result.characterId ?: userProfile.characterId
-                                    try {
-                                        googleAuthService.saveProfile(displayName, characterId)
-                                        userProfile = userProfile.copy(characterId = characterId)
-                                        NavigationScreen.GUIDE_DASHBOARD
-                                    } catch (error: Exception) {
-                                        dataError = error.message ?: "No se pudo guardar el perfil."
-                                        NavigationScreen.DISPLAY_NAME
-                                    }
-                                }
+                                destination == NavigationScreen.GUIDE_DASHBOARD -> if (
+                                    result.profileComplete
+                                ) NavigationScreen.GUIDE_DASHBOARD else NavigationScreen.GUIDE_WELCOME
+                                result.profileComplete -> NavigationScreen.CATALOG
                                 result.displayNameSet -> NavigationScreen.CHARACTER_SELECTION
                                 else -> NavigationScreen.DISPLAY_NAME
                             }
@@ -187,6 +192,7 @@ fun App(
                         characterId = result.characterId ?: userProfile.characterId
                     )
                     currentScreen = when {
+                        result.isGuideAccount && !result.profileComplete -> NavigationScreen.GUIDE_WELCOME
                         result.profileComplete -> NavigationScreen.CATALOG
                         result.displayNameSet -> NavigationScreen.CHARACTER_SELECTION
                         else -> NavigationScreen.DISPLAY_NAME
@@ -214,21 +220,38 @@ fun App(
                 val completedChallengeIds = accessToken
                     ?.let { routeDataSource.loadCompletedChallenges(it) }
                     .orEmpty()
+                val totalScore = accessToken
+                    ?.let { routeDataSource.loadTotalChallengeScore(it) }
+                    ?: 0
                 val completedStopIds = remoteRoutes
                     .flatMap { it.stops }
                     .filter { it.challengeId in completedChallengeIds }
                     .map { it.id }
-                val remoteIds = remoteRoutes.mapTo(mutableSetOf()) { it.id }
-                val localRoutes = RoutesRepository.routes.filterNot { it.id in remoteIds }
-                val mergedRoutes = remoteRoutes + localRoutes
-                routes = mergedRoutes
-                selectedRoute = remoteRoutes.firstOrNull { it.id == selectedRoute.id }
-                    ?: mergedRoutes.firstOrNull { it.id == selectedRoute.id }
-                    ?: remoteRoutes.firstOrNull()
-                    ?: mergedRoutes.first()
+                val reviews = runCatching { routeDataSource.loadRouteReviews(accessToken) }
+                    .getOrDefault(emptyList())
+                    .let { withRouteTitles(it, remoteRoutes) }
+                val profiles = accessToken
+                    ?.takeIf { it.isNotBlank() }
+                    ?.let { token ->
+                        runCatching {
+                            routeDataSource.loadGuideProfiles(
+                                remoteRoutes.map { it.guide.id } + listOfNotNull(userProfile.googleId),
+                                token
+                            )
+                        }.getOrDefault(emptyList())
+                    }
+                    .orEmpty()
+                val enrichedRoutes = enrichRoutes(remoteRoutes, reviews, profiles)
+                routes = enrichedRoutes
+                routeReviews = reviews
+                guideProfiles = profiles
+                selectedRoute = enrichedRoutes.firstOrNull { it.id == selectedRoute.id }
+                    ?: enrichedRoutes.firstOrNull()
+                    ?: selectedRoute
                 userProfile = userProfile.copy(
                     solvedEnigmaIds = userProfile.solvedEnigmaIds + completedStopIds,
-                    savedRouteIds = savedRouteIds ?: userProfile.savedRouteIds
+                    savedRouteIds = savedRouteIds ?: userProfile.savedRouteIds,
+                    totalScore = totalScore
                 )
             } catch (error: CancellationException) {
                 throw error
@@ -292,8 +315,8 @@ fun App(
                                 activeBottomTab = 2
                                 currentScreen = NavigationScreen.JOURNAL
                             },
-                            icon = { Icon(Icons.Default.AutoStories, contentDescription = "Cuaderno") },
-                            label = { Text("Cuaderno", fontSize = 11.sp) },
+                            icon = { Icon(Icons.Default.AutoStories, contentDescription = "Mi aventura") },
+                            label = { Text("Mi aventura", fontSize = 11.sp) },
                             colors = NavigationBarItemDefaults.colors(
                                 indicatorColor = PineDeep.copy(alpha = 0.12f),
                                 selectedIconColor = PineDeep,
@@ -329,8 +352,47 @@ fun App(
                                 signInError = googleSignInError,
                                 guideSignInError = guideSignInError,
                                 language = appLanguage.current,
+                                routes = routes,
                                 onOpenGuideMode = {
                                     beginGoogleSignIn(NavigationScreen.GUIDE_DASHBOARD)
+                                }
+                            )
+                        }
+                        NavigationScreen.GUIDE_WELCOME -> {
+                            GuideWelcomeScreen(
+                                onContinue = { currentScreen = NavigationScreen.GUIDE_PROFILE_SETUP },
+                                onBack = { currentScreen = NavigationScreen.WELCOME }
+                            )
+                        }
+                        NavigationScreen.GUIDE_PROFILE_SETUP -> {
+                            GuideProfileSetupScreen(
+                                initialName = displayNameDraft,
+                                isSaving = isSavingDisplayName,
+                                errorMessage = displayNameError,
+                                onBack = { currentScreen = NavigationScreen.GUIDE_WELCOME },
+                                onSave = { name, bio, photoDataUrl ->
+                                    val token = accessToken
+                                    val userId = userProfile.googleId
+                                    if (token.isNullOrBlank() || userId.isNullOrBlank()) {
+                                        displayNameError = "La sesión de Google ha caducado. Inicia sesión de nuevo."
+                                    } else if (!isSavingDisplayName) {
+                                        coroutineScope.launch {
+                                            isSavingDisplayName = true
+                                            displayNameError = null
+                                            try {
+                                                routeDataSource.saveGuideProfile(userId, name, bio, photoDataUrl, token)
+                                                googleAuthService.completeGuideProfile(name)
+                                                userProfile = userProfile.copy(name = name)
+                                                currentScreen = NavigationScreen.GUIDE_DASHBOARD
+                                            } catch (error: CancellationException) {
+                                                throw error
+                                            } catch (error: Exception) {
+                                                displayNameError = error.message ?: "No se pudo guardar tu perfil de guía."
+                                            } finally {
+                                                isSavingDisplayName = false
+                                            }
+                                        }
+                                    }
                                 }
                             )
                         }
@@ -345,6 +407,8 @@ fun App(
                                     val name = displayNameDraft.trim()
                                     if (name.isEmpty() || name.length > 60) {
                                         displayNameError = welcomeStrings.displayNameRequired
+                                    } else if (ProfanityFilter.containsProfanity(name)) {
+                                        displayNameError = ProfanityFilter.displayNameError(name)
                                     } else if (!isSavingDisplayName) {
                                         val token = accessToken
                                         val userId = userProfile.googleId
@@ -452,8 +516,28 @@ fun App(
                                 },
                                 onOpenProfile = {
                                     currentScreen = NavigationScreen.JOURNAL
+                                },
+                                onOpenGuideProfile = { guide ->
+                                    selectedGuide = guide
+                                    currentScreen = NavigationScreen.GUIDE_PROFILE
                                 }
                             )
+                        }
+                        NavigationScreen.GUIDE_PROFILE -> {
+                            selectedGuide?.let { guide ->
+                                GuideProfileScreen(
+                                    guide = guide,
+                                    allRoutes = routes,
+                                    reviews = routeReviews.filter { it.guideId == guide.id },
+                                    onBack = { currentScreen = NavigationScreen.DETAIL },
+                                    onSelectRoute = { routeId ->
+                                        routes.find { it.id == routeId }?.let { r ->
+                                            selectedRoute = r
+                                            currentScreen = NavigationScreen.DETAIL
+                                        }
+                                    }
+                                )
+                            } ?: run { currentScreen = NavigationScreen.DETAIL }
                         }
                         NavigationScreen.EXPEDITION -> {
                             ActiveExpeditionScreen(
@@ -466,23 +550,22 @@ fun App(
                                     mapIsExpedition = true
                                     currentScreen = NavigationScreen.MAP
                                 },
-                                onCheckInStop = { stopId ->
-                                    userProfile = userProfile.copy(
-                                        visitedStopIds = userProfile.visitedStopIds + stopId
-                                    )
-                                },
                                 onSolveEnigma = { stopId, attempts ->
+                                    val isNewlySolved = stopId !in userProfile.solvedEnigmaIds
                                     userProfile = userProfile.copy(
-                                        solvedEnigmaIds = userProfile.solvedEnigmaIds + stopId
+                                        solvedEnigmaIds = userProfile.solvedEnigmaIds + stopId,
+                                        totalScore = userProfile.totalScore + if (isNewlySolved) 100 else 0
                                     )
                                     val challengeId = selectedRoute.stops
                                         .firstOrNull { it.id == stopId }
                                         ?.challengeId
                                     val token = accessToken
-                                    if (challengeId != null && token != null) {
+                                    val userId = userProfile.googleId
+                                    if (challengeId != null && token != null && userId != null) {
                                         coroutineScope.launch {
                                             try {
                                                 routeDataSource.saveChallengeProgress(
+                                                    userId = userId,
                                                     challengeId = challengeId,
                                                     attempts = attempts,
                                                     score = 100,
@@ -498,14 +581,29 @@ fun App(
                                         }
                                     }
                                 },
-                                onAddNote = {
-                                    // Add to field notes
-                                },
-                                onCompleteRoute = { routeId ->
-                                    userProfile = userProfile.copy(
-                                        completedRouteIds = userProfile.completedRouteIds + routeId
-                                    )
-                                    currentScreen = NavigationScreen.JOURNAL
+                                onSubmitReview = { routeRating, guideRating, comment ->
+                                    val token = accessToken
+                                    val userId = userProfile.googleId
+                                    if (token != null && userId != null) {
+                                        coroutineScope.launch {
+                                            try {
+                                                routeDataSource.saveRouteReview(
+                                                    userId = userId,
+                                                    routeId = selectedRoute.id,
+                                                    guideId = selectedRoute.guide.id,
+                                                    routeRating = routeRating,
+                                                    guideRating = guideRating,
+                                                    comment = comment,
+                                                    accessToken = token
+                                                )
+                                            } catch (error: CancellationException) {
+                                                throw error
+                                            } catch (error: Exception) {
+                                                dataError = error.message
+                                                    ?: "No se pudo guardar la valoración."
+                                            }
+                                        }
+                                    }
                                 }
                             )
                         }
@@ -516,6 +614,7 @@ fun App(
                                 initialRouteId = mapRouteToFocus,
                                 expeditionMode = mapIsExpedition,
                                 solvedStopIds = userProfile.solvedEnigmaIds,
+                                triggeredStopIds = triggeredStopIds,
                                 onBack = {
                                     mapIsExpedition = false
                                     currentScreen = mapReturnScreen
@@ -526,6 +625,7 @@ fun App(
                                 },
                                 onStopReached = { stop ->
                                     activeExpeditionStopId = stop.id
+                                    triggeredStopIds = triggeredStopIds + stop.id
                                     userProfile = userProfile.copy(
                                         visitedStopIds = userProfile.visitedStopIds + stop.id
                                     )
@@ -537,6 +637,7 @@ fun App(
                             JournalScreen(
                                 userProfile = userProfile,
                                 routes = routes,
+                                myReviews = routeReviews.filter { it.userId == userProfile.googleId },
                                 language = appLanguage.current,
                                 languageTitle = welcomeStrings.languageTitle,
                                 onLanguageChange = appLanguage::select,
@@ -546,6 +647,29 @@ fun App(
                                     if (r != null) {
                                         selectedRoute = r
                                         currentScreen = NavigationScreen.DETAIL
+                                    }
+                                },
+                                onSaveDisplayName = { name ->
+                                    val validationError = ProfanityFilter.displayNameError(name)
+                                    val token = accessToken
+                                    val userId = userProfile.googleId
+                                    if (validationError != null) {
+                                        dataError = validationError
+                                    } else if (token.isNullOrBlank() || userId.isNullOrBlank()) {
+                                        dataError = "La sesión de Google ha caducado. Inicia sesión de nuevo."
+                                    } else {
+                                        coroutineScope.launch {
+                                            try {
+                                                routeDataSource.saveDisplayName(userId, name, token)
+                                                googleAuthService.saveDisplayName(name)
+                                                userProfile = userProfile.copy(name = name)
+                                            } catch (error: CancellationException) {
+                                                throw error
+                                            } catch (error: Exception) {
+                                                dataError = error.message
+                                                    ?: "No se pudo guardar el nombre en tu perfil."
+                                            }
+                                        }
                                     }
                                 },
                                 onSignOut = {
@@ -570,8 +694,25 @@ fun App(
                             )
                         }
                         NavigationScreen.GUIDE_DASHBOARD -> {
+                            val guideRoutes = routes.filter { it.guide.id == userProfile.googleId }
+                            val currentGuide = guideRoutes.firstOrNull()?.guide ?: enrichGuide(
+                                GuideAuthor(
+                                    id = userProfile.googleId ?: "",
+                                    name = userProfile.name,
+                                    title = "Guía",
+                                    bio = "",
+                                    rating = 0.0,
+                                    reviewsCount = 0,
+                                    location = ""
+                                ),
+                                routeReviews,
+                                guideProfiles
+                            )
                             GuideDashboardScreen(
-                                routes = routes.filter { it.guide.id == userProfile.googleId },
+                                guide = currentGuide,
+                                routes = guideRoutes,
+                                reviews = routeReviews.filter { it.guideId == userProfile.googleId },
+                                isSaving = isSavingRoute,
                                 onBack = { currentScreen = NavigationScreen.CATALOG },
                                 onCreateNewRoute = {
                                     if (accessToken == null) {
@@ -615,12 +756,14 @@ fun App(
                                 userProfile = userProfile,
                                 initialRoute = editingRoute,
                                 language = appLanguage.current,
+                                isSaving = isSavingRoute,
                                 onBack = { currentScreen = NavigationScreen.GUIDE_DASHBOARD },
                                 onSave = { route, status ->
                                     val token = accessToken
                                     if (token == null) {
                                         dataError = "La sesión ha caducado. Inicia sesión de nuevo."
                                     } else {
+                                        isSavingRoute = true
                                         coroutineScope.launch {
                                             try {
                                                 val savedRoute = routeDataSource.saveRoute(route, status, token)
@@ -635,6 +778,8 @@ fun App(
                                                 throw error
                                             } catch (error: Exception) {
                                                 dataError = error.message ?: "No se pudo guardar la ruta."
+                                            } finally {
+                                                isSavingRoute = false
                                             }
                                         }
                                     }

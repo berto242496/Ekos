@@ -18,5 +18,6 @@ expect fun RouteMapView(
     selectedCoordinates: Pair<Double, Double>? = null,
     pickerCoordinates: List<Pair<Double, Double>> = emptyList(),
     onUserLocationChanged: ((Double, Double) -> Unit)? = null,
+    completedStopIds: Set<String> = emptySet(),
     language: AppLanguage = AppLanguage.SPANISH
 )

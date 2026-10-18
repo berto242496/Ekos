@@ -106,7 +106,26 @@ data class GuideAuthor(
     val location: String = "Tui - Valença",
     val verified: Boolean = true,
     val routesCount: Int = 3,
-    val availableBalance: Double = 142.50
+    val availableBalance: Double = 142.50,
+    val avatarUrl: String? = null
+)
+
+data class RouteReview(
+    val routeId: String,
+    val routeTitle: String = "",
+    val guideId: String,
+    val userId: String,
+    val routeRating: Int,
+    val guideRating: Int,
+    val comment: String,
+    val createdAt: String
+)
+
+data class GuideProfileInfo(
+    val userId: String,
+    val displayName: String,
+    val bio: String,
+    val avatarUrl: String?
 )
 
 data class RouteItem(
@@ -135,7 +154,10 @@ data class RouteItem(
     ),
     val overviewFeatures: List<OverviewFeature>,
     val stops: List<RouteStop>,
-    val status: String = "publicada"
+    val status: String = "publicada",
+    val startedCount: Int = 0,
+    val rating: Double = 0.0,
+    val reviewsCount: Int = 0
 )
 
 data class FieldNote(
@@ -166,5 +188,14 @@ data class UserProfile(
     val visitedStopIds: Set<String> = setOf("stop-c1"),
     val solvedEnigmaIds: Set<String> = setOf("stop-c1"),
     val completedRouteIds: Set<String> = emptySet(),
-    val unlockedAchievementIds: Set<String> = setOf("primera_ruta", "espiritu_raiano")
+    val unlockedAchievementIds: Set<String> = setOf("primera_ruta", "espiritu_raiano"),
+    val totalScore: Int = 0
+)
+
+data class UserAchievementStatus(
+    val id: String,
+    val title: String,
+    val description: String,
+    val icon: String,
+    val isUnlocked: Boolean
 )

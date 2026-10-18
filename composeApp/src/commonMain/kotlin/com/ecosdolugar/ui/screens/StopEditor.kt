@@ -161,6 +161,29 @@ internal class StopFormState {
         missingWord = missingWord.trim()
     )
 
+    fun loadFrom(draft: StopDraft) {
+        title = draft.title
+        location = draft.location
+        story = draft.story
+        imageUrl = draft.imageUrl
+        audioMode = draft.audioMode
+        narrationVoice = draft.narrationVoice
+        recordedAudioUrl = draft.recordedAudioUrl
+        latitude = draft.latitude.toString()
+        longitude = draft.longitude.toString()
+        trialType = draft.trialType
+        question = draft.question
+        hint = draft.hint
+        answer = draft.answer
+        wrongAnswers.clear()
+        wrongAnswers += draft.wrongAnswers.ifEmpty { listOf("") }
+        puzzleImageUrl = draft.puzzleImageUrl
+        puzzleGridSize = draft.puzzleGridSize
+        word = draft.word
+        sentence = draft.sentence
+        missingWord = draft.missingWord
+    }
+
     fun reset() {
         title = ""
         location = ""

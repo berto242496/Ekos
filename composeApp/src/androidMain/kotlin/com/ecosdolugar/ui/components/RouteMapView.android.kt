@@ -56,6 +56,7 @@ actual fun RouteMapView(
     selectedCoordinates: Pair<Double, Double>?,
     pickerCoordinates: List<Pair<Double, Double>>,
     onUserLocationChanged: ((Double, Double) -> Unit)?,
+    completedStopIds: Set<String>,
     language: AppLanguage
 ) {
     val context = LocalContext.current
@@ -134,7 +135,7 @@ actual fun RouteMapView(
         }
     }
 
-    val routeData = remember(routes) { encodeRoutes(routes) }
+    val routeData = remember(routes, completedStopIds) { encodeRoutes(routes, completedStopIds) }
     Box(modifier = modifier) {
         AndroidView(
             modifier = Modifier.fillMaxSize(),
@@ -336,14 +337,14 @@ private class RouteMapWebView(context: Context) : WebView(context) {
     }
 }
 
-private fun encodeRoutes(routes: List<RouteItem>): String {
+private fun encodeRoutes(routes: List<RouteItem>, completedStopIds: Set<String>): String {
     val encoded = JSONArray()
     routes.forEach { route ->
         val stops = JSONArray()
         route.stops
             .filter { it.latitude.isFinite() && it.longitude.isFinite() }
             .sortedBy { it.order }
-            .forEach { stop -> stops.put(stop.toJson()) }
+            .forEach { stop -> stops.put(stop.toJson(completed = stop.id in completedStopIds)) }
         encoded.put(
             JSONObject()
                 .put("id", route.id)
@@ -354,12 +355,13 @@ private fun encodeRoutes(routes: List<RouteItem>): String {
     return encoded.toString()
 }
 
-private fun RouteStop.toJson() = JSONObject()
+private fun RouteStop.toJson(completed: Boolean) = JSONObject()
     .put("id", id)
     .put("order", order)
     .put("title", title)
     .put("lat", latitude)
     .put("lng", longitude)
+    .put("completed", completed)
 
 private fun routeMapHtml(): String = """
     <!doctype html>
@@ -373,16 +375,17 @@ private fun routeMapHtml(): String = """
         #map { position: absolute; inset: 0; width: 100vw; height: 100vh; background: #dde8e2; }
         .route-pin {
           display: flex; align-items: center; justify-content: center;
-          width: 30px; height: 30px; border: 2px solid white; border-radius: 50%;
-          background: #17452f; color: white; font: 700 13px sans-serif;
-          box-shadow: 0 2px 7px #0006;
+          width: 22px; height: 22px; border: 2px solid white; border-radius: 50%;
+          background: #17452f; color: white; font: 700 10px sans-serif;
+          box-shadow: 0 2px 6px #0006;
         }
-        .route-pin.selected { width: 36px; height: 36px; background: #d49b45; color: #17291e; }
+        .route-pin.completed { background: #3f8a4f; }
+        .route-pin.selected { width: 26px; height: 26px; background: #d49b45; color: #17291e; }
         .route-start {
           display: flex; align-items: center; justify-content: center;
-          width: 32px; height: 32px; border: 2px solid white; border-radius: 50%;
-          background: #17452f; color: white; font: 700 12px sans-serif;
-          box-shadow: 0 2px 7px #0006;
+          width: 24px; height: 24px; border: 2px solid white; border-radius: 50%;
+          background: #17452f; color: white; font: 700 10px sans-serif;
+          box-shadow: 0 2px 6px #0006;
         }
         .user-location { border: 3px solid white; border-radius: 50%; background: #2878d0; box-shadow: 0 1px 8px #0008; }
         .leaflet-popup-content { font: 14px sans-serif; }
@@ -432,20 +435,20 @@ private fun routeMapHtml(): String = """
         map.on('dragstart', () => { hasUserMovedMap = true; });
         map.on('zoomstart', () => { if (!settingUserLocation) hasUserMovedMap = true; });
 
-        function startIcon(order) {
+        function startIcon() {
           return L.divIcon({
             className: '',
-            html: '<span class="route-start">' + order + '</span>',
-            iconSize: [36, 36],
-            iconAnchor: [18, 18]
+            html: '<span class="route-start">⚑</span>',
+            iconSize: [26, 26],
+            iconAnchor: [13, 13]
           });
         }
         function stopIcon(stop) {
           return L.divIcon({
             className: '',
-            html: '<span class="route-pin' + (stop.id === selectedStopId ? ' selected' : '') + '">' + stop.order + '</span>',
-            iconSize: [40, 40],
-            iconAnchor: [20, 20]
+            html: '<span class="route-pin' + (stop.id === selectedStopId ? ' selected' : '') + (stop.completed ? ' completed' : '') + '">' + (stop.completed ? '✓' : stop.order) + '</span>',
+            iconSize: [24, 24],
+            iconAnchor: [12, 12]
           });
         }
         function redrawVisibleStarts() {
@@ -454,7 +457,7 @@ private fun routeMapHtml(): String = """
           allRoutes.forEach(route => {
             const start = route.stops[0];
             if (!start || route.id === activeRouteId || !bounds.contains([start.lat, start.lng])) return;
-            const marker = L.marker([start.lat, start.lng], { icon: startIcon(start.order) }).addTo(routeStartLayer);
+            const marker = L.marker([start.lat, start.lng], { icon: startIcon() }).addTo(routeStartLayer);
             const label = document.createElement('div');
             label.textContent = route.title;
             marker.bindPopup(label);
@@ -463,16 +466,11 @@ private fun routeMapHtml(): String = """
             });
           });
         }
-        function redrawSelectedRoute() {
+        function redrawSelectedRoute(fit) {
           selectedRouteLayer.clearLayers();
           const route = allRoutes.find(item => item.id === activeRouteId);
           if (!route || route.stops.length === 0) return;
           const points = route.stops.map(stop => [stop.lat, stop.lng]);
-          if (points.length > 1) {
-            L.polyline(points, {
-              color: '#d49b45', weight: 5, opacity: 0.9, lineCap: 'round', lineJoin: 'round'
-            }).addTo(selectedRouteLayer);
-          }
           route.stops.forEach(stop => {
             const marker = L.marker([stop.lat, stop.lng], { icon: stopIcon(stop) }).addTo(selectedRouteLayer);
             const label = document.createElement('div');
@@ -480,13 +478,13 @@ private fun routeMapHtml(): String = """
             marker.bindPopup(label);
             marker.on('click', () => {
               selectedStopId = stop.id;
-              redrawSelectedRoute();
+              redrawSelectedRoute(false);
               if (window.AndroidMap) window.AndroidMap.onStopSelected(stop.id);
             });
           });
           const bounds = L.latLngBounds(points);
-          if (userMarker) bounds.extend(userMarker.getLatLng());
-          if (bounds.isValid() && !hasUserMovedMap) {
+          if (userMarker && fit) bounds.extend(userMarker.getLatLng());
+          if (fit && bounds.isValid() && !hasUserMovedMap) {
             settingUserLocation = true;
             map.fitBounds(bounds, { padding: [36, 36], maxZoom: 16 });
             settingUserLocation = false;
@@ -497,9 +495,11 @@ private fun routeMapHtml(): String = """
           allRoutes = JSON.parse(routesJson);
           activeRouteId = routeId;
           selectedStopId = stopId;
-          redrawSelectedRoute();
+          const routeChanged = previousRouteId !== activeRouteId;
+          if (routeChanged) hasUserMovedMap = false;
+          redrawSelectedRoute(routeChanged);
           redrawVisibleStarts();
-          if (previousRouteId !== activeRouteId && !activeRouteId && userMarker && !hasUserMovedMap) {
+          if (routeChanged && !activeRouteId && userMarker && !hasUserMovedMap) {
             settingUserLocation = true;
             map.setView(userMarker.getLatLng(), 14);
             settingUserLocation = false;
@@ -517,7 +517,7 @@ private fun routeMapHtml(): String = """
           }
           if (!hasUserMovedMap) {
             if (activeRouteId) {
-              redrawSelectedRoute();
+              redrawSelectedRoute(true);
             } else {
               settingUserLocation = true;
               map.setView(position, 14);

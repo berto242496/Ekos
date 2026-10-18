@@ -26,6 +26,7 @@ interface GoogleAuthService {
     suspend fun signInWithGoogle(): GoogleAuthResult
     suspend fun restoreSession(): GoogleAuthResult
     suspend fun saveDisplayName(displayName: String)
+    suspend fun completeGuideProfile(displayName: String)
     suspend fun saveProfile(displayName: String, characterId: String)
     suspend fun setGuideAccount(isGuideAccount: Boolean)
     suspend fun signOut(accessToken: String?)

@@ -24,6 +24,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.ecosdolugar.model.RouteItem
 import ecosdolugar.composeapp.generated.resources.Res
 import ecosdolugar.composeapp.generated.resources.hero_forest
 import ecosdolugar.composeapp.generated.resources.google_g_logo
@@ -41,9 +42,11 @@ fun WelcomeScreen(
     signInError: String?,
     guideSignInError: String?,
     language: AppLanguage,
+    routes: List<RouteItem>,
     onOpenGuideMode: () -> Unit
 ) {
     val strings = appLanguageStrings(language)
+    val publishedRoutes = routes.filter { it.status == "publicada" }
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -123,7 +126,11 @@ fun WelcomeScreen(
                 )
 
                 Spacer(Modifier.height(20.dp))
-                WelcomeMetrics(strings)
+                WelcomeMetrics(
+                    strings = strings,
+                    provincesCount = publishedRoutes.map { it.region }.filter { it.isNotBlank() }.distinct().size,
+                    routesCount = publishedRoutes.size
+                )
                 Spacer(Modifier.height(20.dp))
                 GoogleSignInButton(strings, onClick = onSignInWithGoogle, isLoading = isSignInLoading)
                 if (signInError != null) {
@@ -216,7 +223,7 @@ private fun WelcomeHeader(
 }
 
 @Composable
-private fun WelcomeMetrics(strings: AppLanguageStrings) {
+private fun WelcomeMetrics(strings: AppLanguageStrings, provincesCount: Int, routesCount: Int) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -226,9 +233,9 @@ private fun WelcomeMetrics(strings: AppLanguageStrings) {
             .padding(vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        MetricColumn(strings.provinces, "4", Modifier.weight(1f).padding(start = 11.dp))
+        MetricColumn(strings.provinces, provincesCount.toString(), Modifier.weight(1f).padding(start = 11.dp))
         Box(Modifier.width(1.dp).height(38.dp).background(Color.White.copy(alpha = 0.12f)))
-        MetricColumn(strings.mythicalRoutes, "7", Modifier.weight(1f).padding(start = 11.dp))
+        MetricColumn(strings.mythicalRoutes, routesCount.toString(), Modifier.weight(1f).padding(start = 11.dp))
         Box(Modifier.width(1.dp).height(38.dp).background(Color.White.copy(alpha = 0.12f)))
         MetricColumn(
             strings.geography,

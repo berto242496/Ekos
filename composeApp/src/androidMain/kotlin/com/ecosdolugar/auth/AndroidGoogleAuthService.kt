@@ -137,14 +137,16 @@ class AndroidGoogleAuthService(
             val session = routesRepository.refreshAuthSession(stored.getString("refresh_token"))
             val displayName = stored.optString("display_name").ifBlank { session.displayName }
             val characterId = stored.optString("character_id").takeIf(String::isNotBlank)
-            val profileComplete = stored.optBoolean("profile_complete") && characterId != null
+            val isGuideAccount = stored.optBoolean("is_guide_account")
+            val profileComplete = stored.optBoolean("profile_complete") &&
+                (characterId != null || isGuideAccount)
             persistSession(
                 session,
                 displayName,
                 characterId,
                 stored.optBoolean("display_name_set"),
                 profileComplete,
-                stored.optBoolean("is_guide_account")
+                isGuideAccount
             )
             GoogleAuthResult.Success(
                 googleId = session.userId,
@@ -157,7 +159,7 @@ class AndroidGoogleAuthService(
                 characterId = characterId,
                 displayNameSet = stored.optBoolean("display_name_set"),
                 profileComplete = profileComplete,
-                isGuideAccount = stored.optBoolean("is_guide_account")
+                isGuideAccount = isGuideAccount
             )
         } catch (error: CancellationException) {
             throw error
@@ -191,6 +193,15 @@ class AndroidGoogleAuthService(
         stored.put("display_name", displayName.trim())
         stored.put("display_name_set", true)
         stored.put("profile_complete", false)
+        writeStoredSession(stored)
+    }
+
+    override suspend fun completeGuideProfile(displayName: String) {
+        val stored = readStoredSession()
+            ?: throw IllegalStateException("No hay una sesión guardada para actualizar el perfil.")
+        stored.put("display_name", displayName.trim())
+        stored.put("display_name_set", true)
+        stored.put("profile_complete", true)
         writeStoredSession(stored)
     }
 

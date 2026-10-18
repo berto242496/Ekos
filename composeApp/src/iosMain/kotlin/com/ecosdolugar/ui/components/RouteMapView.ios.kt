@@ -28,6 +28,7 @@ actual fun RouteMapView(
     selectedCoordinates: Pair<Double, Double>?,
     pickerCoordinates: List<Pair<Double, Double>>,
     onUserLocationChanged: ((Double, Double) -> Unit)?,
+    completedStopIds: Set<String>,
     language: AppLanguage
 ) {
     val selectedRoute = routes.firstOrNull { it.id == selectedRouteId }
@@ -118,7 +119,11 @@ actual fun RouteMapView(
         }
         selectedStops.forEach { stop ->
             drawCircle(
-                color = if (stop.id == selectedStopId) Color(0xFFD49B45) else Color(0xFF17452F),
+                color = when {
+                    stop.id == selectedStopId -> Color(0xFFD49B45)
+                    stop.id in completedStopIds -> Color(0xFF3F8A4F)
+                    else -> Color(0xFF17452F)
+                },
                 radius = 16.dp.toPx(),
                 center = position(stop, size.width, size.height)
             )

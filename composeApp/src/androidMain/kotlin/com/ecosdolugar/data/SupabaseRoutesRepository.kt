@@ -4,9 +4,11 @@ import com.ecosdolugar.model.Category
 import com.ecosdolugar.model.Difficulty
 import com.ecosdolugar.model.FieldEnigma
 import com.ecosdolugar.model.GuideAuthor
+import com.ecosdolugar.model.GuideProfileInfo
 import com.ecosdolugar.model.NarrationVoice
 import com.ecosdolugar.model.OverviewFeature
 import com.ecosdolugar.model.RouteItem
+import com.ecosdolugar.model.RouteReview
 import com.ecosdolugar.model.RouteStop
 import com.ecosdolugar.model.RuneGlyph
 import com.ecosdolugar.model.StopAudioMode
@@ -52,6 +54,54 @@ class SupabaseRoutesRepository(
         (0 until rows.length()).map { index -> rows.getJSONObject(index).toRoute() }
     }
 
+    override suspend fun loadRouteReviews(accessToken: String?): List<RouteReview> = withContext(Dispatchers.IO) {
+        requireConfigured()
+        val selection = "route_id,guide_id,user_id,route_rating,guide_rating,comment,created_at"
+        val response = request(
+            method = "GET",
+            path = "/rest/v1/route_reviews?select=${encode(selection)}&order=created_at.desc",
+            accessToken = accessToken
+        )
+        val rows = JSONArray(response)
+        (0 until rows.length()).map { index ->
+            val row = rows.getJSONObject(index)
+            RouteReview(
+                routeId = row.getString("route_id"),
+                guideId = row.getString("guide_id"),
+                userId = row.getString("user_id"),
+                routeRating = row.optInt("route_rating", 0),
+                guideRating = row.optInt("guide_rating", 0),
+                comment = row.nullableString("comment"),
+                createdAt = row.nullableString("created_at")
+            )
+        }
+    }
+
+    override suspend fun loadGuideProfiles(guideIds: List<String>, accessToken: String): List<GuideProfileInfo> =
+        withContext(Dispatchers.IO) {
+            requireConfigured()
+            val validIds = guideIds.filter { UUID_PATTERN.matches(it) }.distinct()
+            if (validIds.isEmpty()) return@withContext emptyList()
+            val body = JSONObject().put("guide_ids", JSONArray(validIds)).toString()
+            val response = request(
+                method = "POST",
+                path = "/rest/v1/rpc/get_guide_profiles",
+                body = body,
+                accessToken = accessToken,
+                contentType = "application/json"
+            )
+            val rows = JSONArray(response)
+            (0 until rows.length()).map { index ->
+                val row = rows.getJSONObject(index)
+                GuideProfileInfo(
+                    userId = row.getString("user_id"),
+                    displayName = row.nullableString("display_name"),
+                    bio = row.nullableString("bio"),
+                    avatarUrl = row.nullableString("avatar_url").ifBlank { null }
+                )
+            }
+        }
+
     override suspend fun saveRoute(route: RouteItem, status: String, accessToken: String): RouteItem =
         withContext(Dispatchers.IO) {
             requireConfigured()
@@ -87,6 +137,7 @@ class SupabaseRoutesRepository(
     }
 
     override suspend fun saveChallengeProgress(
+        userId: String,
         challengeId: String,
         attempts: Int,
         score: Int,
@@ -95,9 +146,11 @@ class SupabaseRoutesRepository(
     ) = withContext(Dispatchers.IO) {
         requireConfigured()
         require(accessToken.isNotBlank()) { "Inicia sesión para sincronizar el progreso del reto." }
+        require(userId.isNotBlank()) { "Vuelve a iniciar sesión para sincronizar el progreso del reto." }
         require(attempts >= 0) { "El número de intentos no puede ser negativo." }
         require(score in 0..100) { "La puntuación debe estar entre 0 y 100." }
         val progress = JSONObject()
+            .put("user_id", userId)
             .put("challenge_id", challengeId)
             .put("status", if (completed) "completado" else "iniciado")
             .put("attempts", attempts)
@@ -123,6 +176,36 @@ class SupabaseRoutesRepository(
         Unit
     }
 
+    override suspend fun saveRouteReview(
+        userId: String,
+        routeId: String,
+        guideId: String,
+        routeRating: Int,
+        guideRating: Int,
+        comment: String,
+        accessToken: String
+    ) = withContext(Dispatchers.IO) {
+        requireConfigured()
+        require(accessToken.isNotBlank()) { "Inicia sesión para dejar una valoración." }
+        require(routeRating in 1..5 && guideRating in 1..5) { "Las valoraciones deben estar entre 1 y 5." }
+        val review = JSONObject()
+            .put("user_id", userId)
+            .put("route_id", routeId)
+            .put("guide_id", guideId)
+            .put("route_rating", routeRating)
+            .put("guide_rating", guideRating)
+            .put("comment", comment.trim().take(500))
+        request(
+            method = "POST",
+            path = "/rest/v1/route_reviews?on_conflict=user_id,route_id",
+            body = JSONArray().put(review).toString(),
+            accessToken = accessToken,
+            contentType = "application/json",
+            prefer = "resolution=merge-duplicates,return=minimal"
+        )
+        Unit
+    }
+
     override suspend fun loadCompletedChallenges(accessToken: String): Set<String> =
         withContext(Dispatchers.IO) {
             requireConfigured()
@@ -135,6 +218,21 @@ class SupabaseRoutesRepository(
             val rows = JSONArray(response)
             (0 until rows.length()).mapTo(mutableSetOf()) { index ->
                 rows.getJSONObject(index).getString("challenge_id")
+            }
+        }
+
+    override suspend fun loadTotalChallengeScore(accessToken: String): Int =
+        withContext(Dispatchers.IO) {
+            requireConfigured()
+            require(accessToken.isNotBlank()) { "Inicia sesión para cargar tu puntuación." }
+            val response = request(
+                method = "GET",
+                path = "/rest/v1/user_challenge_progress?select=score&status=eq.completado",
+                accessToken = accessToken
+            )
+            val rows = JSONArray(response)
+            (0 until rows.length()).sumOf { index ->
+                rows.getJSONObject(index).optInt("score", 0)
             }
         }
 
@@ -160,6 +258,41 @@ class SupabaseRoutesRepository(
             )
             Unit
         }
+
+    override suspend fun saveGuideProfile(
+        userId: String,
+        displayName: String,
+        bio: String,
+        avatarUrl: String?,
+        accessToken: String
+    ): String? = withContext(Dispatchers.IO) {
+        requireConfigured()
+        val normalizedName = displayName.trim()
+        val normalizedBio = bio.trim()
+        require(normalizedName.isNotEmpty()) { "Escribe tu nombre de guía." }
+        require(normalizedName.length <= 60) { "El nombre no puede superar los 60 caracteres." }
+        require(normalizedBio.length <= 500) { "La descripción no puede superar los 500 caracteres." }
+        require(userId.isNotBlank()) { "No se pudo identificar al usuario." }
+        require(accessToken.isNotBlank()) { "Inicia sesión para guardar tu perfil de guía." }
+        val storedAvatarUrl = avatarUrl?.let { url ->
+            if (url.startsWith("data:")) persistDataUrl(url, userId, "avatar", accessToken) else url
+        }
+        request(
+            method = "POST",
+            path = "/rest/v1/user_profiles?on_conflict=user_id",
+            body = JSONArray().put(
+                JSONObject()
+                    .put("user_id", userId)
+                    .put("display_name", normalizedName)
+                    .put("bio", normalizedBio)
+                    .put("avatar_url", storedAvatarUrl ?: JSONObject.NULL)
+            ).toString(),
+            accessToken = accessToken,
+            contentType = "application/json",
+            prefer = "resolution=merge-duplicates,return=minimal"
+        )
+        storedAvatarUrl
+    }
 
     override suspend fun loadSavedRouteIds(userId: String, accessToken: String): Set<String> =
         withContext(Dispatchers.IO) {
@@ -277,7 +410,7 @@ class SupabaseRoutesRepository(
 
     private fun persistRouteMedia(route: RouteItem, accessToken: String): RouteItem {
         fun persist(url: String): String = if (url.startsWith("data:")) {
-            persistDataUrl(url, route, accessToken)
+            persistDataUrl(url, route.guide.id, route.id, accessToken)
         } else {
             url
         }
@@ -293,7 +426,7 @@ class SupabaseRoutesRepository(
         )
     }
 
-    private fun persistDataUrl(dataUrl: String, route: RouteItem, accessToken: String): String {
+    private fun persistDataUrl(dataUrl: String, creatorId: String, folderId: String, accessToken: String): String {
         val match = Regex(
             "^data:((?:image/(?:jpeg|png|webp))|(?:audio/(?:mp4|mpeg|webm|ogg)));base64,(.+)$",
             RegexOption.DOT_MATCHES_ALL
@@ -310,7 +443,6 @@ class SupabaseRoutesRepository(
             "Cada archivo multimedia debe ocupar como máximo 50 MB."
         }
 
-        val creatorId = route.guide.id
         require(creatorId.isNotBlank()) { "No se pudo determinar el propietario de la imagen." }
         val extension = when (contentType) {
             "image/jpeg" -> "jpg"
@@ -321,7 +453,7 @@ class SupabaseRoutesRepository(
             "audio/webm" -> "webm"
             else -> "ogg"
         }
-        val safeRouteId = route.id.replace(Regex("[^a-zA-Z0-9_-]"), "-")
+        val safeRouteId = folderId.replace(Regex("[^a-zA-Z0-9_-]"), "-")
         val objectPath = "$creatorId/$safeRouteId/${UUID.randomUUID()}.$extension"
         val connection = (URL(
             "${projectUrl.trimEnd('/')}/storage/v1/object/route-media/$objectPath"
@@ -412,6 +544,11 @@ private fun RouteItem.withPersistentIds(): RouteItem {
     }
     return copy(id = stableRouteId, stopsCount = stableStops.size, stops = stableStops)
 }
+
+private val UUID_PATTERN = Regex("[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}")
+
+private fun JSONObject.nullableString(name: String): String =
+    if (isNull(name)) "" else optString(name, "")
 
 private fun JSONObject.toRoute(): RouteItem {
     val metadata = getJSONObject("metadata")

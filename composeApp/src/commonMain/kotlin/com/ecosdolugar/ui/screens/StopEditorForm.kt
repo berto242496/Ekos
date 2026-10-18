@@ -1,5 +1,6 @@
 package com.ecosdolugar.ui.screens
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -14,10 +15,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -28,9 +28,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Popup
+import androidx.compose.ui.window.PopupProperties
 import com.ecosdolugar.localization.AppLanguage
 import com.ecosdolugar.model.NarrationVoice
 import com.ecosdolugar.model.StopAudioMode
@@ -41,6 +45,8 @@ import com.ecosdolugar.ui.components.RouteMapView
 import com.ecosdolugar.ui.components.rememberAudioClipPlayer
 import com.ecosdolugar.ui.components.rememberVoicePreviewer
 import com.ecosdolugar.ui.components.rememberVoiceRecorder
+import com.ecosdolugar.ui.theme.MossContainer
+import com.ecosdolugar.ui.theme.PineContainer
 import com.ecosdolugar.ui.theme.SurfaceCream
 import com.ecosdolugar.ui.theme.TerracottaGold
 
@@ -57,7 +63,8 @@ internal fun StopEditorForm(
     existingCoordinates: List<Pair<Double, Double>>,
     language: AppLanguage,
     onMessage: (String?) -> Unit,
-    onAddStop: () -> Unit
+    onAddStop: () -> Unit,
+    addLabel: String
 ) {
     val previewer = rememberVoicePreviewer()
     val clipPlayer = rememberAudioClipPlayer()
@@ -111,8 +118,9 @@ internal fun StopEditorForm(
 
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         FieldLabel("Narración del relato")
-        NarrationModeDropdown(
+        StyledDropdown(
             selected = form.audioMode,
+            options = StopAudioMode.entries.map { it to narrationModeLabel(it) },
             onSelected = { form.audioMode = it }
         )
         when (form.audioMode) {
@@ -236,18 +244,11 @@ internal fun StopEditorForm(
 
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         FieldLabel("Tipo de prueba")
-        trialTypeOptions.chunked(2).forEach { rowOptions ->
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                rowOptions.forEach { (type, label) ->
-                    SelectableChip(
-                        text = label,
-                        selected = form.trialType == type,
-                        onClick = { form.trialType = type },
-                        modifier = Modifier.weight(1f)
-                    )
-                }
-            }
-        }
+        StyledDropdown(
+            selected = form.trialType,
+            options = trialTypeOptions,
+            onSelected = { form.trialType = it }
+        )
     }
 
     when (form.trialType) {
@@ -366,13 +367,13 @@ internal fun StopEditorForm(
     }
 
     SecondaryButton(
-        text = "Añadir parada",
+        text = addLabel,
         onClick = onAddStop
     )
 }
 
 @Composable
-private fun NarrationModeDropdown(selected: StopAudioMode, onSelected: (StopAudioMode) -> Unit) {
+internal fun <T> StyledDropdown(selected: T, options: List<Pair<T, String>>, onSelected: (T) -> Unit) {
     var expanded by remember { mutableStateOf(false) }
     val shape = RoundedCornerShape(12.dp)
     Box {
@@ -387,7 +388,7 @@ private fun NarrationModeDropdown(selected: StopAudioMode, onSelected: (StopAudi
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                narrationModeLabel(selected),
+                options.firstOrNull { it.first == selected }?.second.orEmpty(),
                 modifier = Modifier.weight(1f),
                 color = InkDeep,
                 fontFamily = FontFamily.Serif,
@@ -395,22 +396,41 @@ private fun NarrationModeDropdown(selected: StopAudioMode, onSelected: (StopAudi
             )
             Icon(Icons.Default.ArrowDropDown, contentDescription = null, tint = InkMuted)
         }
-        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-            StopAudioMode.entries.forEach { mode ->
-                DropdownMenuItem(
-                    text = {
-                        Text(
-                            narrationModeLabel(mode),
-                            color = InkDeep,
-                            fontFamily = FontFamily.Serif,
-                            fontSize = 14.sp
-                        )
-                    },
-                    onClick = {
-                        onSelected(mode)
-                        expanded = false
+        if (expanded) {
+            Popup(
+                alignment = Alignment.BottomStart,
+                offset = IntOffset(0, 0),
+                onDismissRequest = { expanded = false },
+                properties = PopupProperties(focusable = true)
+            ) {
+                Surface(
+                    shape = shape,
+                    color = SurfaceCream,
+                    border = BorderStroke(1.dp, FieldBorder),
+                    shadowElevation = 6.dp,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(vertical = 6.dp)) {
+                        options.forEach { (value, label) ->
+                            val isSelected = value == selected
+                            Text(
+                                label,
+                                color = if (isSelected) PineContainer else InkDeep,
+                                fontFamily = FontFamily.Serif,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                fontSize = 14.sp,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        onSelected(value)
+                                        expanded = false
+                                    }
+                                    .background(if (isSelected) MossContainer.copy(alpha = 0.45f) else SurfaceCream)
+                                    .padding(horizontal = 14.dp, vertical = 12.dp)
+                            )
+                        }
                     }
-                )
+                }
             }
         }
     }

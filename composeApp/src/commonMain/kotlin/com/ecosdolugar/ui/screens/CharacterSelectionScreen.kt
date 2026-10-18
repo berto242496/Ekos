@@ -22,6 +22,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ecosdolugar.data.CharactersRepository
@@ -48,7 +49,11 @@ fun CharacterSelectionScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(PineDeep)
+            .background(
+                Brush.verticalGradient(
+                    listOf(activeColor.copy(alpha = 0.35f), PineDeep, PineDeep)
+                )
+            )
     ) {
         Column(
             modifier = Modifier
@@ -262,6 +267,7 @@ fun CharacterSelectionScreen(
                     .padding(horizontal = 20.dp)
                     .height(52.dp),
                 shape = RoundedCornerShape(14.dp),
+                contentPadding = PaddingValues(horizontal = 12.dp),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = activeColor,
                     contentColor = Color(0xFF0F1B12)
@@ -272,7 +278,10 @@ fun CharacterSelectionScreen(
                 Text(
                     text = "${strings.confirmPrefix} ${selectedChar.name}",
                     fontSize = 15.sp,
-                    fontWeight = FontWeight.Bold
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    softWrap = false,
+                    overflow = TextOverflow.Ellipsis
                 )
             }
 

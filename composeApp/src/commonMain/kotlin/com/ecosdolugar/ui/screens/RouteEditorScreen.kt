@@ -24,11 +24,13 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -99,6 +101,7 @@ fun RouteEditorScreen(
     userProfile: UserProfile,
     initialRoute: RouteItem?,
     language: AppLanguage,
+    isSaving: Boolean,
     onBack: () -> Unit,
     onSave: (RouteItem, String) -> Unit
 ) {
@@ -129,9 +132,11 @@ fun RouteEditorScreen(
         mutableStateOf(initialCategories(initialRoute))
     }
     val stopForm = remember { StopFormState() }
+    var editingStopIndex by remember { mutableStateOf<Int?>(null) }
     var validationMessage by remember { mutableStateOf<String?>(null) }
     var currentStep by remember { mutableStateOf(1) }
     var showExitConfirmation by remember { mutableStateOf(false) }
+    var pendingStatus by remember { mutableStateOf<String?>(null) }
 
     fun toggleCategory(category: Category) {
         val next = if (category in selectedCategories) {
@@ -159,34 +164,53 @@ fun RouteEditorScreen(
             validationMessage = invalid
             return
         }
-        stops += stopForm.toDraft()
+        val editing = editingStopIndex
+        if (editing != null && editing in stops.indices) {
+            stops[editing] = stopForm.toDraft()
+            editingStopIndex = null
+        } else {
+            stops += stopForm.toDraft()
+        }
         stopForm.reset()
         validationMessage = null
         scope.launch { scrollState.animateScrollTo(0) }
     }
 
-    fun save(status: String) {
+    fun cancelStopEdit() {
+        editingStopIndex = null
+        stopForm.reset()
+        validationMessage = null
+    }
+
+    fun editStop(index: Int) {
+        editingStopIndex = index
+        stopForm.loadFrom(stops[index])
+        validationMessage = null
+    }
+
+    fun save(status: String): Boolean {
+        if (isSaving) return false
         if (title.isBlank() || location.isBlank()) {
             validationMessage = "Indica el nombre y la ubicación de la ruta."
-            return
+            return false
         }
         if (selectedCategories.isEmpty()) {
             validationMessage = "Selecciona al menos un tipo de ruta."
-            return
+            return false
         }
         val formattedDuration = formatDuration(durationHours, durationMinutes)
         if (formattedDuration == null) {
             validationMessage = "Indica una duración válida (minutos entre 0 y 59)."
-            return
+            return false
         }
         if (status != "borrador" && stops.isEmpty()) {
             validationMessage = "Añade al menos una parada con su ubicación y reto."
-            return
+            return false
         }
         val creatorId = userProfile.googleId
         if (creatorId.isNullOrBlank()) {
             validationMessage = "Vuelve a iniciar sesión para guardar la ruta."
-            return
+            return false
         }
         val guide = GuideAuthor(
             id = creatorId,
@@ -238,7 +262,9 @@ fun RouteEditorScreen(
                 ),
                 stops = routeStops
             )
+        pendingStatus = status
         onSave(route, status)
+        return true
     }
 
     val hasUnsavedData = title != initialRoute?.title.orEmpty() ||
@@ -427,34 +453,60 @@ fun RouteEditorScreen(
                                     fontSize = 11.sp
                                 )
                             }
-                            IconButton(onClick = { stops.removeAt(index) }) {
+                            IconButton(onClick = { editStop(index) }) {
+                                Icon(Icons.Default.Edit, contentDescription = "Editar parada", tint = PineContainer)
+                            }
+                            IconButton(onClick = {
+                                val editing = editingStopIndex
+                                if (editing == index) cancelStopEdit()
+                                else if (editing != null && editing > index) editingStopIndex = editing - 1
+                                stops.removeAt(index)
+                            }) {
                                 Icon(Icons.Default.Delete, contentDescription = "Eliminar parada", tint = TerracottaGold)
                             }
                         }
                     }
                     StopEditorForm(
                         form = stopForm,
-                        existingCoordinates = stops.map { it.latitude to it.longitude },
+                        existingCoordinates = stops.mapIndexed { index, stop ->
+                            stop.latitude to stop.longitude
+                        }.filterIndexed { index, _ -> index != editingStopIndex },
                         language = language,
                         onMessage = { validationMessage = it },
-                        onAddStop = ::addStop
+                        onAddStop = ::addStop,
+                        addLabel = if (editingStopIndex != null) "Guardar cambios de la parada" else "Añadir parada"
                     )
+                    if (editingStopIndex != null) {
+                        SecondaryButton(text = "Cancelar edición", onClick = ::cancelStopEdit)
+                    }
                 }
                 validationMessage?.let { ValidationBanner(it) }
                 SecondaryButton(
                     text = "Volver a los datos de la ruta",
-                    onClick = { currentStep = 1 }
+                    onClick = { currentStep = 1 },
+                    enabled = !isSaving
                 )
                 SecondaryButton(
                     text = "Guardar borrador",
-                    onClick = { save("borrador") }
+                    onClick = { save("borrador") },
+                    enabled = !isSaving,
+                    loading = isSaving && pendingStatus == "borrador"
                 )
                 Button(
                     onClick = { save("pendiente") },
+                    enabled = !isSaving,
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(16.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = PineContainer, contentColor = SurfaceCream)
                 ) {
+                    if (isSaving && pendingStatus == "pendiente") {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(18.dp),
+                            color = SurfaceCream,
+                            strokeWidth = 2.dp
+                        )
+                        Spacer(Modifier.size(8.dp))
+                    }
                     Text("Enviar para verificación", fontFamily = FontFamily.Serif, fontWeight = FontWeight.Bold)
                 }
             }
@@ -463,26 +515,38 @@ fun RouteEditorScreen(
 
     if (showExitConfirmation) {
         AlertDialog(
-            onDismissRequest = { showExitConfirmation = false },
+            onDismissRequest = { if (!isSaving) showExitConfirmation = false },
             title = { Text("Guardar cambios", fontFamily = FontFamily.Serif, fontWeight = FontWeight.Bold) },
             text = { Text("Tienes datos en la ruta. ¿Quieres guardarla como borrador antes de salir?") },
             confirmButton = {
-                TextButton(onClick = {
-                    showExitConfirmation = false
-                    save("borrador")
-                }) {
-                    Text("Guardar borrador", color = PineContainer, fontWeight = FontWeight.Bold)
+                TextButton(
+                    enabled = !isSaving,
+                    onClick = {
+                        if (!save("borrador")) showExitConfirmation = false
+                    }
+                ) {
+                    if (isSaving) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(18.dp),
+                            color = PineContainer,
+                            strokeWidth = 2.dp
+                        )
+                        Spacer(Modifier.size(8.dp))
+                        Text("Guardando…", color = InkMuted, fontWeight = FontWeight.Bold)
+                    } else {
+                        Text("Guardar borrador", color = PineContainer, fontWeight = FontWeight.Bold)
+                    }
                 }
             },
             dismissButton = {
                 Row {
-                    TextButton(onClick = {
+                    TextButton(enabled = !isSaving, onClick = {
                         showExitConfirmation = false
                         onBack()
                     }) {
                         Text("Salir sin guardar", color = InkMuted)
                     }
-                    TextButton(onClick = { showExitConfirmation = false }) {
+                    TextButton(enabled = !isSaving, onClick = { showExitConfirmation = false }) {
                         Text("Seguir editando", color = PineContainer, fontWeight = FontWeight.Bold)
                     }
                 }
@@ -675,16 +739,22 @@ private fun DifficultyOption(
 internal fun SecondaryButton(
     text: String,
     onClick: () -> Unit,
-    icon: androidx.compose.ui.graphics.vector.ImageVector? = null
+    icon: androidx.compose.ui.graphics.vector.ImageVector? = null,
+    enabled: Boolean = true,
+    loading: Boolean = false
 ) {
     OutlinedButton(
         onClick = onClick,
+        enabled = enabled,
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
         colors = ButtonDefaults.outlinedButtonColors(containerColor = Color.White, contentColor = PineContainer),
         border = BorderStroke(1.dp, FieldBorder)
     ) {
-        if (icon != null) {
+        if (loading) {
+            CircularProgressIndicator(modifier = Modifier.size(18.dp), color = PineContainer, strokeWidth = 2.dp)
+            Spacer(Modifier.size(6.dp))
+        } else if (icon != null) {
             Icon(icon, contentDescription = null)
             Spacer(Modifier.size(6.dp))
         }

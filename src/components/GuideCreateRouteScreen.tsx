@@ -12,8 +12,10 @@ import {
 import { soundEngine, VOICE_PERSONAS } from '../services/soundEngine';
 import { useI18n } from '../services/i18n';
 import { LanguageSelector } from './LanguageSelector';
+import { CoordinateMapPicker } from './CoordinateMapPicker';
 import {
   ChevronLeft,
+  ChevronRight,
   Plus,
   Trash2,
   MapPin,
@@ -37,6 +39,7 @@ import {
 
 interface GuideCreateRouteScreenProps {
   currentGuide: GuideAuthor;
+  initialRoute?: RouteItem | null;
   onSaveDraft: (route: RouteItem) => void;
   onPublishRoute: (route: RouteItem) => void;
   onCancel: () => void;
@@ -361,6 +364,7 @@ const TEMPLATE_PRESETS: RouteTemplatePreset[] = [
 
 export const GuideCreateRouteScreen: React.FC<GuideCreateRouteScreenProps> = ({
   currentGuide,
+  initialRoute = null,
   onSaveDraft,
   onPublishRoute,
   onCancel,
@@ -368,24 +372,37 @@ export const GuideCreateRouteScreen: React.FC<GuideCreateRouteScreenProps> = ({
   const { t } = useI18n();
 
   // Current active template key
-  const [selectedTemplateId, setSelectedTemplateId] = useState<string>('tpl-lendas');
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string>(
+    initialRoute ? '' : 'tpl-lendas',
+  );
+  const [currentStep, setCurrentStep] = useState<1 | 2>(1);
 
   // Form State: Route Metadata (Spanish by default)
-  const [title, setTitle] = useState(TEMPLATE_PRESETS[0].title);
-  const [location, setLocation] = useState(TEMPLATE_PRESETS[0].location);
-  const [description, setDescription] = useState(TEMPLATE_PRESETS[0].description);
-  const [category, setCategory] = useState<Category>(TEMPLATE_PRESETS[0].category);
-  const [duration, setDuration] = useState(TEMPLATE_PRESETS[0].duration);
-  const [difficulty, setDifficulty] = useState<'Fácil' | 'Media' | 'Exigente'>(TEMPLATE_PRESETS[0].difficulty);
-  const [price, setPrice] = useState<RoutePrice>(TEMPLATE_PRESETS[0].price);
-  const [coverImage, setCoverImage] = useState(TEMPLATE_PRESETS[0].coverImage);
+  const [title, setTitle] = useState(initialRoute?.title ?? TEMPLATE_PRESETS[0].title);
+  const [location, setLocation] = useState(initialRoute?.location ?? TEMPLATE_PRESETS[0].location);
+  const [description, setDescription] = useState(initialRoute?.description ?? TEMPLATE_PRESETS[0].description);
+  const [category, setCategory] = useState<Category>(
+    initialRoute?.categories[0] ?? TEMPLATE_PRESETS[0].category,
+  );
+  const [duration, setDuration] = useState(initialRoute?.duration ?? TEMPLATE_PRESETS[0].duration);
+  const [difficulty, setDifficulty] = useState<'Fácil' | 'Media' | 'Exigente'>(
+    initialRoute?.difficulty ?? TEMPLATE_PRESETS[0].difficulty,
+  );
+  const [price, setPrice] = useState<RoutePrice>(
+    (initialRoute?.price as RoutePrice | undefined) ?? TEMPLATE_PRESETS[0].price,
+  );
+  const [coverImage, setCoverImage] = useState(initialRoute?.image ?? TEMPLATE_PRESETS[0].coverImage);
 
   // Global Route Voice & Audio Configuration
-  const [defaultVoiceId, setDefaultVoiceId] = useState<VoicePersonaId>(TEMPLATE_PRESETS[0].defaultVoiceId);
-  const [defaultAudioMode, setDefaultAudioMode] = useState<'tts' | 'recorded' | 'written'>('tts');
+  const [defaultVoiceId, setDefaultVoiceId] = useState<VoicePersonaId>(
+    initialRoute?.defaultVoiceId ?? TEMPLATE_PRESETS[0].defaultVoiceId,
+  );
+  const [defaultAudioMode, setDefaultAudioMode] = useState<'tts' | 'recorded' | 'written'>(
+    initialRoute?.defaultAudioMode ?? 'tts',
+  );
 
   // Stops State
-  const [stops, setStops] = useState<RouteStop[]>(TEMPLATE_PRESETS[0].stops);
+  const [stops, setStops] = useState<RouteStop[]>(initialRoute?.stops ?? TEMPLATE_PRESETS[0].stops);
 
   // Stop Form State
   const [isAddingStop, setIsAddingStop] = useState(false);
@@ -395,6 +412,8 @@ export const GuideCreateRouteScreen: React.FC<GuideCreateRouteScreenProps> = ({
   const [stopTitle, setStopTitle] = useState('');
   const [stopSubtitle, setStopSubtitle] = useState('');
   const [stopLocation, setStopLocation] = useState('');
+  const [stopLatitude, setStopLatitude] = useState('');
+  const [stopLongitude, setStopLongitude] = useState('');
   const [stopStory, setStopStory] = useState('');
   const [stopHistoricalNote, setStopHistoricalNote] = useState('');
   const [stopImage, setStopImage] = useState(GALICIAN_IMAGE_PRESETS[0].url);
@@ -417,12 +436,11 @@ export const GuideCreateRouteScreen: React.FC<GuideCreateRouteScreenProps> = ({
 
   // Acertijo fields
   const [acertijoQuestion, setAcertijoQuestion] = useState('¿Qué figura sagrada custodia la entrada de este lugar?');
-  const [acertijoOptions, setAcertijoOptions] = useState<string[]>([
-    'Un lobo alado con ojos de ámbar',
+  const [acertijoCorrectAnswer, setAcertijoCorrectAnswer] = useState('Un lobo alado con ojos de ámbar');
+  const [acertijoWrongAnswers, setAcertijoWrongAnswers] = useState([
     'Una serpiente de agua bicéfala',
     'Un carnero de oro solar',
   ]);
-  const [acertijoCorrectIndex, setAcertijoCorrectIndex] = useState(0);
   const [acertijoHint, setAcertijoHint] = useState('Fíjate en el dintel superior grabado en la roca.');
 
   // Cifrado Mágico fields
@@ -448,6 +466,22 @@ export const GuideCreateRouteScreen: React.FC<GuideCreateRouteScreenProps> = ({
   const [customCoverUrl, setCustomCoverUrl] = useState('');
 
   const [validationError, setValidationError] = useState<string | null>(null);
+  const routeIdRef = useRef(initialRoute?.id ?? `route-${Date.now()}`);
+  const initialFormSnapshot = useRef(
+    JSON.stringify({
+      title: initialRoute?.title ?? TEMPLATE_PRESETS[0].title,
+      location: initialRoute?.location ?? TEMPLATE_PRESETS[0].location,
+      description: initialRoute?.description ?? TEMPLATE_PRESETS[0].description,
+      category: initialRoute?.categories[0] ?? TEMPLATE_PRESETS[0].category,
+      duration: initialRoute?.duration ?? TEMPLATE_PRESETS[0].duration,
+      difficulty: initialRoute?.difficulty ?? TEMPLATE_PRESETS[0].difficulty,
+      price: initialRoute?.price ?? TEMPLATE_PRESETS[0].price,
+      coverImage: initialRoute?.image ?? TEMPLATE_PRESETS[0].coverImage,
+      defaultVoiceId: initialRoute?.defaultVoiceId ?? TEMPLATE_PRESETS[0].defaultVoiceId,
+      defaultAudioMode: initialRoute?.defaultAudioMode ?? 'tts',
+      stops: initialRoute?.stops ?? TEMPLATE_PRESETS[0].stops,
+    }),
+  );
 
   // Handle template selection
   const handleSelectTemplate = (tplId: string) => {
@@ -577,6 +611,8 @@ export const GuideCreateRouteScreen: React.FC<GuideCreateRouteScreenProps> = ({
     setStopTitle('');
     setStopSubtitle('');
     setStopLocation(location || 'Galicia');
+    setStopLatitude('');
+    setStopLongitude('');
     setStopStory('');
     setStopHistoricalNote('');
     setStopImage(GALICIAN_IMAGE_PRESETS[stops.length % GALICIAN_IMAGE_PRESETS.length].url);
@@ -586,8 +622,8 @@ export const GuideCreateRouteScreen: React.FC<GuideCreateRouteScreenProps> = ({
     setRecordedAudioBlobUrl(null);
     setStopGameType('acertijo');
     setAcertijoQuestion('¿Qué figura o misterio esconde este enclave?');
-    setAcertijoOptions(['Opción A: Marca de canteros', 'Opción B: Escudo nobiliario', 'Opción C: Cruz solar']);
-    setAcertijoCorrectIndex(0);
+    setAcertijoCorrectAnswer('Opción A: Marca de canteros');
+    setAcertijoWrongAnswers(['Opción B: Escudo nobiliario', 'Opción C: Cruz solar']);
     setAcertijoHint('Observa atentamente el entorno.');
     setIsAddingStop(true);
   };
@@ -599,6 +635,8 @@ export const GuideCreateRouteScreen: React.FC<GuideCreateRouteScreenProps> = ({
     setStopTitle(s.title);
     setStopSubtitle(s.subtitle);
     setStopLocation(s.locationName);
+    setStopLatitude(String(s.coordinates.lat));
+    setStopLongitude(String(s.coordinates.lng));
     setStopStory(s.story);
     setStopHistoricalNote(s.historicalNote || '');
     setStopImage(s.imageUrl || coverImage);
@@ -610,8 +648,12 @@ export const GuideCreateRouteScreen: React.FC<GuideCreateRouteScreenProps> = ({
     if (s.trial?.type === 'acertijo') {
       setStopGameType('acertijo');
       setAcertijoQuestion(s.trial.question || s.enigma.question);
-      setAcertijoOptions(s.trial.options || ['Opción A', 'Opción B', 'Opción C']);
-      setAcertijoCorrectIndex(s.trial.correctOptionIndex || 0);
+      const options = s.trial.options || ['Opción A', 'Opción B', 'Opción C'];
+      const correctIndex = s.trial.correctOptionIndex ?? 0;
+      setAcertijoCorrectAnswer(options[correctIndex] || '');
+      setAcertijoWrongAnswers(options.filter((_, index) => index !== correctIndex).length
+        ? options.filter((_, index) => index !== correctIndex)
+        : ['']);
       setAcertijoHint(s.trial.generalHint || s.enigma.hint);
     } else if (s.trial?.type === 'cifrado_magico') {
       setStopGameType('cifrado_magico');
@@ -638,6 +680,33 @@ export const GuideCreateRouteScreen: React.FC<GuideCreateRouteScreenProps> = ({
       alert('Por favor indica el nombre de la parada.');
       return;
     }
+    const latitude = Number(stopLatitude);
+    const longitude = Number(stopLongitude);
+    if (
+      !stopLatitude.trim() ||
+      !stopLongitude.trim() ||
+      !Number.isFinite(latitude) ||
+      !Number.isFinite(longitude) ||
+      latitude < -90 ||
+      latitude > 90 ||
+      longitude < -180 ||
+      longitude > 180
+    ) {
+      alert(t('creator_stop_coordinates_required'));
+      return;
+    }
+
+    if (stopGameType === 'acertijo') {
+      const answers = [acertijoCorrectAnswer, ...acertijoWrongAnswers].map((answer) => answer.trim());
+      if (answers.some((answer) => !answer)) {
+        alert('Completa la respuesta correcta y todas las incorrectas.');
+        return;
+      }
+      if (new Set(answers).size !== answers.length) {
+        alert('Las respuestas deben ser distintas.');
+        return;
+      }
+    }
 
     let trialObj: StopTrial | undefined = undefined;
 
@@ -647,8 +716,8 @@ export const GuideCreateRouteScreen: React.FC<GuideCreateRouteScreenProps> = ({
         title: `Reto de Observación: ${stopTitle}`,
         loreContext: `Misterio patrimonial documentado por el guía para ${stopTitle}.`,
         question: acertijoQuestion.trim() || '¿Cuál es la respuesta correcta?',
-        options: acertijoOptions.map((o) => o.trim()).filter((o) => o.length > 0),
-        correctOptionIndex: acertijoCorrectIndex,
+        options: [acertijoCorrectAnswer, ...acertijoWrongAnswers].map((option) => option.trim()),
+        correctOptionIndex: 0,
         generalHint: acertijoHint.trim() || 'Observa con atención los vestigios históricos.',
         characterClues: {
           meiga: 'La intuición de la Meiga descarta las opciones falsas.',
@@ -714,10 +783,10 @@ export const GuideCreateRouteScreen: React.FC<GuideCreateRouteScreenProps> = ({
       recordedAudioUrl: recordedAudioBlobUrl || undefined,
       audioDuration: stopAudioMode === 'written' ? 'Lectura' : '2:30 min',
       coordinates: {
-        lat: 42.04 + stops.length * 0.02,
-        lng: -8.64 - stops.length * 0.02,
-        x: Math.min(85, Math.max(15, 20 + stops.length * 18)),
-        y: Math.min(85, Math.max(20, 25 + stops.length * 15)),
+        lat: latitude,
+        lng: longitude,
+        x: 50,
+        y: 50,
       },
       enigma: {
         question:
@@ -755,9 +824,8 @@ export const GuideCreateRouteScreen: React.FC<GuideCreateRouteScreenProps> = ({
 
   // Compile full RouteItem
   const assembleRoute = (status: 'pendiente' | 'borrador'): RouteItem => {
-    const generatedId = `route-${Date.now()}`;
     return {
-      id: generatedId,
+      id: routeIdRef.current,
       title: title.trim() || 'Ruta Cultural de Autor',
       subtitle: `Itinerario guiado en ${location || 'Galicia'} con retos y relatos`,
       description:
@@ -769,7 +837,7 @@ export const GuideCreateRouteScreen: React.FC<GuideCreateRouteScreenProps> = ({
       isFeatured: false,
       stopsCount: stops.length,
       duration: duration || '1h 30 min',
-      distance: `${(stops.length * 0.85).toFixed(1).replace('.', ',')} km`,
+      distance: `${(stops.length * 0.85).toFixed(2).replace('.', ',')} km`,
       difficulty,
       categories: [category],
       audioTag:
@@ -845,6 +913,57 @@ export const GuideCreateRouteScreen: React.FC<GuideCreateRouteScreenProps> = ({
     onSaveDraft(item);
   };
 
+  const handleNextStep = () => {
+    if (!title.trim()) {
+      setValidationError('Por favor, indica un nombre para la ruta.');
+      return;
+    }
+    if (!location.trim()) {
+      setValidationError('Por favor, indica el sitio o ubicación de la ruta.');
+      return;
+    }
+    setValidationError(null);
+    setCurrentStep(2);
+  };
+
+  const hasUnsavedData =
+    isAddingStop ||
+    selectedTemplateId !== (initialRoute ? '' : 'tpl-lendas') ||
+    JSON.stringify({
+      title,
+      location,
+      description,
+      category,
+      duration,
+      difficulty,
+      price,
+      coverImage,
+      defaultVoiceId,
+      defaultAudioMode,
+      stops,
+    }) !== initialFormSnapshot.current;
+
+  const handleCancel = () => {
+    if (
+      hasUnsavedData &&
+      window.confirm(t('creator_exit_draft_prompt'))
+    ) {
+      soundEngine.stopSpeech();
+      handleDraft();
+      return;
+    }
+    soundEngine.stopSpeech();
+    onCancel();
+  };
+
+  const selectedStopCoordinates =
+    Number.isFinite(Number(stopLatitude)) &&
+    Number.isFinite(Number(stopLongitude)) &&
+    stopLatitude.trim() !== '' &&
+    stopLongitude.trim() !== ''
+      ? { lat: Number(stopLatitude), lng: Number(stopLongitude) }
+      : undefined;
+
   return (
     <div className="min-h-screen bg-[#fcf9f2] text-[#1b3022] selection:bg-[#c48b47]/20 flex flex-col justify-between">
       {/* Top Header */}
@@ -852,10 +971,7 @@ export const GuideCreateRouteScreen: React.FC<GuideCreateRouteScreenProps> = ({
         <div className="max-w-5xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
           <button
             id="create-route-cancel-btn"
-            onClick={() => {
-              soundEngine.stopSpeech();
-              onCancel();
-            }}
+            onClick={handleCancel}
             className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-serif text-[#1b3022]/80 hover:text-[#1b3022] px-3 py-1.5 rounded-lg border border-[#1b3022]/15 hover:border-[#1b3022]/30 transition-colors cursor-pointer"
           >
             <ChevronLeft className="w-4 h-4" />
@@ -863,33 +979,18 @@ export const GuideCreateRouteScreen: React.FC<GuideCreateRouteScreenProps> = ({
           </button>
 
           <div className="flex items-center gap-2 sm:gap-3">
-            {/* Multi-language Selector Pill */}
             <LanguageSelector variant="compact" />
-
-            <button
-              id="create-route-save-draft-btn"
-              onClick={handleDraft}
-              className="inline-flex items-center gap-1.5 px-3 sm:px-4 py-1.5 rounded-xl border border-[#1b3022]/20 hover:border-[#1b3022]/40 bg-white/70 text-[#1b3022] text-xs font-serif font-medium transition-all cursor-pointer"
-            >
-              <FileEdit className="w-3.5 h-3.5 text-[#c48b47]" />
-              <span className="hidden sm:inline">{t('creator_bottom_draft')}</span>
-              <span className="sm:hidden">Borrador</span>
-            </button>
-
-            <button
-              id="create-route-publish-btn"
-              onClick={handlePublish}
-              className="inline-flex items-center gap-1.5 px-4 sm:px-5 py-1.5 rounded-xl bg-[#1b3022] hover:bg-[#274430] text-[#fcf9f2] text-xs font-serif font-semibold shadow-xs transition-all cursor-pointer"
-            >
-              <Send className="w-3.5 h-3.5 text-[#c48b47]" />
-              <span>{t('creator_bottom_publish')}</span>
-            </button>
+            <span className="whitespace-nowrap text-xs font-serif font-semibold text-[#47654e]">
+              {t('creator_step_label')} {currentStep}/2
+            </span>
           </div>
         </div>
       </header>
 
       {/* Main Body */}
       <main className="max-w-4xl mx-auto px-4 sm:px-6 py-8 w-full flex-1 space-y-8">
+        {currentStep === 1 && (
+          <>
         {/* Banner de Bienvenida y Selector de Plantillas */}
         <div className="bg-gradient-to-br from-[#1b3022] via-[#24422e] to-[#16291d] text-[#fcf9f2] rounded-3xl p-6 sm:p-8 shadow-sm border border-[#1b3022]/20">
           <div className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-[#c48b47] px-3 py-1 rounded-full bg-white/10 border border-white/10 mb-3">
@@ -955,6 +1056,8 @@ export const GuideCreateRouteScreen: React.FC<GuideCreateRouteScreenProps> = ({
             </div>
           </div>
         </div>
+          </>
+        )}
 
         {/* Notificación de Error de Validación */}
         {validationError && (
@@ -964,6 +1067,8 @@ export const GuideCreateRouteScreen: React.FC<GuideCreateRouteScreenProps> = ({
           </div>
         )}
 
+        {currentStep === 1 && (
+          <>
         {/* ========================================================
             SECCIÓN 1: EL SITIO Y DATOS DE LA RUTA
         ======================================================== */}
@@ -1129,6 +1234,22 @@ export const GuideCreateRouteScreen: React.FC<GuideCreateRouteScreenProps> = ({
             </div>
           </div>
         </section>
+          </>
+        )}
+
+        {currentStep === 2 && (
+          <>
+        <div className="rounded-3xl border border-[#1b3022]/10 bg-[#1b3022] p-6 text-[#fcf9f2] shadow-sm">
+          <span className="text-xs font-semibold uppercase tracking-wider text-[#c48b47]">
+            {t('creator_step_label')} 2/2
+          </span>
+          <h1 className="mt-1 text-2xl font-serif font-bold">
+            {t('creator_stops_screen_title')}
+          </h1>
+          <p className="mt-1 text-sm font-serif text-[#fcf9f2]/80">
+            {t('creator_stops_screen_desc')}
+          </p>
+        </div>
 
         {/* ========================================================
             SECCIÓN 2: CARGAR IMAGEN DE LA RUTA
@@ -1463,7 +1584,11 @@ export const GuideCreateRouteScreen: React.FC<GuideCreateRouteScreenProps> = ({
             </div>
           )}
         </section>
+          </>
+        )}
 
+        {currentStep === 2 && (
+          <>
         {/* ========================================================
             SECCIÓN 4: PARADAS DEL ITINERARIO + ELECCIÓN DEL JUEGO
         ======================================================== */}
@@ -1627,6 +1752,51 @@ export const GuideCreateRouteScreen: React.FC<GuideCreateRouteScreenProps> = ({
                     placeholder={t('creator_stop_site_ph')}
                     className="w-full px-3 py-2.5 rounded-xl border border-[#1b3022]/20 bg-white font-serif text-xs outline-none focus:border-[#c48b47]"
                   />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 gap-4">
+                <CoordinateMapPicker
+                  selectedCoordinates={selectedStopCoordinates}
+                  existingCoordinates={stops
+                    .filter((_, index) => index !== editingStopIndex)
+                    .map(stop => stop.coordinates)}
+                  onSelect={coordinates => {
+                    setStopLatitude(coordinates.lat.toFixed(6));
+                    setStopLongitude(coordinates.lng.toFixed(6));
+                  }}
+                />
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-serif font-semibold text-[#334b39] mb-1">
+                      {t('creator_latitude')}
+                    </label>
+                    <input
+                      type="number"
+                      min="-90"
+                      max="90"
+                      step="any"
+                      value={stopLatitude}
+                      onChange={event => setStopLatitude(event.target.value)}
+                      placeholder="42.880500"
+                      className="w-full px-3 py-2.5 rounded-xl border border-[#1b3022]/20 bg-white font-serif text-xs outline-none focus:border-[#c48b47]"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-serif font-semibold text-[#334b39] mb-1">
+                      {t('creator_longitude')}
+                    </label>
+                    <input
+                      type="number"
+                      min="-180"
+                      max="180"
+                      step="any"
+                      value={stopLongitude}
+                      onChange={event => setStopLongitude(event.target.value)}
+                      placeholder="-8.544200"
+                      className="w-full px-3 py-2.5 rounded-xl border border-[#1b3022]/20 bg-white font-serif text-xs outline-none focus:border-[#c48b47]"
+                    />
+                  </div>
                 </div>
               </div>
 
@@ -1857,36 +2027,54 @@ export const GuideCreateRouteScreen: React.FC<GuideCreateRouteScreenProps> = ({
 
                     <div>
                       <label className="block text-[11px] font-serif font-semibold text-[#334b39] mb-1">
-                        Opciones de respuesta (marca la correcta con el radio selector):
+                        Respuesta correcta:
+                      </label>
+                      <input
+                        type="text"
+                        value={acertijoCorrectAnswer}
+                        onChange={(e) => setAcertijoCorrectAnswer(e.target.value)}
+                        className="w-full px-3 py-1.5 rounded-lg border border-[#1b3022]/20 bg-white font-serif text-xs outline-none"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-serif font-semibold text-[#334b39] mb-1">
+                        Respuestas incorrectas:
                       </label>
                       <div className="space-y-2">
-                        {acertijoOptions.map((opt, i) => (
-                          <div key={i} className="flex items-center gap-2">
-                            <input
-                              type="radio"
-                              name="acertijo-correct-opt"
-                              checked={acertijoCorrectIndex === i}
-                              onChange={() => setAcertijoCorrectIndex(i)}
-                              className="accent-[#c48b47] w-4 h-4 cursor-pointer"
-                            />
+                        {acertijoWrongAnswers.map((answer, index) => (
+                          <div key={index} className="flex items-center gap-2">
                             <input
                               type="text"
-                              value={opt}
+                              value={answer}
                               onChange={(e) => {
-                                const next = [...acertijoOptions];
-                                next[i] = e.target.value;
-                                setAcertijoOptions(next);
+                                const next = [...acertijoWrongAnswers];
+                                next[index] = e.target.value;
+                                setAcertijoWrongAnswers(next);
                               }}
+                              aria-label={`Respuesta incorrecta ${index + 1}`}
                               className="flex-1 px-3 py-1.5 rounded-lg border border-[#1b3022]/20 bg-white font-serif text-xs outline-none"
                             />
-                            {acertijoCorrectIndex === i && (
-                              <span className="text-[10px] text-green-700 font-bold bg-green-100 px-2 py-0.5 rounded">
-                                Correcta
-                              </span>
-                            )}
+                            <button
+                              type="button"
+                              onClick={() => setAcertijoWrongAnswers((answers) => answers.filter((_, i) => i !== index))}
+                              disabled={acertijoWrongAnswers.length <= 1}
+                              aria-label={`Eliminar respuesta incorrecta ${index + 1}`}
+                              className="p-1.5 text-[#8c5717] disabled:opacity-40"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
                           </div>
                         ))}
                       </div>
+                      <button
+                        type="button"
+                        onClick={() => setAcertijoWrongAnswers((answers) => [...answers, ''])}
+                        className="mt-2 inline-flex items-center gap-1 rounded-lg border border-[#1b3022]/20 px-3 py-1.5 font-serif text-xs font-semibold text-[#334b39] hover:bg-[#1b3022]/5"
+                      >
+                        <Plus className="h-3.5 w-3.5" />
+                        Añadir respuesta incorrecta
+                      </button>
                     </div>
 
                     <div>
@@ -2070,12 +2258,15 @@ export const GuideCreateRouteScreen: React.FC<GuideCreateRouteScreenProps> = ({
             id="bottom-cancel-btn"
             type="button"
             onClick={() => {
-              soundEngine.stopSpeech();
-              onCancel();
+              setValidationError(null);
+              setCurrentStep(1);
             }}
             className="text-xs font-serif text-[#1b3022]/70 hover:text-[#1b3022] underline cursor-pointer"
           >
-            {t('creator_bottom_back')}
+            <span className="inline-flex items-center gap-1">
+              <ChevronLeft className="h-4 w-4" />
+              {t('creator_back_route_data')}
+            </span>
           </button>
 
           <div className="flex items-center gap-3 w-full sm:w-auto">
@@ -2099,6 +2290,22 @@ export const GuideCreateRouteScreen: React.FC<GuideCreateRouteScreenProps> = ({
             </button>
           </div>
         </div>
+          </>
+        )}
+
+        {currentStep === 1 && (
+          <div className="flex justify-end border-t border-[#1b3022]/15 pt-4">
+            <button
+              id="creator-next-step-btn"
+              type="button"
+              onClick={handleNextStep}
+              className="inline-flex items-center gap-2 rounded-2xl bg-[#1b3022] px-6 py-3 text-sm font-serif font-bold text-[#fcf9f2] shadow-md transition-colors hover:bg-[#25422e]"
+            >
+              {t('creator_continue_stops')}
+              <ChevronRight className="h-4 w-4 text-[#c48b47]" />
+            </button>
+          </div>
+        )}
       </main>
     </div>
   );

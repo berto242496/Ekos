@@ -19,6 +19,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ecosdolugar.model.OverviewFeature
 import com.ecosdolugar.model.RouteItem
+import com.ecosdolugar.ui.components.RouteCoverImage
 import com.ecosdolugar.ui.theme.*
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -138,6 +139,10 @@ fun RouteDetailScreen(
                     colors = CardDefaults.cardColors(containerColor = SurfaceContainerHighest)
                 ) {
                     Box(modifier = Modifier.fillMaxSize()) {
+                        RouteCoverImage(
+                            url = route.imageUrl,
+                            modifier = Modifier.fillMaxSize()
+                        )
                         // Badge Top Left
                         Surface(
                             shape = CircleShape,

@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { RouteItem, RouteStop } from '../types';
 import { getCharacterById } from '../data/charactersData';
+import { useI18n } from '../services/i18n';
 import {
   Layers,
   Play,
@@ -14,23 +15,40 @@ interface InteractiveMapProps {
   routes: RouteItem[];
   selectedRouteId?: string;
   characterId?: string;
+  expeditionMode?: boolean;
+  solvedStopIds?: string[];
   onSelectRoute: (route: RouteItem) => void;
   onStartRoute: (route: RouteItem) => void;
+  onStopReached?: (stop: RouteStop) => void;
   onClose?: () => void;
   isModal?: boolean;
 }
+
+interface UserLocation {
+  lat: number;
+  lng: number;
+  accuracy: number;
+}
+
+type LocationErrorKey =
+  | 'map_location_unsupported'
+  | 'map_location_denied'
+  | 'map_location_error';
 
 export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   routes,
   selectedRouteId,
   characterId = 'meiga',
+  expeditionMode = false,
+  solvedStopIds = [],
   onSelectRoute,
   onStartRoute,
+  onStopReached,
   onClose,
   isModal = false,
 }) => {
   const [activeFilter, setActiveFilter] = useState<string>(
-    isModal ? selectedRouteId || 'all' : 'all',
+    isModal || expeditionMode ? selectedRouteId || 'all' : 'all',
   );
   const [selectedStop, setSelectedStop] = useState<{
     stop: RouteStop;
@@ -39,7 +57,14 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   const [zoom, setZoom] = useState(8);
   const [mapReady, setMapReady] = useState(false);
   const [pan, setPan] = useState({ x: 0, y: 0 });
+  const [userLocation, setUserLocation] = useState<UserLocation | null>(null);
+  const [locationError, setLocationError] = useState<LocationErrorKey | null>(null);
+  const [locationStatus, setLocationStatus] = useState<'loading' | 'ready' | 'unavailable'>(
+    expeditionMode ? 'loading' : 'unavailable',
+  );
   const mapRef = useRef<HTMLDivElement>(null);
+  const onStopReachedRef = useRef(onStopReached);
+  const triggeredStopIds = useRef(new Set<string>());
   const dragStart = useRef<{
     pointerId: number;
     x: number;
@@ -49,9 +74,47 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   } | null>(null);
   const [mapSize, setMapSize] = useState({ width: 0, height: 0 });
   const activeChar = getCharacterById(characterId);
+  const { t } = useI18n();
 
-  const activeRoutes =
-    activeFilter === 'all'
+  useEffect(() => {
+    onStopReachedRef.current = onStopReached;
+  }, [onStopReached]);
+
+  useEffect(() => {
+    if (!expeditionMode) return;
+    if (!navigator.geolocation) {
+      setLocationStatus('unavailable');
+      setLocationError('map_location_unsupported');
+      return;
+    }
+
+    setLocationStatus('loading');
+    const watchId = navigator.geolocation.watchPosition(
+      position => {
+        setUserLocation({
+          lat: position.coords.latitude,
+          lng: position.coords.longitude,
+          accuracy: position.coords.accuracy,
+        });
+        setLocationError(null);
+        setLocationStatus('ready');
+      },
+      error => {
+        setLocationStatus('unavailable');
+        setLocationError(
+          error.code === error.PERMISSION_DENIED ? 'map_location_denied' : 'map_location_error',
+        );
+      },
+      { enableHighAccuracy: true, maximumAge: 1000, timeout: 20000 },
+    );
+
+    return () => navigator.geolocation.clearWatch(watchId);
+  }, [expeditionMode]);
+
+  // En expedición solo se muestra la ruta desde la que se entra.
+  const activeRoutes = expeditionMode
+    ? routes.filter(r => r.id === selectedRouteId)
+    : activeFilter === 'all'
       ? routes
       : routes.filter(r => r.id === activeFilter);
 
@@ -74,11 +137,15 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
 
     const latitudes = visibleStops.map(({ stop }) => stop.coordinates.lat);
     const longitudes = visibleStops.map(({ stop }) => stop.coordinates.lng);
+    if (expeditionMode && userLocation) {
+      latitudes.push(userLocation.lat);
+      longitudes.push(userLocation.lng);
+    }
     return {
       lat: (Math.min(...latitudes) + Math.max(...latitudes)) / 2,
       lng: (Math.min(...longitudes) + Math.max(...longitudes)) / 2,
     };
-  }, [visibleStops]);
+  }, [expeditionMode, userLocation, visibleStops]);
 
   useEffect(() => {
     const element = mapRef.current;
@@ -96,7 +163,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
 
   useEffect(() => {
     if (mapSize.width === 0 || mapSize.height === 0) return;
-    if (visibleStops.length < 2) {
+    if (visibleStops.length < 2 && !userLocation) {
       setMapReady(true);
       return;
     }
@@ -112,6 +179,18 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
           256,
       };
     });
+    if (expeditionMode && userLocation) {
+      const latitude = Math.max(-85.0511, Math.min(85.0511, userLocation.lat));
+      const sinLatitude = Math.sin((latitude * Math.PI) / 180);
+      zoomZeroPoints.push({
+        x: ((userLocation.lng + 180) / 360) * 256,
+        y: (0.5 - Math.log((1 + sinLatitude) / (1 - sinLatitude)) / (4 * Math.PI)) * 256,
+      });
+    }
+    if (zoomZeroPoints.length === 0) {
+      setMapReady(true);
+      return;
+    }
     const spanX =
       Math.max(...zoomZeroPoints.map(point => point.x)) -
       Math.min(...zoomZeroPoints.map(point => point.x));
@@ -124,7 +203,33 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
 
     setZoom(Math.max(6, Math.min(15, fittedZoom)));
     setMapReady(true);
-  }, [mapSize, visibleStops]);
+  }, [expeditionMode, mapSize, userLocation, visibleStops]);
+
+  useEffect(() => {
+    if (!expeditionMode || !userLocation || !onStopReachedRef.current) return;
+    const toRadians = (degrees: number) => (degrees * Math.PI) / 180;
+    const distanceInMeters = (stop: RouteStop) => {
+      const earthRadius = 6_371_000;
+      const latitudeDelta = toRadians(stop.coordinates.lat - userLocation.lat);
+      const longitudeDelta = toRadians(stop.coordinates.lng - userLocation.lng);
+      const a =
+        Math.sin(latitudeDelta / 2) ** 2 +
+        Math.cos(toRadians(userLocation.lat)) *
+          Math.cos(toRadians(stop.coordinates.lat)) *
+          Math.sin(longitudeDelta / 2) ** 2;
+      return earthRadius * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    };
+    const reached = visibleStops.find(
+      ({ stop }) =>
+        !solvedStopIds.includes(stop.id) &&
+        !triggeredStopIds.current.has(stop.id) &&
+        distanceInMeters(stop) <= 10,
+    );
+    if (reached) {
+      triggeredStopIds.current.add(reached.stop.id);
+      onStopReachedRef.current?.(reached.stop);
+    }
+  }, [expeditionMode, solvedStopIds, userLocation, visibleStops]);
 
   useEffect(() => {
     setSelectedStop(null);
@@ -203,10 +308,12 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
       <header className="sticky top-0 z-30 bg-[#fcf9f2]/95 backdrop-blur-md px-5 py-3 border-b border-[#1b3022]/10 flex items-center justify-between">
         <div className="flex flex-col">
           <span className="font-sans text-[11px] uppercase tracking-wider text-[#47654e] font-semibold">
-            Cartografía de Galicia · As 4 Provincias
+            {expeditionMode ? t('map_eyebrow_expedition') : t('map_eyebrow_default')}
           </span>
           <h2 className="font-serif text-[18px] font-semibold text-[#1c1c18]">
-            Mapa de Rutas & Patrimonio
+            {expeditionMode
+              ? routes.find(route => route.id === selectedRouteId)?.title || t('map_title_fallback')
+              : t('map_title_default')}
           </h2>
         </div>
 
@@ -214,7 +321,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
           {/* Active Companion Chip */}
           <div
             className="h-8 px-2.5 rounded-full bg-[#1b3022]/10 border border-[#1b3022]/20 flex items-center gap-1.5"
-            title={`Compañeiro Activo: ${activeChar.name}`}
+            title={t('map_companion').replace('{name}', activeChar.name)}
           >
             <span className="text-base leading-none">{activeChar.avatarEmoji}</span>
             <span className="font-serif text-[12px] font-semibold text-[#1b3022] hidden sm:inline">
@@ -225,14 +332,14 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
           <div className="flex items-center rounded-full border border-[#1b3022]/15 bg-white">
             <button
               onClick={() => setZoom(current => Math.max(6, current - 1))}
-              aria-label="Alejar mapa"
+              aria-label={t('map_zoom_out')}
               className="p-2 text-[#1b3022] hover:bg-[#f1eee7] rounded-l-full cursor-pointer"
             >
               <Minus className="w-4 h-4" />
             </button>
             <button
               onClick={() => setZoom(current => Math.min(15, current + 1))}
-              aria-label="Acercar mapa"
+              aria-label={t('map_zoom_in')}
               className="p-2 text-[#1b3022] hover:bg-[#f1eee7] rounded-r-full cursor-pointer"
             >
               <Plus className="w-4 h-4" />
@@ -242,6 +349,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
           {isModal && onClose && (
             <button
               onClick={onClose}
+              aria-label={t('close')}
               className="w-8 h-8 rounded-full bg-[#ebe8e1] flex items-center justify-center text-[#1c1c18] hover:bg-[#dcdad3] cursor-pointer"
             >
               <X className="w-4 h-4" />
@@ -250,8 +358,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
         </div>
       </header>
 
-      {/* Filter Chips on Map */}
-      <div className="px-5 py-2.5 bg-[#f6f3ec] border-b border-[#e5e2db] flex items-center gap-2 overflow-x-auto no-scrollbar">
+      {!expeditionMode && <div className="px-5 py-2.5 bg-[#f6f3ec] border-b border-[#e5e2db] flex items-center gap-2 overflow-x-auto no-scrollbar">
         <button
           onClick={() => setActiveFilter('all')}
           className={`px-3 py-1 rounded-full text-[12px] font-sans font-semibold tracking-wide whitespace-nowrap transition-all cursor-pointer ${
@@ -260,7 +367,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
               : 'bg-white text-[#434843] border border-[#c3c8c1]/40 hover:bg-[#ebe8e1]'
           }`}
         >
-          Toda Galicia ({routes.length} rutas)
+          {t('map_all_routes').replace('{count}', String(routes.length))}
         </button>
 
         {routes.map(r => {
@@ -279,13 +386,13 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
             </button>
           );
         })}
-      </div>
+      </div>}
 
       <div
         ref={mapRef}
         className="relative flex-1 w-full min-h-[420px] bg-[#e8eee8] overflow-hidden select-none cursor-grab active:cursor-grabbing"
         role="region"
-        aria-label="Mapa de rutas de Galicia"
+        aria-label={t('map_region_label')}
         style={{ touchAction: 'none' }}
         onPointerDown={event => {
           if (event.button !== 0) return;
@@ -387,50 +494,84 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
                   : 'w-8 h-8 hover:scale-110'
               }`}
               title={`${route.title}: ${stop.title}`}
-              aria-label={`${route.title}, parada ${stop.order}: ${stop.title}`}
+              aria-label={t('map_stop_aria')
+                .replace('{route}', route.title)
+                .replace('{order}', String(stop.order))
+                .replace('{title}', stop.title)}
             >
               <span className="font-serif text-[12px] font-bold">{stop.order}</span>
             </button>
           );
         })}
 
+        {expeditionMode && userLocation && (
+          <div
+            className="absolute z-20 h-5 w-5 -translate-x-1/2 -translate-y-1/2 rounded-full border-[3px] border-white bg-blue-600 shadow-lg"
+            style={{
+              left: toMapPosition(userLocation.lat, userLocation.lng).x,
+              top: toMapPosition(userLocation.lat, userLocation.lng).y,
+            }}
+            title={t('map_user_marker_title').replace('{m}', String(Math.round(userLocation.accuracy)))}
+            aria-label={t('map_user_marker')}
+          />
+        )}
+
         {visibleStops.length === 0 && (
           <div className="absolute inset-0 flex items-center justify-center p-6 pointer-events-none">
             <p className="rounded-xl bg-white/95 px-4 py-3 text-center text-sm text-[#434843] shadow-md">
-              Esta ruta todavía no tiene paradas con coordenadas.
+              {t('map_no_stops')}
             </p>
           </div>
         )}
 
-        <div className="absolute bottom-4 left-4 z-10 max-w-[min(24rem,calc(100%-2rem))] rounded-xl border border-[#1b3022]/10 bg-white/95 p-3 shadow-md">
-          <div className="mb-1.5 flex items-center gap-1.5 font-sans text-[11px] font-semibold text-[#061b0e]">
-            <Layers className="w-3.5 h-3.5 text-[#47654e]" />
-            <span>Paradas de las rutas visibles</span>
+        {expeditionMode && (
+          <div className="absolute top-3 left-3 z-10 max-w-[min(24rem,calc(100%-2rem))] rounded-xl border border-[#1b3022]/10 bg-white/95 p-3 shadow-md">
+            <p className="text-[12px] font-semibold text-[#061b0e]">
+              {locationStatus === 'ready'
+                ? t('map_location_ready')
+                : locationError
+                  ? t(locationError)
+                  : t('map_location_waiting')}
+            </p>
+            {userLocation && (
+              <p className="mt-1 text-[10px] text-[#737973]">
+                {t('map_location_precision').replace('{m}', String(Math.round(userLocation.accuracy)))}
+              </p>
+            )}
           </div>
-          {visibleStops.length > 0 ? (
-            <div className="flex max-h-16 flex-wrap gap-x-3 gap-y-1 overflow-y-auto text-[11px] text-[#434843]">
-              {activeRoutes
-                .filter(route =>
-                  route.stops.some(
-                    stop =>
-                      Number.isFinite(stop.coordinates.lat) &&
-                      Number.isFinite(stop.coordinates.lng),
-                  ),
-                )
-                .map(route => (
-                  <div key={route.id} className="flex items-center gap-1.5">
-                    <span
-                      className="h-2.5 w-2.5 shrink-0 rounded-full"
-                      style={{ backgroundColor: getRouteColor(route.id) }}
-                    />
-                    <span className="max-w-36 truncate">{route.title}</span>
-                  </div>
-                ))}
+        )}
+
+        {!expeditionMode && (
+          <div className="absolute bottom-4 left-4 z-10 max-w-[min(24rem,calc(100%-2rem))] rounded-xl border border-[#1b3022]/10 bg-white/95 p-3 shadow-md">
+            <div className="mb-1.5 flex items-center gap-1.5 font-sans text-[11px] font-semibold text-[#061b0e]">
+              <Layers className="w-3.5 h-3.5 text-[#47654e]" />
+              <span>{t('map_stops_visible')}</span>
             </div>
-          ) : (
-            <span className="text-[11px] text-[#737973]">Sin puntos para mostrar</span>
-          )}
-        </div>
+            {visibleStops.length > 0 ? (
+              <div className="flex max-h-16 flex-wrap gap-x-3 gap-y-1 overflow-y-auto text-[11px] text-[#434843]">
+                {activeRoutes
+                  .filter(route =>
+                    route.stops.some(
+                      stop =>
+                        Number.isFinite(stop.coordinates.lat) &&
+                        Number.isFinite(stop.coordinates.lng),
+                    ),
+                  )
+                  .map(route => (
+                    <div key={route.id} className="flex items-center gap-1.5">
+                      <span
+                        className="h-2.5 w-2.5 shrink-0 rounded-full"
+                        style={{ backgroundColor: getRouteColor(route.id) }}
+                      />
+                      <span className="max-w-36 truncate">{route.title}</span>
+                    </div>
+                  ))}
+              </div>
+            ) : (
+              <span className="text-[11px] text-[#737973]">{t('map_no_points')}</span>
+            )}
+          </div>
+        )}
 
         <a
           href="https://www.openstreetmap.org/copyright"
@@ -442,9 +583,8 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
         </a>
       </div>
 
-      {/* Selected Stop Drawer Sheet */}
       {selectedStop && (
-        <div className="bg-white border-t border-[#1b3022]/10 p-4 shadow-xl z-30 max-w-lg mx-auto w-full flex flex-col gap-2.5 animate-in slide-in-from-bottom duration-200">
+        <div className={`bg-white border-t border-[#1b3022]/10 p-4 shadow-xl z-30 max-w-lg mx-auto w-full flex flex-col gap-2.5 animate-in slide-in-from-bottom duration-200 ${expeditionMode ? 'absolute bottom-0 left-0 right-0 rounded-t-2xl' : ''}`}>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <span
@@ -454,12 +594,15 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
                 {selectedStop.route.title}
               </span>
               <span className="font-sans text-[12px] text-[#737973]">
-                Parada {selectedStop.stop.order} de {selectedStop.route.stopsCount}
+                {t('map_stop_of')
+                  .replace('{order}', String(selectedStop.stop.order))
+                  .replace('{count}', String(selectedStop.route.stopsCount))}
               </span>
             </div>
 
             <button
               onClick={() => setSelectedStop(null)}
+              aria-label={t('close')}
               className="text-[#737973] hover:text-[#1c1c18] p-1 cursor-pointer"
             >
               <X className="w-4 h-4" />
@@ -475,14 +618,14 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
             </p>
           </div>
 
-          <p className="font-sans text-[13px] text-[#434843] line-clamp-2 leading-relaxed">
+          <p className={`font-sans text-[13px] text-[#434843] leading-relaxed ${expeditionMode ? 'max-h-[30vh] overflow-y-auto' : 'line-clamp-2'}`}>
             {selectedStop.stop.story}
           </p>
 
-          <div className="flex items-center justify-between pt-1 border-t border-[#f1eee7] mt-1">
+          {!expeditionMode && <div className="flex items-center justify-between pt-1 border-t border-[#f1eee7] mt-1">
             <div className="flex items-center gap-2 text-[12px] text-[#737973] font-sans">
               <Volume2 className="w-4 h-4 text-[#47654e]" />
-              <span>Audio: {selectedStop.stop.audioDuration}</span>
+              <span>{t('map_audio').replace('{duration}', selectedStop.stop.audioDuration)}</span>
             </div>
 
             <div className="flex items-center gap-2">
@@ -493,7 +636,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
                 }}
                 className="px-3 py-1.5 rounded-lg border border-[#c3c8c1]/40 text-[#1c1c18] hover:bg-[#f6f3ec] text-[12px] font-sans font-semibold cursor-pointer"
               >
-                Ver ruta
+                {t('map_view_route')}
               </button>
               <button
                 onClick={() => {
@@ -503,10 +646,10 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
                 className="px-3.5 py-1.5 rounded-lg bg-[#061b0e] text-white hover:bg-[#1b3022] text-[12px] font-sans font-semibold flex items-center gap-1 cursor-pointer"
               >
                 <Play className="w-3 h-3 fill-current" />
-                <span>Explorar</span>
+                <span>{t('map_explore')}</span>
               </button>
             </div>
-          </div>
+          </div>}
         </div>
       )}
     </div>

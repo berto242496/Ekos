@@ -19,13 +19,18 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ecosdolugar.data.CharactersRepository
-import com.ecosdolugar.data.RoutesRepository
+import com.ecosdolugar.localization.AppLanguage
 import com.ecosdolugar.model.UserProfile
+import com.ecosdolugar.model.RouteItem
 import com.ecosdolugar.ui.theme.*
 
 @Composable
 fun JournalScreen(
     userProfile: UserProfile,
+    routes: List<RouteItem>,
+    language: AppLanguage,
+    languageTitle: String,
+    onLanguageChange: (AppLanguage) -> Unit,
     onBack: () -> Unit,
     onOpenRoute: (String) -> Unit,
     onSignOut: () -> Unit
@@ -35,8 +40,8 @@ fun JournalScreen(
     }
     val charColor = Color(character.accentColorHex)
 
-    val savedRoutes = remember(userProfile.savedRouteIds) {
-        RoutesRepository.routes.filter { userProfile.savedRouteIds.contains(it.id) }
+    val savedRoutes = remember(userProfile.savedRouteIds, routes) {
+        routes.filter { userProfile.savedRouteIds.contains(it.id) }
     }
 
     Box(
@@ -97,13 +102,60 @@ fun JournalScreen(
                 }
             }
 
+            item {
+                var languageMenuExpanded by remember { mutableStateOf(false) }
+                Surface(
+                    shape = RoundedCornerShape(14.dp),
+                    color = Color(0xFF14241B),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            languageTitle,
+                            color = Color.White,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Box {
+                            TextButton(onClick = { languageMenuExpanded = true }) {
+                                Text(language.displayName, color = TerracottaFixedDim)
+                                Icon(
+                                    Icons.Default.ArrowDropDown,
+                                    contentDescription = null,
+                                    tint = TerracottaFixedDim
+                                )
+                            }
+                            DropdownMenu(
+                                expanded = languageMenuExpanded,
+                                onDismissRequest = { languageMenuExpanded = false }
+                            ) {
+                                AppLanguage.entries.forEach { option ->
+                                    DropdownMenuItem(
+                                        text = { Text(option.displayName) },
+                                        onClick = {
+                                            onLanguageChange(option)
+                                            languageMenuExpanded = false
+                                        }
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
             if (userProfile.isGoogleAuthenticated) {
                 item {
                     OutlinedButton(
                         onClick = onSignOut,
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White)
                     ) {
-                        Text("Cerrar sesión")
+                        Text("Cerrar sesión", color = Color.White)
                     }
                 }
             }

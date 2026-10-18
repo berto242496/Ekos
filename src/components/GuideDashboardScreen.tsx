@@ -50,6 +50,7 @@ interface GuideDashboardScreenProps {
   onSelectGuide: (guideId: string) => void;
   guideRoutes: RouteItem[];
   onCreateRoute: () => void;
+  onEditRoute: (routeId: string) => void;
   onViewRouteDetail: (routeId: string) => void;
   onBackToVisitor: () => void;
 }
@@ -60,6 +61,7 @@ export const GuideDashboardScreen: React.FC<GuideDashboardScreenProps> = ({
   onSelectGuide,
   guideRoutes,
   onCreateRoute,
+  onEditRoute,
   onViewRouteDetail,
   onBackToVisitor,
 }) => {
@@ -218,62 +220,6 @@ export const GuideDashboardScreen: React.FC<GuideDashboardScreenProps> = ({
             <span className="bg-[#fcf9f2] px-3 py-1.5 rounded-lg border border-[#1b3022]/10">
               ★ {guide.rating} ({guide.reviewsCount} valoracións)
             </span>
-          </div>
-        </div>
-
-        {/* Highlighted Payout & Earnings Hero Widget */}
-        <div className="p-5 sm:p-6 rounded-3xl bg-gradient-to-br from-[#1b3022] via-[#14261b] to-[#0a180f] text-[#fcf9f2] border border-[#c48b47]/30 shadow-lg mb-8 flex flex-col md:flex-row md:items-center justify-between gap-6">
-          <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <span className="text-xs uppercase font-serif tracking-wider font-semibold text-[#c48b47]">
-                Sección de Cobros e Liquidacións
-              </span>
-              <span className="px-2 py-0.2 rounded-full bg-[#c48b47]/20 text-[#ffddba] font-mono text-[10px] font-bold border border-[#c48b47]/30">
-                85% para o guía
-              </span>
-            </div>
-
-            <div className="flex items-baseline gap-3">
-              <span className="font-serif text-4xl sm:text-5xl font-bold tracking-tight text-white">
-                {availableBalance.toFixed(2).replace('.', ',')} €
-              </span>
-              <span className="text-xs text-[#ffddba]/80 font-serif">saldo dispoñible para transferencia</span>
-            </div>
-
-            <div className="flex items-center gap-4 text-xs text-white/70 font-serif pt-1 flex-wrap">
-              <div className="flex items-center gap-1.5">
-                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-                <span>Conta verificada: {payoutSettings.method === 'iban' ? payoutSettings.bankName.split(' ')[0] : 'Bizum'}</span>
-              </div>
-              <span>·</span>
-              <div className="flex items-center gap-1.5">
-                <Receipt className="w-3.5 h-3.5 text-[#c48b47]" />
-                <span>Total cobrado histórico: {totalNetReceived.toFixed(2).replace('.', ',')} € netos</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="flex flex-col sm:flex-row md:flex-col gap-2.5 shrink-0">
-            <button
-              id="btn-open-guide-payout-modal"
-              type="button"
-              onClick={() => setIsPayoutModalOpen(true)}
-              className="py-3 px-5 rounded-xl bg-[#c48b47] hover:bg-[#d89e5a] active:scale-[0.98] text-[#061b0e] font-serif font-bold text-sm shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
-            >
-              <ArrowDownToLine className="w-4 h-4" />
-              <span>Solicitar cobro / Retirar fondos</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => {
-                setActiveTab('cobros');
-              }}
-              className="py-2.5 px-4 rounded-xl bg-white/10 hover:bg-white/15 text-[#ffddba] border border-white/15 font-serif text-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
-            >
-              <Building2 className="w-3.5 h-3.5" />
-              <span>Ver extractos e datos bancarios</span>
-            </button>
           </div>
         </div>
 
@@ -505,9 +451,20 @@ export const GuideDashboardScreen: React.FC<GuideDashboardScreenProps> = ({
                             <span>Ver no catálogo</span>
                           </button>
 
-                          <span className="text-[11px] text-[#47654e] font-serif">
-                            {route.stops?.length || 0} paradas con audio e enigmas
-                          </span>
+                          <div className="flex items-center gap-3">
+                            <span className="hidden text-[11px] text-[#47654e] font-serif sm:inline">
+                              {route.stops?.length || 0} paradas con audio e enigmas
+                            </span>
+                            <button
+                              id={`edit-route-${route.id}-btn`}
+                              type="button"
+                              onClick={() => onEditRoute(route.id)}
+                              className="inline-flex items-center gap-1.5 rounded-lg border border-[#1b3022]/15 bg-white px-3 py-1.5 text-xs font-serif font-semibold text-[#1b3022] transition-colors hover:border-[#c48b47] hover:text-[#8c5717]"
+                            >
+                              <FileEdit className="h-3.5 w-3.5" />
+                              Editar ruta
+                            </button>
+                          </div>
                         </div>
                       </div>
                     );

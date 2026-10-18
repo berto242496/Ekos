@@ -2,16 +2,18 @@ import React from 'react';
 import { APP_LOGO_URL, HERO_FOREST_URL } from '../data/routesData';
 import { LanguageSelector } from './LanguageSelector';
 import { useI18n } from '../services/i18n';
-import { Compass, ArrowRight, ShieldCheck, MapPin } from 'lucide-react';
+import { Compass, LoaderCircle, MapPin } from 'lucide-react';
 
 interface WelcomeScreenProps {
   onSignInWithGoogle: () => void;
   onOpenGuideMode?: () => void;
+  isGuideSignInLoading?: boolean;
 }
 
 export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
   onSignInWithGoogle,
   onOpenGuideMode,
+  isGuideSignInLoading = false,
 }) => {
   const { t } = useI18n();
   return (
@@ -70,10 +72,13 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
         <button
           id="btn-header-soy-guia"
           onClick={onOpenGuideMode}
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#c48b47]/20 hover:bg-[#c48b47]/35 border border-[#c48b47]/40 text-[#ffddba] text-xs font-serif font-medium transition-all shadow-sm cursor-pointer"
+          disabled={isGuideSignInLoading}
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#c48b47]/20 hover:bg-[#c48b47]/35 border border-[#c48b47]/40 text-[#ffddba] text-xs font-serif font-medium transition-all shadow-sm cursor-pointer disabled:opacity-70"
         >
-          <Compass className="w-3.5 h-3.5 text-[#faba71]" />
-          <span>Soy guía</span>
+          {isGuideSignInLoading
+            ? <LoaderCircle className="w-3.5 h-3.5 animate-spin text-[#faba71]" />
+            : <Compass className="w-3.5 h-3.5 text-[#faba71]" />}
+          <span>{isGuideSignInLoading ? 'Conectando con Google…' : 'Soy guía + Google'}</span>
         </button>
       </header>
 
@@ -146,21 +151,10 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
             </svg>
             <div className="flex flex-col items-start leading-tight">
               <span className="font-sans text-[15px] font-semibold text-[#1f1f1f]">
-                Entrar con Google para elegir personaje
-              </span>
-              <span className="font-sans text-[11px] text-[#666] font-normal">
-                Esencial para despertar tu don mágico y resolver las pruebas
+                Entra con Google
               </span>
             </div>
           </button>
-
-          {/* Requirement Notice (No Free Mode) */}
-          <div className="flex items-center gap-2 p-2.5 rounded-lg bg-emerald-950/60 border border-emerald-500/20 backdrop-blur-sm mt-1">
-            <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
-            <p className="font-sans text-[12px] text-emerald-100/90 leading-snug">
-              Cada ruta requiere la sintonía de un personaje mitológico para desvelar sus secretos.
-            </p>
-          </div>
 
           {/* Separator for Guide Flow */}
           <div className="relative flex py-1.5 items-center">
@@ -176,10 +170,13 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
             id="btn-action-soy-guia"
             type="button"
             onClick={onOpenGuideMode}
-            className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-[#c48b47]/20 to-[#8c5717]/30 hover:from-[#c48b47]/30 hover:to-[#8c5717]/40 border border-[#c48b47]/40 text-[#fcf9f2] active:scale-[0.98] transition-all flex items-center justify-center gap-2.5 font-serif font-semibold text-sm shadow-md"
+            disabled={isGuideSignInLoading}
+            className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-[#c48b47]/20 to-[#8c5717]/30 hover:from-[#c48b47]/30 hover:to-[#8c5717]/40 border border-[#c48b47]/40 text-[#fcf9f2] active:scale-[0.98] transition-all flex items-center justify-center gap-2.5 font-serif font-semibold text-sm shadow-md disabled:opacity-70"
           >
-            <Compass className="w-4 h-4 text-[#faba71]" />
-            <span>Soy guía · Crea y monetiza tus rutas</span>
+            {isGuideSignInLoading
+              ? <LoaderCircle className="w-4 h-4 animate-spin text-[#faba71]" />
+              : <Compass className="w-4 h-4 text-[#faba71]" />}
+            <span>{isGuideSignInLoading ? 'Conectando con Google…' : 'Soy guía · Crea tus rutas con Google'}</span>
           </button>
         </div>
 

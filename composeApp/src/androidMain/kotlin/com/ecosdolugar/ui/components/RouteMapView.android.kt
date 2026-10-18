@@ -7,8 +7,8 @@ import android.content.pm.PackageManager
 import android.location.Location
 import android.location.LocationListener
 import android.location.LocationManager
-import android.os.Build
 import android.os.Looper
+import android.view.MotionEvent
 import android.webkit.JavascriptInterface
 import android.webkit.WebChromeClient
 import android.webkit.WebView
@@ -23,6 +23,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -34,12 +35,14 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
+import com.ecosdolugar.localization.AppLanguage
+import com.ecosdolugar.localization.interactiveMapStrings
 import com.ecosdolugar.model.RouteItem
 import com.ecosdolugar.model.RouteStop
 import org.json.JSONArray
 import org.json.JSONObject
 
-private data class MapLocation(val latitude: Double, val longitude: Double)
+private data class MapLocation(val latitude: Double, val longitude: Double, val accuracy: Float)
 
 @Composable
 actual fun RouteMapView(
@@ -48,28 +51,86 @@ actual fun RouteMapView(
     selectedStopId: String?,
     onRouteSelected: (String) -> Unit,
     onStopSelected: (String) -> Unit,
-    modifier: Modifier
+    modifier: Modifier,
+    onCoordinateSelected: ((Double, Double) -> Unit)?,
+    selectedCoordinates: Pair<Double, Double>?,
+    pickerCoordinates: List<Pair<Double, Double>>,
+    onUserLocationChanged: ((Double, Double) -> Unit)?,
+    language: AppLanguage
 ) {
     val context = LocalContext.current
+    val strings = interactiveMapStrings(language)
     val mapStatus = remember { mutableStateOf("loading") }
     val userLocation = remember { mutableStateOf<MapLocation?>(null) }
+    val permissionGranted = remember { mutableStateOf(hasLocationPermission(context)) }
+    val locationUnavailable = remember { mutableStateOf(false) }
     val requestLocationPermission = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { grants ->
-        if (grants.values.any { it }) {
-            fetchUserLocation(context) { location -> userLocation.value = location }
-        } else {
+        permissionGranted.value = grants.values.any { it }
+        if (!permissionGranted.value) {
+            locationUnavailable.value = true
             android.util.Log.i("RouteMap", "Location permission was denied; showing the default map extent")
+        } else {
+            locationUnavailable.value = false
         }
     }
-
     LaunchedEffect(Unit) {
-        if (hasLocationPermission(context)) {
-            fetchUserLocation(context) { location -> userLocation.value = location }
-        } else {
+        permissionGranted.value = hasLocationPermission(context)
+        if (!permissionGranted.value) {
             requestLocationPermission.launch(
                 arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION)
             )
+        }
+    }
+
+    LaunchedEffect(userLocation.value, onUserLocationChanged) {
+        userLocation.value?.let { location ->
+            onUserLocationChanged?.invoke(location.latitude, location.longitude)
+        }
+    }
+
+    DisposableEffect(context, permissionGranted.value) {
+        if (!permissionGranted.value) {
+            onDispose { }
+        } else {
+            val manager = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
+            val hasFinePermission = ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.ACCESS_FINE_LOCATION
+            ) == PackageManager.PERMISSION_GRANTED
+            val providers = (
+                if (hasFinePermission) {
+                    listOf(LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER)
+                } else {
+                    listOf(LocationManager.NETWORK_PROVIDER)
+                }
+            ).filter(manager::isProviderEnabled)
+            locationUnavailable.value = providers.isEmpty()
+            val listener = object : LocationListener {
+                override fun onLocationChanged(location: Location) {
+                    userLocation.value = location.toMapLocation()
+                    locationUnavailable.value = false
+                }
+
+                @Deprecated("Deprecated in Android")
+                override fun onStatusChanged(providerName: String?, status: Int, extras: android.os.Bundle?) = Unit
+
+                override fun onProviderEnabled(providerName: String) = Unit
+                override fun onProviderDisabled(providerName: String) = Unit
+            }
+            try {
+                providers.forEach { provider ->
+                    manager.getLastKnownLocation(provider)?.let { userLocation.value = it.toMapLocation() }
+                    manager.requestLocationUpdates(provider, 1000L, 0f, listener, Looper.getMainLooper())
+                }
+            } catch (error: SecurityException) {
+                locationUnavailable.value = true
+                android.util.Log.e("RouteMap", "Location permission was revoked while tracking the user", error)
+            }
+            onDispose {
+                manager.removeUpdates(listener)
+            }
         }
     }
 
@@ -81,19 +142,45 @@ actual fun RouteMapView(
                 createRouteMap(
                     viewContext,
                     onRouteSelected,
-                    onStopSelected
+                    onStopSelected,
+                    onCoordinateSelected
                 ) { status -> mapStatus.value = status }
             },
             update = { webView ->
-                webView.updateMap(routeData, selectedRouteId, selectedStopId, userLocation.value)
+                webView.updateMap(
+                    routeData,
+                    selectedRouteId,
+                    selectedStopId,
+                    userLocation.value,
+                    selectedCoordinates,
+                    pickerCoordinates
+                )
             }
         )
 
+        if (onUserLocationChanged != null && locationUnavailable.value) {
+            Text(
+                text = if (permissionGranted.value) {
+                strings.enableGps
+                } else {
+                    strings.grantLocation
+                },
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = 64.dp, start = 12.dp, end = 12.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(Color(0xEE173626))
+                    .padding(horizontal = 14.dp, vertical = 10.dp),
+                color = Color.White,
+                style = MaterialTheme.typography.bodySmall
+            )
+        }
+
         if (mapStatus.value != "ready") {
             val message = when (mapStatus.value) {
-                "loading" -> "Cargando mapa…"
-                "leaflet-error" -> "No se pudo iniciar el mapa. Comprueba la conexión a internet."
-                "tiles-error" -> "No se pudieron cargar las calles. Comprueba la conexión a internet."
+                "loading" -> strings.loadingMap
+                "leaflet-error" -> strings.mapStartError
+                "tiles-error" -> strings.tilesError
                 else -> null
             }
             if (message != null) {
@@ -117,70 +204,14 @@ private fun hasLocationPermission(context: Context): Boolean =
     ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
         ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
 
-@SuppressLint("MissingPermission")
-private fun fetchUserLocation(context: Context, onLocation: (MapLocation) -> Unit) {
-    if (!hasLocationPermission(context)) return
-    val manager = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
-    val hasFinePermission = ContextCompat.checkSelfPermission(
-        context,
-        Manifest.permission.ACCESS_FINE_LOCATION
-    ) == PackageManager.PERMISSION_GRANTED
-    val permittedProviders = if (hasFinePermission) {
-        listOf(LocationManager.NETWORK_PROVIDER, LocationManager.GPS_PROVIDER)
-    } else {
-        listOf(LocationManager.NETWORK_PROVIDER)
-    }
-    val providers = permittedProviders
-        .filter(manager::isProviderEnabled)
-
-    if (providers.isEmpty()) {
-        android.util.Log.w("RouteMap", "No location provider is enabled")
-        return
-    }
-
-    try {
-        providers.forEach { provider ->
-            manager.getLastKnownLocation(provider)?.let { location ->
-                onLocation(location.toMapLocation())
-            }
-        }
-
-        providers.forEach { provider ->
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                manager.getCurrentLocation(provider, null, context.mainExecutor) { location ->
-                    if (location != null) onLocation(location.toMapLocation())
-                }
-            } else {
-                @Suppress("DEPRECATION")
-                manager.requestSingleUpdate(
-                    provider,
-                    object : LocationListener {
-                        override fun onLocationChanged(location: Location) {
-                            onLocation(location.toMapLocation())
-                        }
-
-                        @Deprecated("Deprecated in Android")
-                        override fun onStatusChanged(providerName: String?, status: Int, extras: android.os.Bundle?) = Unit
-
-                        override fun onProviderEnabled(providerName: String) = Unit
-                        override fun onProviderDisabled(providerName: String) = Unit
-                    },
-                    Looper.getMainLooper()
-                )
-            }
-        }
-    } catch (error: SecurityException) {
-        android.util.Log.e("RouteMap", "Location permission was revoked while requesting the current position", error)
-    }
-}
-
-private fun Location.toMapLocation() = MapLocation(latitude, longitude)
+private fun Location.toMapLocation() = MapLocation(latitude, longitude, accuracy)
 
 @SuppressLint("SetJavaScriptEnabled")
 private fun createRouteMap(
     context: Context,
     onRouteSelected: (String) -> Unit,
     onStopSelected: (String) -> Unit,
+    onCoordinateSelected: ((Double, Double) -> Unit)?,
     updateMapStatus: (String) -> Unit
 ) = RouteMapWebView(context).apply {
     setBackgroundColor(android.graphics.Color.rgb(221, 232, 226))
@@ -216,6 +247,11 @@ private fun createRouteMap(
             }
 
             @JavascriptInterface
+            fun onCoordinateSelected(latitude: Double, longitude: Double) {
+                post { onCoordinateSelected?.invoke(latitude, longitude) }
+            }
+
+            @JavascriptInterface
             fun onMapStatus(status: String) {
                 post { updateMapStatus(status) }
             }
@@ -231,19 +267,41 @@ private class RouteMapWebView(context: Context) : WebView(context) {
     private var selectedRouteId: String? = null
     private var selectedStopId: String? = null
     private var userLocation: MapLocation? = null
+    private var selectedCoordinates: Pair<Double, Double>? = null
+    private var pickerCoordinates: List<Pair<Double, Double>> = emptyList()
+
+    override fun dispatchTouchEvent(event: MotionEvent): Boolean {
+        if (event.actionMasked == MotionEvent.ACTION_DOWN ||
+            event.actionMasked == MotionEvent.ACTION_MOVE
+        ) {
+            parent?.requestDisallowInterceptTouchEvent(true)
+        }
+        val handled = super.dispatchTouchEvent(event)
+        if (event.actionMasked == MotionEvent.ACTION_UP ||
+            event.actionMasked == MotionEvent.ACTION_CANCEL
+        ) {
+            parent?.requestDisallowInterceptTouchEvent(false)
+        }
+        return handled
+    }
 
     fun updateMap(
         routesJson: String,
         routeId: String?,
         stopId: String?,
-        location: MapLocation?
+        location: MapLocation?,
+        pickedCoordinates: Pair<Double, Double>?,
+        pickerPoints: List<Pair<Double, Double>>
     ) {
         val changed = routeData != routesJson || selectedRouteId != routeId ||
-            selectedStopId != stopId || userLocation != location
+            selectedStopId != stopId || userLocation != location ||
+            selectedCoordinates != pickedCoordinates || pickerCoordinates != pickerPoints
         routeData = routesJson
         selectedRouteId = routeId
         selectedStopId = stopId
         userLocation = location
+        selectedCoordinates = pickedCoordinates
+        pickerCoordinates = pickerPoints
         if (changed && pageLoaded) applyMapState()
     }
 
@@ -257,6 +315,16 @@ private class RouteMapWebView(context: Context) : WebView(context) {
         evaluateJavascript("window.setMapHeight && window.setMapHeight($height);", null)
         evaluateJavascript(
             "window.setMapData && window.setMapData(${JSONObject.quote(routeData)}, ${JSONObject.quote(selectedRouteId.orEmpty())}, ${JSONObject.quote(selectedStopId.orEmpty())});",
+            null
+        )
+        val points = JSONArray().apply {
+            pickerCoordinates.forEach { (latitude, longitude) ->
+                put(JSONArray().put(latitude).put(longitude))
+            }
+        }
+        val picked = selectedCoordinates
+        evaluateJavascript(
+            "window.setPickerData && window.setPickerData(${picked?.first ?: "null"}, ${picked?.second ?: "null"}, ${JSONObject.quote(points.toString())});",
             null
         )
         userLocation?.let { location ->
@@ -351,12 +419,16 @@ private fun routeMapHtml(): String = """
 
         const routeStartLayer = L.layerGroup().addTo(map);
         const selectedRouteLayer = L.layerGroup().addTo(map);
+        const pickerLayer = L.layerGroup().addTo(map);
         let allRoutes = [];
         let activeRouteId = '';
         let selectedStopId = '';
         let userMarker = null;
         let hasUserMovedMap = false;
         let settingUserLocation = false;
+        map.on('click', event => {
+          if (window.AndroidMap) window.AndroidMap.onCoordinateSelected(event.latlng.lat, event.latlng.lng);
+        });
         map.on('dragstart', () => { hasUserMovedMap = true; });
         map.on('zoomstart', () => { if (!settingUserLocation) hasUserMovedMap = true; });
 
@@ -413,7 +485,12 @@ private fun routeMapHtml(): String = """
             });
           });
           const bounds = L.latLngBounds(points);
-          if (bounds.isValid()) map.fitBounds(bounds, { padding: [36, 36], maxZoom: 16 });
+          if (userMarker) bounds.extend(userMarker.getLatLng());
+          if (bounds.isValid() && !hasUserMovedMap) {
+            settingUserLocation = true;
+            map.fitBounds(bounds, { padding: [36, 36], maxZoom: 16 });
+            settingUserLocation = false;
+          }
         }
         window.setMapData = function(routesJson, routeId, stopId) {
           const previousRouteId = activeRouteId;
@@ -439,9 +516,13 @@ private fun routeMapHtml(): String = """
             userMarker.setLatLng(position);
           }
           if (!hasUserMovedMap) {
-            settingUserLocation = true;
-            map.setView(position, 14);
-            settingUserLocation = false;
+            if (activeRouteId) {
+              redrawSelectedRoute();
+            } else {
+              settingUserLocation = true;
+              map.setView(position, 14);
+              settingUserLocation = false;
+            }
           }
         };
         window.setMapHeight = function(height) {
@@ -449,6 +530,18 @@ private fun routeMapHtml(): String = """
           document.getElementById('map').style.height = height + 'px';
           map.invalidateSize({ pan: false });
           redrawVisibleStarts();
+        };
+        window.setPickerData = function(latitude, longitude, pointsJson) {
+          pickerLayer.clearLayers();
+          const points = JSON.parse(pointsJson);
+          points.forEach((point, index) => {
+            L.circleMarker(point, {
+              radius: 9, color: '#fff', weight: 2, fillColor: '#47654e', fillOpacity: 1
+            }).bindTooltip(String(index + 1)).addTo(pickerLayer);
+          });
+          if (latitude !== null && longitude !== null) {
+            L.marker([latitude, longitude]).addTo(pickerLayer);
+          }
         };
         map.on('moveend', redrawVisibleStarts);
         setTimeout(() => {

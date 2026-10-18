@@ -464,7 +464,7 @@ data class UserProfile(
     val name: String = "Explorador da Raia",
     val email: String = "explorador@ecosdolugar.gal",
     val isVisitor: Boolean = true,
-    val savedRouteIds: Set<String> = setOf("contrabando"),
+    val savedRouteIds: Set<String> = emptySet(),
     val visitedStopIds: Set<String> = setOf("stop-c1"),
     val solvedEnigmaIds: Set<String> = setOf("stop-c1")
 )`

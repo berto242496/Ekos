@@ -1,21 +1,30 @@
 package com.ecosdolugar.ui.screens
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -28,19 +37,33 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.launch
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlin.random.Random
+import com.ecosdolugar.ui.components.RouteMapView
+import com.ecosdolugar.ui.components.RouteCoverImagePicker
 import com.ecosdolugar.data.RoutesRepository
+import com.ecosdolugar.localization.AppLanguage
 import com.ecosdolugar.model.Category
 import com.ecosdolugar.model.Difficulty
 import com.ecosdolugar.model.FieldEnigma
@@ -51,28 +74,31 @@ import com.ecosdolugar.model.RouteStop
 import com.ecosdolugar.model.StopTrial
 import com.ecosdolugar.model.TrialType
 import com.ecosdolugar.model.UserProfile
-import com.ecosdolugar.ui.theme.PineDeep
+import com.ecosdolugar.ui.theme.PineContainer
 import com.ecosdolugar.ui.theme.SurfaceCream
 import com.ecosdolugar.ui.theme.TerracottaGold
 
-private data class StopDraft(
-    val title: String,
-    val location: String,
-    val story: String,
-    val latitude: Double,
-    val longitude: Double,
-    val question: String,
-    val hint: String,
-    val answer: String,
-    val wrongAnswer: String,
-    val source: RouteStop? = null
-)
+// Tokens de la web (GuideCreateRouteScreen.tsx) para mantener el mismo aspecto
+internal val InkDeep = Color(0xFF0F2416)
+private val InkLabel = Color(0xFF334B39)
+internal val InkMuted = Color(0xFF47654E)
+private val BadgeText = Color(0xFF8C5717)
+internal val FieldBorder = PineContainer.copy(alpha = 0.2f)
+private val SectionBorder = PineContainer.copy(alpha = 0.1f)
+private val ErrorBackground = Color(0xFFFEF2F2)
+private val ErrorBorder = Color(0xFFFECACA)
+private val ErrorText = Color(0xFF991B1B)
+
+private fun initialCategories(route: RouteItem?): List<Category> =
+    route?.categories?.filter { it != Category.ALL }?.takeIf { it.isNotEmpty() }
+        ?: listOf(Category.HISTORIA)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RouteEditorScreen(
     userProfile: UserProfile,
     initialRoute: RouteItem?,
+    language: AppLanguage,
     onBack: () -> Unit,
     onSave: (RouteItem, String) -> Unit
 ) {
@@ -81,83 +107,62 @@ fun RouteEditorScreen(
     }
     val stops = remember(initialRoute?.id) {
         mutableStateListOf<StopDraft>().apply {
-            initialRoute?.stops.orEmpty().forEach { stop ->
-                val trial = stop.trial
-                val wrongAnswerIndex = trial?.options?.indices?.firstOrNull {
-                    it != trial.correctOptionIndex
-                }
-                add(
-                    StopDraft(
-                        title = stop.title,
-                        location = stop.locationName,
-                        story = stop.story,
-                        latitude = stop.latitude,
-                        longitude = stop.longitude,
-                        question = trial?.question?.takeIf { it.isNotBlank() } ?: stop.enigma.question,
-                        hint = trial?.generalHint?.takeIf { it.isNotBlank() } ?: stop.enigma.hint,
-                        answer = trial?.options?.getOrNull(trial.correctOptionIndex)
-                            ?: stop.enigma.answer,
-                        wrongAnswer = trial?.options?.getOrNull(wrongAnswerIndex ?: -1)
-                            ?: "No lo sé",
-                        source = stop
-                    )
-                )
-            }
+            initialRoute?.stops.orEmpty().forEach { add(StopDraft.fromRouteStop(it)) }
         }
     }
     val scrollState = rememberScrollState()
+    val scope = rememberCoroutineScope()
     var title by remember(initialRoute?.id) { mutableStateOf(initialRoute?.title.orEmpty()) }
     var location by remember(initialRoute?.id) { mutableStateOf(initialRoute?.location.orEmpty()) }
     var description by remember(initialRoute?.id) { mutableStateOf(initialRoute?.description.orEmpty()) }
-    var stopTitle by remember { mutableStateOf("") }
-    var stopLocation by remember { mutableStateOf("") }
-    var story by remember { mutableStateOf("") }
-    var latitude by remember { mutableStateOf("") }
-    var longitude by remember { mutableStateOf("") }
-    var question by remember { mutableStateOf("") }
-    var hint by remember { mutableStateOf("") }
-    var answer by remember { mutableStateOf("") }
-    var wrongAnswer by remember { mutableStateOf("") }
+    var imageUrl by remember(initialRoute?.id) {
+        mutableStateOf(initialRoute?.imageUrl ?: RoutesRepository.HERO_FOREST_URL)
+    }
+    var durationHours by remember(initialRoute?.id) {
+        mutableStateOf(parseDurationPart(initialRoute?.duration, isHours = true))
+    }
+    var durationMinutes by remember(initialRoute?.id) {
+        mutableStateOf(parseDurationPart(initialRoute?.duration, isHours = false))
+    }
+    var difficulty by remember(initialRoute?.id) { mutableStateOf(initialRoute?.difficulty ?: Difficulty.FACIL) }
+    var selectedCategories by remember(initialRoute?.id) {
+        mutableStateOf(initialCategories(initialRoute))
+    }
+    val stopForm = remember { StopFormState() }
     var validationMessage by remember { mutableStateOf<String?>(null) }
+    var currentStep by remember { mutableStateOf(1) }
+    var showExitConfirmation by remember { mutableStateOf(false) }
 
-    fun addStop() {
-        val lat = latitude.toDoubleOrNull()
-        val lng = longitude.toDoubleOrNull()
-        val invalid = when {
-            stopTitle.isBlank() -> "Pon un nombre a la parada."
-            stopLocation.isBlank() -> "Indica el lugar de la parada."
-            lat == null || lat !in -90.0..90.0 -> "La latitud debe estar entre -90 y 90."
-            lng == null || lng !in -180.0..180.0 -> "La longitud debe estar entre -180 y 180."
-            question.isBlank() -> "Escribe el enigma de esta parada."
-            answer.isBlank() || wrongAnswer.isBlank() || answer == wrongAnswer ->
-                "Indica una respuesta correcta y otra incorrecta distintas."
+    fun toggleCategory(category: Category) {
+        val next = if (category in selectedCategories) {
+            selectedCategories - category
+        } else {
+            selectedCategories + category
+        }
+        if (next.isNotEmpty()) selectedCategories = next
+    }
+
+    fun continueToStops() {
+        validationMessage = when {
+            title.isBlank() || location.isBlank() -> "Indica el nombre y la ubicación de la ruta."
+            selectedCategories.isEmpty() -> "Selecciona al menos un tipo de ruta."
+            formatDuration(durationHours, durationMinutes) == null ->
+                "Indica una duración válida (minutos entre 0 y 59)."
             else -> null
         }
+        if (validationMessage == null) currentStep = 2
+    }
+
+    fun addStop() {
+        val invalid = stopForm.validate()
         if (invalid != null) {
             validationMessage = invalid
             return
         }
-        stops += StopDraft(
-            title = stopTitle.trim(),
-            location = stopLocation.trim(),
-            story = story.trim(),
-            latitude = lat!!,
-            longitude = lng!!,
-            question = question.trim(),
-            hint = hint.trim(),
-            answer = answer.trim(),
-            wrongAnswer = wrongAnswer.trim()
-        )
-        stopTitle = ""
-        stopLocation = ""
-        story = ""
-        latitude = ""
-        longitude = ""
-        question = ""
-        hint = ""
-        answer = ""
-        wrongAnswer = ""
+        stops += stopForm.toDraft()
+        stopForm.reset()
         validationMessage = null
+        scope.launch { scrollState.animateScrollTo(0) }
     }
 
     fun save(status: String) {
@@ -165,7 +170,16 @@ fun RouteEditorScreen(
             validationMessage = "Indica el nombre y la ubicación de la ruta."
             return
         }
-        if (stops.isEmpty()) {
+        if (selectedCategories.isEmpty()) {
+            validationMessage = "Selecciona al menos un tipo de ruta."
+            return
+        }
+        val formattedDuration = formatDuration(durationHours, durationMinutes)
+        if (formattedDuration == null) {
+            validationMessage = "Indica una duración válida (minutos entre 0 y 59)."
+            return
+        }
+        if (status != "borrador" && stops.isEmpty()) {
             validationMessage = "Añade al menos una parada con su ubicación y reto."
             return
         }
@@ -181,65 +195,22 @@ fun RouteEditorScreen(
             bio = "Creador de rutas culturales.",
             location = location
         )
-        val routeStops = stops.mapIndexed { index, draft ->
-            val trial = StopTrial(
-                type = TrialType.ACERTIJO,
-                title = "Enigma: ${draft.title}",
-                loreContext = draft.story,
-                question = draft.question,
-                options = listOf(draft.answer, draft.wrongAnswer),
-                correctOptionIndex = 0,
-                generalHint = draft.hint,
-                solutionExplanation = draft.answer,
-                magicalReward = "Reto superado"
-            )
-            val source = draft.source
-            val existingTrial = source?.trial
-            val compiledTrial = existingTrial?.copy(
-                title = "Enigma: ${draft.title}",
-                loreContext = draft.story,
-                question = draft.question,
-                options = listOf(draft.answer, draft.wrongAnswer),
-                correctOptionIndex = 0,
-                generalHint = draft.hint,
-                solutionExplanation = draft.answer
-            ) ?: trial
-            source?.copy(
-                order = index + 1,
-                title = draft.title,
-                subtitle = draft.location,
-                locationName = draft.location,
-                story = draft.story,
-                enigma = FieldEnigma(draft.question, draft.hint, draft.answer),
-                trial = compiledTrial,
-                latitude = draft.latitude,
-                longitude = draft.longitude,
-                mapPositionX = (20 + index * 15).coerceAtMost(85).toFloat(),
-                mapPositionY = (30 + index * 12).coerceAtMost(85).toFloat()
-            ) ?: RouteStop(
-                id = "$routeId-stop-${index + 1}",
-                order = index + 1,
-                title = draft.title,
-                subtitle = draft.location,
-                locationName = draft.location,
-                story = draft.story,
-                historicalNote = "",
-                enigma = FieldEnigma(draft.question, draft.hint, draft.answer),
-                trial = compiledTrial,
-                audioDuration = "Lectura",
-                latitude = draft.latitude,
-                longitude = draft.longitude,
-                mapPositionX = (20 + index * 15).coerceAtMost(85).toFloat(),
-                mapPositionY = (30 + index * 12).coerceAtMost(85).toFloat()
-            )
-        }
+        val distanceHundredths = stops.size * 80
+        val formattedDistance =
+            "${distanceHundredths / 100},${(distanceHundredths % 100).toString().padStart(2, '0')} km"
+        val routeStops = stops.mapIndexed { index, draft -> draft.toRouteStop(index, routeId) }
         val route = initialRoute?.copy(
             title = title.trim(),
             subtitle = "Ruta cultural en ${location.trim()}",
             description = description.trim(),
             location = location.trim(),
             region = location.trim().uppercase(),
+            imageUrl = imageUrl.trim(),
             stopsCount = routeStops.size,
+            duration = formattedDuration,
+            distance = formattedDistance,
+            difficulty = difficulty,
+            categories = selectedCategories,
             stops = routeStops
         ) ?: RouteItem(
                 id = routeId,
@@ -248,12 +219,12 @@ fun RouteEditorScreen(
                 description = description.trim(),
                 location = location.trim(),
                 region = location.trim().uppercase(),
-                imageUrl = RoutesRepository.HERO_FOREST_URL,
+                imageUrl = imageUrl.trim(),
                 stopsCount = routeStops.size,
-                duration = "1h 30 min",
-                distance = "${(routeStops.size * 0.8).toString().replace('.', ',')} km",
-                difficulty = Difficulty.FACIL,
-                categories = listOf(Category.HISTORIA),
+                duration = formattedDuration,
+                distance = formattedDistance,
+                difficulty = difficulty,
+                categories = selectedCategories,
                 audioTag = "Retos interactivos",
                 tomoRef = "Cuaderno del Guía",
                 guide = guide,
@@ -270,221 +241,484 @@ fun RouteEditorScreen(
         onSave(route, status)
     }
 
+    val hasUnsavedData = title != initialRoute?.title.orEmpty() ||
+        location != initialRoute?.location.orEmpty() ||
+        description != initialRoute?.description.orEmpty() ||
+        imageUrl != (initialRoute?.imageUrl ?: RoutesRepository.HERO_FOREST_URL) ||
+        selectedCategories != initialCategories(initialRoute) ||
+        difficulty != (initialRoute?.difficulty ?: Difficulty.FACIL) ||
+        (initialRoute == null && stops.isNotEmpty()) ||
+        (initialRoute != null && stops.size != initialRoute.stops.size)
+
     Scaffold(
         topBar = {
             TopAppBar(
                 title = {
                     Text(
                         if (initialRoute == null) "Crear ruta" else "Continuar borrador",
-                        color = SurfaceCream
+                        color = InkDeep,
+                        fontFamily = FontFamily.Serif,
+                        fontWeight = FontWeight.Bold
                     )
                 },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Volver", tint = SurfaceCream)
+                    IconButton(onClick = {
+                        if (hasUnsavedData) showExitConfirmation = true else onBack()
+                    }) {
+                        Icon(Icons.Default.ArrowBack, contentDescription = "Volver", tint = InkDeep)
                     }
                 },
-                colors = androidx.compose.material3.TopAppBarDefaults.topAppBarColors(
-                    containerColor = PineDeep
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = SurfaceCream,
+                    titleContentColor = InkDeep,
+                    navigationIconContentColor = InkDeep
                 )
             )
         },
-        containerColor = PineDeep
+        containerColor = SurfaceCream
     ) { padding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
                 .verticalScroll(scrollState)
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(20.dp)
         ) {
             Text(
-                "DATOS DE LA RUTA",
-                color = TerracottaGold,
+                "Paso $currentStep de 2",
+                color = InkMuted,
+                fontFamily = FontFamily.Serif,
+                fontWeight = FontWeight.SemiBold,
                 fontSize = 12.sp
             )
-            RouteEditorTextField(
-                value = title,
-                onValueChange = { title = it },
-                label = "Nombre de la ruta",
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true
-            )
-            RouteEditorTextField(
-                value = location,
-                onValueChange = { location = it },
-                label = "Localidad o zona",
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true
-            )
-            RouteEditorTextField(
-                value = description,
-                onValueChange = { description = it },
-                label = "Descripción",
-                modifier = Modifier.fillMaxWidth(),
-                minLines = 2
-            )
-
-            Spacer(Modifier.height(4.dp))
-            Text(
-                "PARADAS Y RETOS",
-                color = TerracottaGold,
-                fontSize = 12.sp
-            )
-            stops.forEachIndexed { index, stop ->
-                Card(
-                    colors = CardDefaults.cardColors(containerColor = Color(0xFF183321)),
-                    shape = RoundedCornerShape(12.dp)
+            if (currentStep == 1) {
+                EditorSection(
+                    badge = "Datos generales",
+                    title = "Datos de la ruta",
+                    description = "Nombre, lugar, tipo, duración y dificultad de la ruta."
                 ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(12.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text("${index + 1}. ${stop.title}", color = SurfaceCream)
-                            Text(
-                                "${stop.location} · ${stop.latitude}, ${stop.longitude}",
-                                color = SurfaceCream.copy(alpha = 0.7f),
-                                fontSize = 11.sp
+                    RouteEditorTextField(
+                        value = title,
+                        onValueChange = { title = it },
+                        label = "Nombre de la ruta",
+                        singleLine = true
+                    )
+                    RouteEditorTextField(
+                        value = location,
+                        onValueChange = { location = it },
+                        label = "Localidad o zona",
+                        singleLine = true
+                    )
+                    RouteEditorTextField(
+                        value = description,
+                        onValueChange = { description = it },
+                        label = "Descripción",
+                        minLines = 3
+                    )
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        FieldLabel("Tipo de ruta")
+                        Text(
+                            "Puedes seleccionar varios tipos.",
+                            color = InkMuted,
+                            fontFamily = FontFamily.Serif,
+                            fontSize = 12.sp
+                        )
+                        Category.values().filter { it != Category.ALL }.chunked(2).forEach { rowOptions ->
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                rowOptions.forEach { option ->
+                                    SelectableChip(
+                                        text = option.displayName,
+                                        selected = option in selectedCategories,
+                                        onClick = { toggleCategory(option) },
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                }
+                                if (rowOptions.size < 2) Spacer(Modifier.weight(1f))
+                            }
+                        }
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        RouteEditorTextField(
+                            value = durationHours,
+                            onValueChange = { durationHours = it.filter(Char::isDigit).take(2) },
+                            label = "Horas",
+                            modifier = Modifier.weight(1f),
+                            singleLine = true,
+                            keyboardType = KeyboardType.Number
+                        )
+                        RouteEditorTextField(
+                            value = durationMinutes,
+                            onValueChange = { durationMinutes = it.filter(Char::isDigit).take(2) },
+                            label = "Minutos",
+                            modifier = Modifier.weight(1f),
+                            singleLine = true,
+                            keyboardType = KeyboardType.Number
+                        )
+                    }
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        FieldLabel("Dificultad")
+                        Difficulty.values().forEach { option ->
+                            DifficultyOption(
+                                option = option,
+                                selected = difficulty == option,
+                                onClick = { difficulty = option }
                             )
                         }
-                        IconButton(onClick = { stops.removeAt(index) }) {
-                            Icon(Icons.Default.Delete, contentDescription = "Eliminar parada", tint = TerracottaGold)
+                    }
+                    RouteEditorTextField(
+                        value = imageUrl.takeUnless { it.startsWith("data:image/") }.orEmpty(),
+                        onValueChange = { imageUrl = it },
+                        label = "URL de la imagen de la ruta",
+                        singleLine = true
+                    )
+                    RouteCoverImagePicker(
+                        onImageSelected = { imageUrl = it },
+                        onError = { validationMessage = it }
+                    )
+                    Text(
+                        if (imageUrl.startsWith("data:image/")) {
+                            "Imagen seleccionada. Se guardará en el almacenamiento de la aplicación."
+                        } else {
+                            "Esta imagen aparecerá en el listado y en la cabecera de la ruta."
+                        },
+                        color = InkMuted,
+                        fontFamily = FontFamily.Serif,
+                        fontSize = 12.sp
+                    )
+                }
+                validationMessage?.let { ValidationBanner(it) }
+                Button(
+                    onClick = ::continueToStops,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = PineContainer, contentColor = SurfaceCream)
+                ) {
+                    Text("Continuar para añadir paradas", fontFamily = FontFamily.Serif, fontWeight = FontWeight.Bold)
+                }
+            } else {
+                EditorSection(
+                    badge = "Paradas y retos",
+                    title = "Paradas y retos (${stops.size})",
+                    description = "Cada parada tiene su ubicación y un enigma vinculado."
+                ) {
+                    stops.forEachIndexed { index, stop ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(16.dp))
+                                .background(SurfaceCream)
+                                .border(1.dp, FieldBorder, RoundedCornerShape(16.dp))
+                                .padding(start = 14.dp, end = 4.dp, top = 10.dp, bottom = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    "${index + 1}. ${stop.title}",
+                                    color = InkDeep,
+                                    fontFamily = FontFamily.Serif,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 14.sp
+                                )
+                                Text(
+                                    "${stop.location} · ${stop.latitude}, ${stop.longitude}",
+                                    color = InkMuted,
+                                    fontFamily = FontFamily.Serif,
+                                    fontSize = 11.sp
+                                )
+                            }
+                            IconButton(onClick = { stops.removeAt(index) }) {
+                                Icon(Icons.Default.Delete, contentDescription = "Eliminar parada", tint = TerracottaGold)
+                            }
                         }
+                    }
+                    StopEditorForm(
+                        form = stopForm,
+                        existingCoordinates = stops.map { it.latitude to it.longitude },
+                        language = language,
+                        onMessage = { validationMessage = it },
+                        onAddStop = ::addStop
+                    )
+                }
+                validationMessage?.let { ValidationBanner(it) }
+                SecondaryButton(
+                    text = "Volver a los datos de la ruta",
+                    onClick = { currentStep = 1 }
+                )
+                SecondaryButton(
+                    text = "Guardar borrador",
+                    onClick = { save("borrador") }
+                )
+                Button(
+                    onClick = { save("pendiente") },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = PineContainer, contentColor = SurfaceCream)
+                ) {
+                    Text("Enviar para verificación", fontFamily = FontFamily.Serif, fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+    }
+
+    if (showExitConfirmation) {
+        AlertDialog(
+            onDismissRequest = { showExitConfirmation = false },
+            title = { Text("Guardar cambios", fontFamily = FontFamily.Serif, fontWeight = FontWeight.Bold) },
+            text = { Text("Tienes datos en la ruta. ¿Quieres guardarla como borrador antes de salir?") },
+            confirmButton = {
+                TextButton(onClick = {
+                    showExitConfirmation = false
+                    save("borrador")
+                }) {
+                    Text("Guardar borrador", color = PineContainer, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                Row {
+                    TextButton(onClick = {
+                        showExitConfirmation = false
+                        onBack()
+                    }) {
+                        Text("Salir sin guardar", color = InkMuted)
+                    }
+                    TextButton(onClick = { showExitConfirmation = false }) {
+                        Text("Seguir editando", color = PineContainer, fontWeight = FontWeight.Bold)
                     }
                 }
             }
-            RouteEditorTextField(
-                value = stopTitle,
-                onValueChange = { stopTitle = it },
-                label = "Nombre de la parada",
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true
-            )
-            RouteEditorTextField(
-                value = stopLocation,
-                onValueChange = { stopLocation = it },
-                label = "Lugar o dirección",
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true
-            )
-            RouteEditorTextField(
-                value = story,
-                onValueChange = { story = it },
-                label = "Relato de la parada",
-                modifier = Modifier.fillMaxWidth(),
-                minLines = 2
-            )
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                RouteEditorTextField(
-                    value = latitude,
-                    onValueChange = { latitude = it },
-                    label = "Latitud",
-                    modifier = Modifier.weight(1f),
-                    singleLine = true
+        )
+    }
+}
+
+@Composable
+private fun EditorSection(
+    badge: String,
+    title: String,
+    description: String,
+    content: @Composable ColumnScope.() -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        border = BorderStroke(1.dp, SectionBorder)
+    ) {
+        Column(
+            modifier = Modifier.padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(20.dp)
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(50))
+                        .background(TerracottaGold.copy(alpha = 0.15f))
+                        .padding(horizontal = 10.dp, vertical = 3.dp)
+                ) {
+                    Text(
+                        badge.uppercase(),
+                        color = BadgeText,
+                        fontFamily = FontFamily.Serif,
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 11.sp,
+                        letterSpacing = 0.6.sp
+                    )
+                }
+                Text(
+                    title,
+                    color = InkDeep,
+                    fontFamily = FontFamily.Serif,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 22.sp
                 )
-                RouteEditorTextField(
-                    value = longitude,
-                    onValueChange = { longitude = it },
-                    label = "Longitud",
-                    modifier = Modifier.weight(1f),
-                    singleLine = true
+                Text(
+                    description,
+                    color = InkMuted,
+                    fontFamily = FontFamily.Serif,
+                    fontSize = 13.sp
                 )
             }
-            Text(
-                "El reto se vincula a esta parada. Introduce las coordenadas reales del punto.",
-                color = SurfaceCream.copy(alpha = 0.75f),
-                fontSize = 12.sp
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(1.dp)
+                    .background(SectionBorder)
             )
-            RouteEditorTextField(
-                value = question,
-                onValueChange = { question = it },
-                label = "Pregunta del reto",
-                modifier = Modifier.fillMaxWidth(),
-                minLines = 2
-            )
-            RouteEditorTextField(
-                value = hint,
-                onValueChange = { hint = it },
-                label = "Pista",
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true
-            )
-            RouteEditorTextField(
-                value = answer,
-                onValueChange = { answer = it },
-                label = "Respuesta correcta",
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true
-            )
-            RouteEditorTextField(
-                value = wrongAnswer,
-                onValueChange = { wrongAnswer = it },
-                label = "Respuesta incorrecta",
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true
-            )
-            OutlinedButton(
-                onClick = ::addStop,
-                modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = SurfaceCream),
-                border = ButtonDefaults.outlinedButtonBorder.copy(
-                    brush = androidx.compose.ui.graphics.SolidColor(SurfaceCream.copy(alpha = 0.65f))
-                )
-            ) {
-                Icon(Icons.Default.Add, contentDescription = null)
-                Text(" Añadir parada y reto")
-            }
-            validationMessage?.let {
-                Text(it, color = Color(0xFFFFB4AB), fontSize = 12.sp)
-            }
-            Button(
-                onClick = { save("borrador") },
-                modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF34563C))
-            ) {
-                Text("Guardar borrador")
-            }
-            Button(
-                onClick = { save("pendiente") },
-                modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.buttonColors(containerColor = TerracottaGold, contentColor = PineDeep)
-            ) {
-                Text("Enviar para verificación")
-            }
+            Column(verticalArrangement = Arrangement.spacedBy(20.dp), content = content)
         }
     }
 }
 
 @Composable
-private fun RouteEditorTextField(
+internal fun FieldLabel(text: String) {
+    Text(
+        text.uppercase(),
+        color = InkLabel,
+        fontFamily = FontFamily.Serif,
+        fontWeight = FontWeight.SemiBold,
+        fontSize = 12.sp,
+        letterSpacing = 0.6.sp
+    )
+}
+
+@Composable
+internal fun RouteEditorTextField(
     value: String,
     onValueChange: (String) -> Unit,
     label: String,
     modifier: Modifier = Modifier,
     singleLine: Boolean = false,
-    minLines: Int = 1
+    minLines: Int = 1,
+    keyboardType: KeyboardType = KeyboardType.Text
 ) {
-    OutlinedTextField(
-        value = value,
-        onValueChange = onValueChange,
-        label = { Text(label) },
-        modifier = modifier,
-        singleLine = singleLine,
-        minLines = minLines,
-        colors = OutlinedTextFieldDefaults.colors(
-            focusedTextColor = SurfaceCream,
-            unfocusedTextColor = SurfaceCream,
-            focusedContainerColor = Color(0xFF0F2618),
-            unfocusedContainerColor = Color(0xFF0F2618),
-            focusedBorderColor = TerracottaGold,
-            unfocusedBorderColor = SurfaceCream.copy(alpha = 0.55f),
-            focusedLabelColor = TerracottaGold,
-            unfocusedLabelColor = SurfaceCream.copy(alpha = 0.8f),
-            cursorColor = TerracottaGold,
-            focusedPlaceholderColor = SurfaceCream.copy(alpha = 0.55f),
-            unfocusedPlaceholderColor = SurfaceCream.copy(alpha = 0.55f)
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        FieldLabel(label)
+        OutlinedTextField(
+            value = value,
+            onValueChange = onValueChange,
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = singleLine,
+            minLines = minLines,
+            keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
+            textStyle = TextStyle(fontFamily = FontFamily.Serif, fontSize = 15.sp, color = InkDeep),
+            shape = RoundedCornerShape(16.dp),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedContainerColor = Color.White,
+                unfocusedContainerColor = Color.White,
+                focusedBorderColor = TerracottaGold,
+                unfocusedBorderColor = FieldBorder,
+                focusedTextColor = InkDeep,
+                unfocusedTextColor = InkDeep,
+                cursorColor = TerracottaGold
+            )
         )
-    )
+    }
+}
+
+@Composable
+internal fun SelectableChip(
+    text: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val shape = RoundedCornerShape(12.dp)
+    Row(
+        modifier = modifier
+            .clip(shape)
+            .background(if (selected) PineContainer else SurfaceCream)
+            .border(1.dp, if (selected) PineContainer else FieldBorder, shape)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            Icons.Default.Check,
+            contentDescription = null,
+            tint = if (selected) TerracottaGold else Color.Transparent,
+            modifier = Modifier.size(14.dp)
+        )
+        Spacer(Modifier.size(6.dp))
+        Text(
+            text,
+            color = if (selected) SurfaceCream else InkDeep.copy(alpha = 0.8f),
+            fontFamily = FontFamily.Serif,
+            fontSize = 13.sp,
+            maxLines = 1,
+            softWrap = false,
+            overflow = TextOverflow.Ellipsis
+        )
+    }
+}
+
+@Composable
+private fun DifficultyOption(
+    option: Difficulty,
+    selected: Boolean,
+    onClick: () -> Unit
+) {
+    val shape = RoundedCornerShape(16.dp)
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(shape)
+            .background(if (selected) PineContainer else Color.White)
+            .border(1.dp, if (selected) PineContainer else FieldBorder, shape)
+            .clickable(onClick = onClick)
+            .padding(14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(
+                option.label,
+                color = if (selected) SurfaceCream else InkDeep,
+                fontFamily = FontFamily.Serif,
+                fontWeight = FontWeight.Bold,
+                fontSize = 15.sp
+            )
+            Text(
+                option.detail,
+                color = if (selected) SurfaceCream.copy(alpha = 0.75f) else InkMuted,
+                fontFamily = FontFamily.Serif,
+                fontSize = 12.sp
+            )
+        }
+        if (selected) {
+            Icon(Icons.Default.Check, contentDescription = null, tint = TerracottaGold)
+        }
+    }
+}
+
+@Composable
+internal fun SecondaryButton(
+    text: String,
+    onClick: () -> Unit,
+    icon: androidx.compose.ui.graphics.vector.ImageVector? = null
+) {
+    OutlinedButton(
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = ButtonDefaults.outlinedButtonColors(containerColor = Color.White, contentColor = PineContainer),
+        border = BorderStroke(1.dp, FieldBorder)
+    ) {
+        if (icon != null) {
+            Icon(icon, contentDescription = null)
+            Spacer(Modifier.size(6.dp))
+        }
+        Text(text, fontFamily = FontFamily.Serif, fontWeight = FontWeight.Bold)
+    }
+}
+
+@Composable
+private fun ValidationBanner(message: String) {
+    val shape = RoundedCornerShape(16.dp)
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(shape)
+            .background(ErrorBackground)
+            .border(1.dp, ErrorBorder, shape)
+            .padding(14.dp)
+    ) {
+        Text(message, color = ErrorText, fontFamily = FontFamily.Serif, fontSize = 13.sp)
+    }
+}
+
+private fun parseDurationPart(duration: String?, isHours: Boolean): String {
+    val regex = if (isHours) Regex("(\\d+)\\s*h") else Regex("(\\d+)\\s*min")
+    return duration?.let { regex.find(it)?.groupValues?.get(1) }.orEmpty()
+}
+
+private fun formatDuration(hours: String, minutes: String): String? {
+    val h = hours.ifBlank { "0" }.toIntOrNull() ?: return null
+    val m = minutes.ifBlank { "0" }.toIntOrNull() ?: return null
+    if (h < 0 || m !in 0..59 || (h == 0 && m == 0)) return null
+    return when {
+        h == 0 -> "$m min"
+        m == 0 -> "${h}h"
+        else -> "${h}h $m min"
+    }
 }

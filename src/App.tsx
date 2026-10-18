@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { RouteItem, FieldNote, UserProfile, RouteStop, GuideAuthor, UserPurchaseRecord, Achievement } from './types';
 import { ROUTES } from './data/routesData';
 import { MOCK_GUIDES } from './data/guidesData';
@@ -23,17 +23,21 @@ import { useI18n } from './services/i18n';
 import {
   getMyRoutes,
   getPublishedRoutes,
+  getSavedRouteIds,
   saveChallengeProgress,
   saveRoute,
+  saveSavedRouteIds,
 } from './services/routesRepository';
 import { getSupabaseClient, signInWithGoogle, signOut } from './services/supabaseClient';
 import { Compass, Map as MapIcon, BookOpen } from 'lucide-react';
 
 type Screen =
   | 'welcome'
+  | 'display-name'
   | 'character-selection'
   | 'catalog'
   | 'detail'
+  | 'expedition-map'
   | 'expedition'
   | 'guide-landing'
   | 'guide-dashboard'
@@ -44,6 +48,11 @@ type BottomTab = 'rutas' | 'mapa' | 'mi-aventura';
 export default function App() {
   const { t } = useI18n();
   const [currentScreen, setCurrentScreen] = useState<Screen>('welcome');
+  const [isGuideSignInLoading, setIsGuideSignInLoading] = useState(false);
+  const [postNameEntryScreen, setPostNameEntryScreen] = useState<Screen>('character-selection');
+  const [displayNameDraft, setDisplayNameDraft] = useState('');
+  const [displayNameError, setDisplayNameError] = useState<string | null>(null);
+  const [isSavingDisplayName, setIsSavingDisplayName] = useState(false);
   const [activeTab, setActiveTab] = useState<BottomTab>('rutas');
 
   // Dynamic routes collection allowing guides to add and publish routes
@@ -67,10 +76,12 @@ export default function App() {
   const [catalogRoutes, setCatalogRoutes] = useState<RouteItem[]>([]);
 
   const [selectedRoute, setSelectedRoute] = useState<RouteItem>(() => allRoutes[0] || ROUTES[0]);
+  const [pendingChallengeStopId, setPendingChallengeStopId] = useState<string | null>(null);
   const [isMapModalOpen, setIsMapModalOpen] = useState(false);
   const [isKmpModalOpen, setIsKmpModalOpen] = useState(false);
   const [isApkModalOpen, setIsApkModalOpen] = useState(false);
   const [routeStorageError, setRouteStorageError] = useState<string | null>(null);
+  const savedRoutesSyncRef = useRef<Promise<void>>(Promise.resolve());
 
   // Guide Simulation State
   const [currentGuideId, setCurrentGuideId] = useState<string>(() => {
@@ -78,6 +89,7 @@ export default function App() {
   });
   const currentGuide = MOCK_GUIDES.find(g => g.id === currentGuideId) || MOCK_GUIDES[0];
   const [lastCreatedRoute, setLastCreatedRoute] = useState<RouteItem | null>(null);
+  const [editingRoute, setEditingRoute] = useState<RouteItem | null>(null);
   const [profileModalGuide, setProfileModalGuide] = useState<GuideAuthor | null>(null);
 
   // Cache the catalog locally; Supabase remains the source for shared, user-created routes.
@@ -95,14 +107,18 @@ export default function App() {
     try {
       const savedRoute = await saveRoute(newRoute);
       setAllRoutes(prev => [savedRoute, ...prev.filter(route => route.id !== savedRoute.id)]);
-      setCatalogRoutes(prev =>
-        savedRoute.status === 'publicada'
-          ? [savedRoute, ...prev.filter(route => route.id !== savedRoute.id)]
-          : prev,
-      );
+      setCatalogRoutes(prev => [
+        ...(savedRoute.status === 'publicada' ? [savedRoute] : []),
+        ...prev.filter(route => route.id !== savedRoute.id),
+      ]);
       setLastCreatedRoute(savedRoute);
       setRouteStorageError(null);
-      setCurrentScreen('guide-success');
+      if (editingRoute?.id === savedRoute.id) {
+        setEditingRoute(null);
+        setCurrentScreen('guide-dashboard');
+      } else {
+        setCurrentScreen('guide-success');
+      }
     } catch (error) {
       setRouteStorageError(error instanceof Error ? error.message : 'No se pudo publicar la ruta.');
     }
@@ -112,7 +128,9 @@ export default function App() {
     try {
       const savedRoute = await saveRoute(draftRoute);
       setAllRoutes(prev => [savedRoute, ...prev.filter(route => route.id !== savedRoute.id)]);
+      setCatalogRoutes(prev => prev.filter(route => route.id !== savedRoute.id));
       setRouteStorageError(null);
+      setEditingRoute(null);
       setCurrentScreen('guide-dashboard');
     } catch (error) {
       setRouteStorageError(error instanceof Error ? error.message : 'No se pudo guardar el borrador.');
@@ -142,6 +160,7 @@ export default function App() {
             ...parsed,
             isGoogleAuthenticated: false,
             googleId: undefined,
+            isGuideAccount: false,
             purchasedRouteIds: parsed.purchasedRouteIds || [],
             purchaseHistory: parsed.purchaseHistory || [],
             completedRouteIds: parsed.completedRouteIds || [],
@@ -158,7 +177,7 @@ export default function App() {
       email: '',
       isVisitor: false,
       isGoogleAuthenticated: false,
-      savedRouteIds: ['ribeira-sacra'],
+      savedRouteIds: [],
       visitedStopIds: [],
       solvedEnigmaIds: [],
       completedRouteIds: [],
@@ -185,12 +204,14 @@ export default function App() {
             isVisitor: false,
             isGoogleAuthenticated: false,
             googleId: undefined,
+            isGuideAccount: false,
           }));
           setCurrentScreen('welcome');
           return;
         }
 
         const metadata = session.user.user_metadata;
+        const requestedTarget = sessionStorage.getItem('ecos_post_auth_screen');
         setUser(previous => ({
           ...previous,
           name: metadata.full_name || metadata.name || session.user.email || 'Explorador',
@@ -199,8 +220,10 @@ export default function App() {
           isVisitor: false,
           isGoogleAuthenticated: true,
           googleId: session.user.id,
+          isGuideAccount: requestedTarget === 'guide-landing'
+            ? true
+            : previous.isGuideAccount,
         }));
-        const requestedTarget = sessionStorage.getItem('ecos_post_auth_screen');
         sessionStorage.removeItem('ecos_post_auth_screen');
         const validTargets: Screen[] = [
           'welcome',
@@ -214,7 +237,10 @@ export default function App() {
           'guide-success',
         ];
         if (requestedTarget && validTargets.includes(requestedTarget as Screen)) {
-          setCurrentScreen(requestedTarget as Screen);
+          setPostNameEntryScreen(requestedTarget as Screen);
+          setDisplayNameDraft(metadata.full_name || metadata.name || session.user.email?.split('@')[0] || '');
+          setDisplayNameError(null);
+          setCurrentScreen('display-name');
         } else {
           setCurrentScreen(previous => previous === 'welcome' ? 'catalog' : previous);
         }
@@ -231,13 +257,19 @@ export default function App() {
     const loadRoutes = async () => {
       const published = await getPublishedRoutes();
       const owned = user.isGoogleAuthenticated ? await getMyRoutes() : [];
-      return { published, routes: [...owned, ...published] };
+      const savedRouteIds = user.isGoogleAuthenticated ? await getSavedRouteIds() : null;
+      return { published, routes: [...owned, ...published], savedRouteIds };
     };
 
     loadRoutes()
-      .then(({ published, routes }) => {
+      .then(({ published, routes, savedRouteIds }) => {
         if (!isActive) return;
         setCatalogRoutes(published);
+        if (savedRouteIds) {
+          setUser(previous => previous.googleId === user.googleId
+            ? { ...previous, savedRouteIds }
+            : previous);
+        }
         setAllRoutes(previous => {
           const defaultIds = new Set(ROUTES.map(route => route.id));
           const remoteIds = new Set(routes.map(route => route.id));
@@ -310,14 +342,22 @@ export default function App() {
 
   // Handler to toggle saved route
   const handleToggleSavedRoute = (routeId: string) => {
+    const savedIds = user.savedRouteIds.includes(routeId)
+      ? user.savedRouteIds.filter(id => id !== routeId)
+      : [...user.savedRouteIds, routeId];
     setUser(prev => {
-      const isSaved = prev.savedRouteIds.includes(routeId);
-      const newSaved = isSaved
-        ? prev.savedRouteIds.filter(id => id !== routeId)
-        : [...prev.savedRouteIds, routeId];
-      const nextUser = { ...prev, savedRouteIds: newSaved };
+      const nextUser = { ...prev, savedRouteIds: savedIds };
       return checkAchievementsOnUpdate(nextUser);
     });
+    if (user.isGoogleAuthenticated) {
+      savedRoutesSyncRef.current = savedRoutesSyncRef.current
+        .then(() => saveSavedRouteIds(savedIds, user.name))
+        .catch(error => {
+          setRouteStorageError(error instanceof Error
+            ? error.message
+            : 'No se pudieron sincronizar las rutas guardadas.');
+        });
+    }
   };
 
   // Handler to complete a route
@@ -405,6 +445,31 @@ export default function App() {
     });
   };
 
+  const handleSaveDisplayName = async () => {
+    const displayName = displayNameDraft.trim();
+    if (!displayName || displayName.length > 60 || !user.googleId) {
+      setDisplayNameError('Escribe un nombre de entre 1 y 60 caracteres.');
+      return;
+    }
+    setIsSavingDisplayName(true);
+    setDisplayNameError(null);
+    try {
+      const { error } = await getSupabaseClient()
+        .from('user_profiles')
+        .upsert(
+          { user_id: user.googleId, display_name: displayName },
+          { onConflict: 'user_id' },
+        );
+      if (error) throw new Error(`No se pudo guardar el nombre: ${error.message}`);
+      setUser(previous => ({ ...previous, name: displayName }));
+      setCurrentScreen(postNameEntryScreen);
+    } catch (error) {
+      setDisplayNameError(error instanceof Error ? error.message : 'No se pudo guardar el nombre.');
+    } finally {
+      setIsSavingDisplayName(false);
+    }
+  };
+
   const handleConfirmCharacter = (characterId: string) => {
     setUser(prev => {
       const updated: UserProfile = { ...prev, characterId };
@@ -461,7 +526,8 @@ export default function App() {
 
   const handleStartRoute = (route: RouteItem) => {
     setSelectedRoute(route);
-    setCurrentScreen('expedition');
+    setPendingChallengeStopId(null);
+    setCurrentScreen('expedition-map');
   };
 
   const handlePurchaseRoute = (route: RouteItem, purchaseRecord: UserPurchaseRecord) => {
@@ -526,9 +592,48 @@ export default function App() {
         {currentScreen === 'welcome' && (
           <WelcomeScreen
             onSignInWithGoogle={handleSignInWithGoogle}
-            onOpenGuideMode={() => setCurrentScreen('guide-landing')}
+            onOpenGuideMode={() => {
+              setIsGuideSignInLoading(true);
+              beginGoogleSignIn('guide-landing').catch(error => {
+                setIsGuideSignInLoading(false);
+                setRouteStorageError(error instanceof Error ? error.message : 'No se pudo iniciar sesión con Google.');
+              });
+            }}
+            isGuideSignInLoading={isGuideSignInLoading}
           />
         )}
+
+      {currentScreen === 'display-name' && (
+        <main className="min-h-screen bg-[#061b0e] px-5 text-[#fcf9f2] flex items-center justify-center">
+          <section className="w-full max-w-md rounded-2xl border border-white/10 bg-white/10 p-6 shadow-xl">
+            <h1 className="font-serif text-2xl font-semibold">¿Qué nombre quieres mostrar?</h1>
+            <p className="mt-2 text-sm leading-relaxed text-[#ebe8e1]">
+              Este nombre aparecerá en tu perfil y en las rutas que publiques.
+            </p>
+            <label htmlFor="display-name" className="mt-6 block text-sm font-medium">
+              Nombre para mostrar
+            </label>
+            <input
+              id="display-name"
+              type="text"
+              maxLength={60}
+              autoComplete="nickname"
+              value={displayNameDraft}
+              onChange={event => setDisplayNameDraft(event.target.value)}
+              className="mt-2 w-full rounded-xl border border-white/20 bg-[#061b0e]/70 px-4 py-3 text-sm outline-none focus:border-[#c48b47]"
+            />
+            {displayNameError && <p role="alert" className="mt-2 text-sm text-red-200">{displayNameError}</p>}
+            <button
+              type="button"
+              onClick={handleSaveDisplayName}
+              disabled={isSavingDisplayName}
+              className="mt-5 w-full rounded-xl bg-[#c48b47] px-4 py-3 font-semibold text-[#061b0e] disabled:opacity-60"
+            >
+              {isSavingDisplayName ? 'Guardando…' : 'Continuar'}
+            </button>
+          </section>
+        </main>
+      )}
 
       {/* 2. Character Selection Screen */}
       {currentScreen === 'character-selection' && (
@@ -536,7 +641,6 @@ export default function App() {
           user={user}
           onConfirmCharacter={handleConfirmCharacter}
           onBack={() => setCurrentScreen(user.isGoogleAuthenticated ? 'catalog' : 'welcome')}
-          onOpenGoogleAuth={() => setAuthModal({ isOpen: true, mode: 'login' })}
         />
       )}
 
@@ -562,8 +666,20 @@ export default function App() {
           guide={currentGuide}
           availableGuides={MOCK_GUIDES}
           onSelectGuide={handleSelectGuide}
-          guideRoutes={allRoutes.filter(r => r.guide?.id === currentGuide.id)}
-          onCreateRoute={() => setCurrentScreen('guide-create')}
+          guideRoutes={allRoutes.filter(
+            route => route.guide?.id === (user.googleId || currentGuide.id),
+          )}
+          onCreateRoute={() => {
+            setEditingRoute(null);
+            setCurrentScreen('guide-create');
+          }}
+          onEditRoute={routeId => {
+            const route = allRoutes.find(item => item.id === routeId);
+            if (route && route.guide?.id === (user.googleId || currentGuide.id)) {
+              setEditingRoute(route);
+              setCurrentScreen('guide-create');
+            }
+          }}
           onViewRouteDetail={routeId => {
             const found = allRoutes.find(r => r.id === routeId);
             if (found) {
@@ -580,9 +696,13 @@ export default function App() {
       {currentScreen === 'guide-create' && (
         <GuideCreateRouteScreen
           currentGuide={currentGuide}
+          initialRoute={editingRoute}
           onSaveDraft={handleSaveDraft}
           onPublishRoute={handlePublishRoute}
-          onCancel={() => setCurrentScreen('guide-dashboard')}
+          onCancel={() => {
+            setEditingRoute(null);
+            setCurrentScreen('guide-dashboard');
+          }}
         />
       )}
 
@@ -618,13 +738,32 @@ export default function App() {
       )}
 
       {/* 5. Visitor Screen: Expedition Active Mode */}
+      {currentScreen === 'expedition-map' && (
+        <InteractiveMap
+          routes={allRoutes}
+          selectedRouteId={selectedRoute.id}
+          characterId={user.characterId}
+          expeditionMode
+          solvedStopIds={user.solvedEnigmaIds}
+          onSelectRoute={handleSelectRoute}
+          onStartRoute={handleStartRoute}
+          onStopReached={stop => {
+            setPendingChallengeStopId(stop.id);
+            handleCheckInStop(stop.id);
+            setCurrentScreen('expedition');
+          }}
+          onClose={() => setCurrentScreen('detail')}
+        />
+      )}
+
       {currentScreen === 'expedition' && (
         <ActiveExpedition
           route={selectedRoute}
           user={user}
+          initialStopId={pendingChallengeStopId || undefined}
           visitedStopIds={user.visitedStopIds}
           solvedEnigmaIds={user.solvedEnigmaIds}
-          onBack={() => setCurrentScreen('detail')}
+          onBack={() => setCurrentScreen('expedition-map')}
           onCheckInStop={handleCheckInStop}
           onSolveEnigma={handleSolveEnigma}
           onAddNote={handleExpeditionAddNote}
@@ -654,6 +793,7 @@ export default function App() {
               onToggleSaved={handleToggleSavedRoute}
               onOpenCharacterSelection={handleOpenCharacterSelection}
               onOpenGuideMode={() => setCurrentScreen('guide-landing')}
+              isGuideAccount={user.isGuideAccount === true}
             />
           )}
 

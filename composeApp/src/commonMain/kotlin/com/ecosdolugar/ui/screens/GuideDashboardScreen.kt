@@ -29,7 +29,7 @@ fun GuideDashboardScreen(
     routes: List<RouteItem>,
     onBack: () -> Unit,
     onCreateNewRoute: () -> Unit,
-    onEditDraft: (RouteItem) -> Unit,
+    onEditRoute: (RouteItem) -> Unit,
     onPublishDraft: (RouteItem) -> Unit
 ) {
     val scrollState = rememberScrollState()
@@ -58,33 +58,6 @@ fun GuideDashboardScreen(
                 Text("PANEL DE GUÍA OFICIAL", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = TerracottaFixedDim, letterSpacing = 1.sp)
                 IconButton(onClick = onCreateNewRoute) {
                     Icon(Icons.Default.Add, contentDescription = "Nueva Ruta", tint = TerracottaGold)
-                }
-            }
-
-            // Guide Revenue Balance Card
-            Surface(
-                shape = RoundedCornerShape(20.dp),
-                color = Color(0xFF0F2618),
-                border = ButtonDefaults.outlinedButtonBorder.copy(
-                    brush = androidx.compose.ui.graphics.SolidColor(TerracottaGold.copy(alpha = 0.5f))
-                ),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text("BALANCE ACUMULADO", fontSize = 11.sp, color = TerracottaGold, fontWeight = FontWeight.Bold)
-                    Text("142,50 €", fontSize = 32.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                    Text("85% de comisión directa por ventas abonadas via Stripe / Bizum", fontSize = 12.sp, color = SurfaceCream)
-
-                    Button(
-                        onClick = { /* Withdraw action */ },
-                        shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = TerracottaGold, contentColor = PineDeep),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Icon(Icons.Default.AccountBalanceWallet, contentDescription = null)
-                        Spacer(Modifier.width(8.dp))
-                        Text("Transferir a mi cuenta bancaria", fontWeight = FontWeight.Bold)
-                    }
                 }
             }
 
@@ -178,16 +151,16 @@ fun GuideDashboardScreen(
                                 color = SurfaceContainerHighest,
                                 fontSize = 12.sp
                             )
-                            if (route.status == "borrador") {
-                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    OutlinedButton(
-                                        onClick = { onEditDraft(route) },
-                                        colors = ButtonDefaults.outlinedButtonColors(
-                                            contentColor = SurfaceCream
-                                        )
-                                    ) {
-                                        Text("Continuar borrador")
-                                    }
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                OutlinedButton(
+                                    onClick = { onEditRoute(route) },
+                                    colors = ButtonDefaults.outlinedButtonColors(
+                                        contentColor = SurfaceCream
+                                    )
+                                ) {
+                                    Text(if (route.status == "borrador") "Continuar borrador" else "Editar ruta")
+                                }
+                                if (route.status == "borrador") {
                                     Button(
                                         onClick = { onPublishDraft(route) },
                                         colors = ButtonDefaults.buttonColors(

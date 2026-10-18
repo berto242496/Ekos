@@ -11,8 +11,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.LocationOn
-import androidx.compose.material.icons.filled.Map
-import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -28,17 +26,24 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import ecosdolugar.composeapp.generated.resources.Res
 import ecosdolugar.composeapp.generated.resources.hero_forest
+import ecosdolugar.composeapp.generated.resources.google_g_logo
 import org.jetbrains.compose.resources.painterResource
+import com.ecosdolugar.localization.AppLanguage
+import com.ecosdolugar.localization.AppLanguageStrings
+import com.ecosdolugar.localization.appLanguageStrings
 import com.ecosdolugar.ui.theme.*
 
 @Composable
 fun WelcomeScreen(
     onSignInWithGoogle: () -> Unit,
     isSignInLoading: Boolean,
+    isGuideSignInLoading: Boolean,
     signInError: String?,
-    onOpenGuideMode: () -> Unit,
-    onOpenMap: () -> Unit
+    guideSignInError: String?,
+    language: AppLanguage,
+    onOpenGuideMode: () -> Unit
 ) {
+    val strings = appLanguageStrings(language)
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -79,6 +84,7 @@ fun WelcomeScreen(
 
         Column(modifier = Modifier.fillMaxSize()) {
             WelcomeHeader(
+                strings = strings,
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 18.dp)
@@ -100,7 +106,7 @@ fun WelcomeScreen(
                     verticalArrangement = Arrangement.SpaceBetween
                 ) {
                 Text(
-                    text = "Haz visitable\nlo invisible",
+                    text = strings.headline,
                     color = SurfaceCream,
                     fontFamily = FontFamily.Serif,
                     fontSize = 33.sp,
@@ -110,18 +116,16 @@ fun WelcomeScreen(
 
                 Spacer(Modifier.height(11.dp))
                 Text(
-                    text = "Descubre la historia, mitología y tesoros ocultos de toda Galicia a través de rutas digitales interactivas y relatos sonoros.",
+                    text = strings.description,
                     color = SurfaceContainerHigh,
                     fontSize = 14.sp,
                     lineHeight = 21.sp
                 )
 
                 Spacer(Modifier.height(20.dp))
-                WelcomeMetrics()
+                WelcomeMetrics(strings)
                 Spacer(Modifier.height(20.dp))
-                GoogleSignInButton(onClick = onSignInWithGoogle, isLoading = isSignInLoading)
-                Spacer(Modifier.height(8.dp))
-                PublicMapButton(onClick = onOpenMap)
+                GoogleSignInButton(strings, onClick = onSignInWithGoogle, isLoading = isSignInLoading)
                 if (signInError != null) {
                     Text(
                         text = signInError,
@@ -130,12 +134,22 @@ fun WelcomeScreen(
                         lineHeight = 15.sp
                     )
                 }
-                Spacer(Modifier.height(9.dp))
-                WelcomeTrustNotice()
                 Spacer(Modifier.height(14.dp))
-                GuideDivider()
+                GuideDivider(strings)
                 Spacer(Modifier.height(10.dp))
-                GuideCallToAction(onClick = onOpenGuideMode)
+                GuideCallToAction(
+                    strings,
+                    isLoading = isGuideSignInLoading,
+                    onClick = onOpenGuideMode
+                )
+                if (guideSignInError != null) {
+                    Text(
+                        text = guideSignInError,
+                        color = Color(0xFFFFD5D5),
+                        fontSize = 11.sp,
+                        lineHeight = 15.sp
+                    )
+                }
                 Spacer(Modifier.height(13.dp))
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -150,7 +164,7 @@ fun WelcomeScreen(
                     )
                     Spacer(Modifier.width(5.dp))
                     Text(
-                        "A Coruña · Lugo · Ourense · Pontevedra — Arquivo Vivo",
+                        strings.locationLine,
                         color = OutlineVariant.copy(alpha = 0.8f),
                         fontSize = 9.sp,
                         textAlign = TextAlign.Center
@@ -163,35 +177,8 @@ fun WelcomeScreen(
 }
 
 @Composable
-private fun PublicMapButton(onClick: () -> Unit) {
-    Surface(
-        onClick = onClick,
-        shape = RoundedCornerShape(12.dp),
-        color = Color.White.copy(alpha = 0.12f),
-        border = ButtonDefaults.outlinedButtonBorder.copy(
-            brush = androidx.compose.ui.graphics.SolidColor(Color.White.copy(alpha = 0.3f))
-        ),
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 18.dp, vertical = 13.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.Center
-        ) {
-            Icon(Icons.Default.Map, contentDescription = null, tint = TerracottaFixedDim)
-            Spacer(Modifier.width(10.dp))
-            Text(
-                "Explorar el mapa sin registrarme",
-                color = SurfaceCream,
-                fontWeight = FontWeight.SemiBold,
-                fontSize = 13.sp
-            )
-        }
-    }
-}
-
-@Composable
 private fun WelcomeHeader(
+    strings: AppLanguageStrings,
     modifier: Modifier = Modifier
 ) {
     Box(modifier = modifier, contentAlignment = Alignment.Center) {
@@ -208,7 +195,7 @@ private fun WelcomeHeader(
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(
-                    "ECOS DO LUGAR",
+                    strings.brandName,
                     color = Color.White,
                     fontSize = 13.sp,
                     fontWeight = FontWeight.Bold,
@@ -216,7 +203,7 @@ private fun WelcomeHeader(
                     maxLines = 1
                 )
                 Text(
-                    "RUTAS & PATRIMONIO DE TODA GALICIA",
+                    strings.brandSubtitle,
                     color = SurfaceContainerHigh,
                     fontSize = 7.sp,
                     fontWeight = FontWeight.Medium,
@@ -229,7 +216,7 @@ private fun WelcomeHeader(
 }
 
 @Composable
-private fun WelcomeMetrics() {
+private fun WelcomeMetrics(strings: AppLanguageStrings) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -239,23 +226,33 @@ private fun WelcomeMetrics() {
             .padding(vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        MetricColumn("PROVINCIAS", "4", Modifier.weight(1f).padding(start = 11.dp))
+        MetricColumn(strings.provinces, "4", Modifier.weight(1f).padding(start = 11.dp))
         Box(Modifier.width(1.dp).height(38.dp).background(Color.White.copy(alpha = 0.12f)))
-        MetricColumn("RUTAS MÍTICAS", "7", Modifier.weight(1f).padding(start = 11.dp))
+        MetricColumn(strings.mythicalRoutes, "7", Modifier.weight(1f).padding(start = 11.dp))
         Box(Modifier.width(1.dp).height(38.dp).background(Color.White.copy(alpha = 0.12f)))
-        MetricColumn("GEOGRAFÍA", "Toda Galicia", Modifier.weight(1.18f).padding(start = 11.dp))
+        MetricColumn(
+            strings.geography,
+            strings.allGalicia,
+            Modifier.weight(1.18f).padding(start = 11.dp),
+            isGeographyValue = true
+        )
     }
 }
 
 @Composable
-private fun MetricColumn(label: String, value: String, modifier: Modifier = Modifier) {
+private fun MetricColumn(
+    label: String,
+    value: String,
+    modifier: Modifier = Modifier,
+    isGeographyValue: Boolean = false
+) {
     Column(modifier = modifier) {
         Text(label, color = SurfaceContainerHigh, fontSize = 9.sp, maxLines = 1)
         Text(
             value,
-            color = if (value == "Toda Galicia") TerracottaFixedDim else Color.White,
+            color = if (isGeographyValue) TerracottaFixedDim else Color.White,
             fontFamily = FontFamily.Serif,
-            fontSize = if (value == "Toda Galicia") 15.sp else 18.sp,
+            fontSize = if (isGeographyValue) 15.sp else 18.sp,
             fontWeight = FontWeight.SemiBold,
             maxLines = 1
         )
@@ -263,7 +260,11 @@ private fun MetricColumn(label: String, value: String, modifier: Modifier = Modi
 }
 
 @Composable
-private fun GoogleSignInButton(onClick: () -> Unit, isLoading: Boolean) {
+private fun GoogleSignInButton(
+    strings: AppLanguageStrings,
+    onClick: () -> Unit,
+    isLoading: Boolean
+) {
     Surface(
         onClick = onClick,
         enabled = !isLoading,
@@ -288,70 +289,39 @@ private fun GoogleSignInButton(onClick: () -> Unit, isLoading: Boolean) {
                 )
                 Spacer(Modifier.width(11.dp))
                 Text(
-                    "Conectando con Google...",
+                    strings.connecting,
                     color = Color(0xFF1F1F1F),
                     fontSize = 12.sp,
                     fontWeight = FontWeight.SemiBold
                 )
             } else {
-                Text("G", color = Color(0xFF4285F4), fontSize = 21.sp, fontWeight = FontWeight.Black)
+                Image(
+                    painter = painterResource(Res.drawable.google_g_logo),
+                    contentDescription = "Google",
+                    modifier = Modifier.size(22.dp)
+                )
                 Spacer(Modifier.width(11.dp))
-                Column {
-                    Text(
-                        "Entrar con Google para elegir personaje",
-                        color = Color(0xFF1F1F1F),
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        lineHeight = 15.sp
-                    )
-                    Text(
-                        "Esencial para despertar tu don mágico y resolver las pruebas",
-                        color = Color(0xFF666666),
-                        fontSize = 8.sp,
-                        lineHeight = 11.sp
-                    )
-                }
+                Text(
+                    strings.signInTitle,
+                    color = Color(0xFF1F1F1F),
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    lineHeight = 18.sp
+                )
             }
         }
     }
 }
 
 @Composable
-private fun WelcomeTrustNotice() {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(9.dp))
-            .background(Color(0xFF032A1D).copy(alpha = 0.86f))
-            .border(1.dp, Color(0xFF10B981).copy(alpha = 0.25f), RoundedCornerShape(9.dp))
-            .padding(horizontal = 10.dp, vertical = 9.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        Icon(
-            Icons.Default.Shield,
-            contentDescription = null,
-            tint = Color(0xFF34D399),
-            modifier = Modifier.size(15.dp)
-        )
-        Text(
-            "Cada ruta requiere la sintonía de un personaje mitológico para desvelar sus secretos.",
-            color = Color(0xFFD1FAE5),
-            fontSize = 10.sp,
-            lineHeight = 13.sp
-        )
-    }
-}
-
-@Composable
-private fun GuideDivider() {
+private fun GuideDivider(strings: AppLanguageStrings) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically
     ) {
         HorizontalDivider(modifier = Modifier.weight(1f), color = Color.White.copy(alpha = 0.16f))
         Text(
-            "¿ERES GUÍA LOCAL?",
+            strings.guidePrompt,
             modifier = Modifier.padding(horizontal = 10.dp),
             color = TerracottaFixed.copy(alpha = 0.75f),
             fontSize = 9.sp,
@@ -363,9 +333,14 @@ private fun GuideDivider() {
 }
 
 @Composable
-private fun GuideCallToAction(onClick: () -> Unit) {
+private fun GuideCallToAction(
+    strings: AppLanguageStrings,
+    isLoading: Boolean,
+    onClick: () -> Unit
+) {
     Surface(
         onClick = onClick,
+        enabled = !isLoading,
         shape = RoundedCornerShape(12.dp),
         color = TerracottaGold.copy(alpha = 0.2f),
         border = ButtonDefaults.outlinedButtonBorder.copy(
@@ -377,20 +352,36 @@ private fun GuideCallToAction(onClick: () -> Unit) {
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.Center
         ) {
-            Icon(
-                Icons.Default.Explore,
-                contentDescription = null,
-                tint = TerracottaFixedDim,
-                modifier = Modifier.size(15.dp)
-            )
-            Spacer(Modifier.width(8.dp))
-            Text(
-                "Soy guía · Crea y monetiza tus rutas",
-                color = SurfaceCream,
-                fontFamily = FontFamily.Serif,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.SemiBold
-            )
+            if (isLoading) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(15.dp),
+                    color = TerracottaFixedDim,
+                    strokeWidth = 2.dp
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    strings.guideConnecting,
+                    color = SurfaceCream,
+                    fontFamily = FontFamily.Serif,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+            } else {
+                Icon(
+                    Icons.Default.Explore,
+                    contentDescription = null,
+                    tint = TerracottaFixedDim,
+                    modifier = Modifier.size(15.dp)
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    strings.guideCallToAction,
+                    color = SurfaceCream,
+                    fontFamily = FontFamily.Serif,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
         }
     }
 }

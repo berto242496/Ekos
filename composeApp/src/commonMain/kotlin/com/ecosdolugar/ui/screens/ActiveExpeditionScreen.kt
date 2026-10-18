@@ -1,12 +1,15 @@
 package com.ecosdolugar.ui.screens
 
 import androidx.compose.animation.*
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -31,23 +34,28 @@ import com.ecosdolugar.model.RouteStop
 import com.ecosdolugar.model.UserProfile
 import com.ecosdolugar.ui.theme.*
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun ActiveExpeditionScreen(
     route: RouteItem,
     userProfile: UserProfile,
+    initialStopId: String? = null,
     onBack: () -> Unit,
     onCheckInStop: (String) -> Unit,
     onSolveEnigma: (String, Int) -> Unit,
     onAddNote: (RouteStop) -> Unit,
     onCompleteRoute: (String) -> Unit
 ) {
-    var currentStopIndex by remember { mutableStateOf(0) }
+    var currentStopIndex by remember(route.id, initialStopId) {
+        mutableIntStateOf(route.stops.indexOfFirst { it.id == initialStopId }.coerceAtLeast(0))
+    }
     var isPlayingAudio by remember { mutableStateOf(false) }
     var isDonActive by remember { mutableStateOf(false) }
     var selectedOptionIndex by remember { mutableStateOf<Int?>(null) }
     var attempts by remember(currentStopIndex) { mutableIntStateOf(0) }
     var showExplanation by remember { mutableStateOf(false) }
     var isAnswerCorrect by remember { mutableStateOf(false) }
+    val challengeBringIntoViewRequester = remember { BringIntoViewRequester() }
 
     val character = remember(userProfile.characterId) {
         CharactersRepository.getById(userProfile.characterId)
@@ -67,6 +75,11 @@ fun ActiveExpeditionScreen(
         selectedOptionIndex = null
         showExplanation = false
         isAnswerCorrect = false
+    }
+    LaunchedEffect(currentStop.id, initialStopId) {
+        if (currentStop.id == initialStopId) {
+            challengeBringIntoViewRequester.bringIntoView()
+        }
     }
 
     Box(
@@ -399,7 +412,8 @@ fun ActiveExpeditionScreen(
             Surface(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(16.dp),
+                    .padding(16.dp)
+                    .bringIntoViewRequester(challengeBringIntoViewRequester),
                 shape = RoundedCornerShape(20.dp),
                 color = Color(0xFF141F17),
                 border = ButtonDefaults.outlinedButtonBorder.copy(

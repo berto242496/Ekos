@@ -9,18 +9,25 @@ enum class Category(val displayName: String) {
     NATURALEZA("Naturaleza")
 }
 
-enum class Difficulty(val label: String) {
-    FACIL("Fácil"),
-    MEDIA("Media"),
-    EXIGENTE("Exigente")
+enum class Difficulty(val label: String, val detail: String) {
+    FACIL("Fácil", "Paseo accesible"),
+    MEDIA("Media", "Camino tradicional"),
+    EXIGENTE("Exigente", "Costa o desnivel")
 }
 
 enum class TrialType(val label: String) {
     ACERTIJO("Acertijo Clásico"),
     PUZLE_RUNICO("Puzle Rúnico"),
     CIFRADO_MAGICO("Cifrado Mágico"),
-    ALINEACION_SIMBOLOS("Alineación de Símbolos")
+    ALINEACION_SIMBOLOS("Alineación de Símbolos"),
+    PUZLE_IMAGEN("Puzle de imagen"),
+    ORDENAR_PALABRA("Ordenar palabra"),
+    COMPLETAR_FRASE("Completar frase")
 }
+
+enum class StopAudioMode { WRITTEN, TTS, RECORDED }
+
+enum class NarrationVoice { FEMALE, MALE }
 
 data class RuneGlyph(
     val id: String,
@@ -41,6 +48,12 @@ data class StopTrial(
     val cipherWord: String = "",
     val scrambledLetters: List<String> = emptyList(),
     val cipherClue: String = "",
+    // For 'puzle_imagen': imagen completa que se trocea y se desordena
+    val imageUrl: String = "",
+    val puzzleGridSize: Int = 3,
+    // For 'completar_frase': frase completa y palabra oculta en ella
+    val sentence: String = "",
+    val missingWord: String = "",
     val generalHint: String,
     val characterClues: Map<String, String> = emptyMap(),
     val solutionExplanation: String,
@@ -66,6 +79,10 @@ data class RouteStop(
     val challengeId: String? = null,
     val audioDuration: String,
     val audioNarration: String? = null,
+    val imageUrl: String = "",
+    val audioMode: StopAudioMode = StopAudioMode.WRITTEN,
+    val narrationVoice: NarrationVoice = NarrationVoice.FEMALE,
+    val recordedAudioUrl: String? = null,
     val latitude: Double,
     val longitude: Double,
     val mapPositionX: Float, // 0f to 100f
@@ -143,8 +160,9 @@ data class UserProfile(
     val isVisitor: Boolean = true,
     val characterId: String = "meiga",
     val isGoogleAuthenticated: Boolean = false,
+    val isGuideAccount: Boolean = false,
     val googleId: String? = null,
-    val savedRouteIds: Set<String> = setOf("contrabando"),
+    val savedRouteIds: Set<String> = emptySet(),
     val visitedStopIds: Set<String> = setOf("stop-c1"),
     val solvedEnigmaIds: Set<String> = setOf("stop-c1"),
     val completedRouteIds: Set<String> = emptySet(),

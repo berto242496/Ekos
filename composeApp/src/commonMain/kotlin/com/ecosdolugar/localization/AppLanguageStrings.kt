@@ -1,0 +1,98 @@
+package com.ecosdolugar.localization
+
+data class AppLanguageStrings(
+    val brandName: String,
+    val brandSubtitle: String,
+    val headline: String,
+    val description: String,
+    val provinces: String,
+    val mythicalRoutes: String,
+    val geography: String,
+    val allGalicia: String,
+    val connecting: String,
+    val signInTitle: String,
+    val signInSubtitle: String,
+    val guidePrompt: String,
+    val guideCallToAction: String,
+    val guideConnecting: String,
+    val displayNameTitle: String,
+    val displayNameDescription: String,
+    val displayNameLabel: String,
+    val displayNameContinue: String,
+    val displayNameRequired: String,
+    val locationLine: String,
+    val languageTitle: String
+)
+
+fun appLanguageStrings(language: AppLanguage): AppLanguageStrings =
+    when (language) {
+        AppLanguage.SPANISH -> AppLanguageStrings(
+            brandName = "ECOS DO LUGAR",
+            brandSubtitle = "RUTAS Y PATRIMONIO DE TODA GALICIA",
+            headline = "Haz visitable\nlo invisible",
+            description = "Descubre la historia, mitología y tesoros ocultos de toda Galicia a través de rutas digitales interactivas y relatos sonoros.",
+            provinces = "PROVINCIAS",
+            mythicalRoutes = "RUTAS MÍTICAS",
+            geography = "GEOGRAFÍA",
+            allGalicia = "Toda Galicia",
+            connecting = "Conectando con Google...",
+            signInTitle = "Entra con Google",
+            signInSubtitle = "Esencial para despertar tu don mágico y resolver las pruebas",
+            guidePrompt = "¿ERES GUÍA LOCAL?",
+            guideCallToAction = "Soy guía · Accede con Google",
+            guideConnecting = "Conectando con Google...",
+            displayNameTitle = "¿Qué nombre quieres mostrar?",
+            displayNameDescription = "Este nombre aparecerá en tu perfil y en las rutas que publiques.",
+            displayNameLabel = "Nombre para mostrar",
+            displayNameContinue = "Continuar",
+            displayNameRequired = "Escribe un nombre de hasta 60 caracteres.",
+            locationLine = "A Coruña · Lugo · Ourense · Pontevedra — Arquivo Vivo",
+            languageTitle = "Idioma"
+        )
+        AppLanguage.GALICIAN -> AppLanguageStrings(
+            brandName = "ECOS DO LUGAR",
+            brandSubtitle = "RUTAS E PATRIMONIO DE TODA GALICIA",
+            headline = "Fai visitable\no invisible",
+            description = "Descubre a historia, mitoloxía e tesouros agochados de toda Galicia a través de rutas dixitais interactivas e relatos sonoros.",
+            provinces = "PROVINCIAS",
+            mythicalRoutes = "RUTAS MÍTICAS",
+            geography = "XEOGRAFÍA",
+            allGalicia = "Toda Galicia",
+            connecting = "Conectando con Google...",
+            signInTitle = "Entra con Google",
+            signInSubtitle = "Esencial para espertar o teu don máxico e resolver as probas",
+            guidePrompt = "ES GUÍA LOCAL?",
+            guideCallToAction = "Son guía · Accede con Google",
+            guideConnecting = "Conectando con Google...",
+            displayNameTitle = "Que nome queres amosar?",
+            displayNameDescription = "Este nome aparecerá no teu perfil e nas rutas que publiques.",
+            displayNameLabel = "Nome para amosar",
+            displayNameContinue = "Continuar",
+            displayNameRequired = "Escribe un nome de ata 60 caracteres.",
+            locationLine = "A Coruña · Lugo · Ourense · Pontevedra — Arquivo Vivo",
+            languageTitle = "Idioma"
+        )
+        AppLanguage.ENGLISH -> AppLanguageStrings(
+            brandName = "ECOS DO LUGAR",
+            brandSubtitle = "ROUTES & HERITAGE ACROSS GALICIA",
+            headline = "Make the\ninvisible visible",
+            description = "Discover the history, mythology and hidden treasures of Galicia through interactive digital routes and audio stories.",
+            provinces = "PROVINCES",
+            mythicalRoutes = "MYTHICAL ROUTES",
+            geography = "GEOGRAPHY",
+            allGalicia = "All Galicia",
+            connecting = "Connecting to Google...",
+            signInTitle = "Sign in with Google",
+            signInSubtitle = "Required to awaken your magical gift and solve the challenges",
+            guidePrompt = "ARE YOU A LOCAL GUIDE?",
+            guideCallToAction = "I'm a guide · Continue with Google",
+            guideConnecting = "Connecting to Google...",
+            displayNameTitle = "What name would you like to show?",
+            displayNameDescription = "This name will appear on your profile and on the routes you publish.",
+            displayNameLabel = "Display name",
+            displayNameContinue = "Continue",
+            displayNameRequired = "Enter a name up to 60 characters long.",
+            locationLine = "A Coruña · Lugo · Ourense · Pontevedra — Arquivo Vivo",
+            languageTitle = "Language"
+        )
+    }

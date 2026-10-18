@@ -39,7 +39,9 @@ export const TrialCard: React.FC<TrialCardProps> = ({
   isDonActive = false,
 }) => {
   const char = getCharacterById(characterId);
-  const charClue = trial?.characterClues?.[characterId] || trial?.characterClues?.['meiga'];
+  const charClue = trial?.characterClues?.[characterId]
+    || (characterId === 'urco' ? trial?.characterClues?.['lobishome'] : undefined)
+    || trial?.characterClues?.['meiga'];
 
   // State for 'acertijo':
   const [selectedOption, setSelectedOption] = useState<number | null>(null);
@@ -58,8 +60,6 @@ export const TrialCard: React.FC<TrialCardProps> = ({
   // Character Don states
   const [discardedOptions, setDiscardedOptions] = useState<number[]>([]);
   const [highlightedCorrectOption, setHighlightedCorrectOption] = useState(false);
-  const [fluvialCantigaActive, setFluvialCantigaActive] = useState(false);
-  const [caminanteChronicleActive, setCaminanteChronicleActive] = useState(false);
   const [donMessage, setDonMessage] = useState<string | null>(null);
 
   const completeAttempt = () => {
@@ -122,20 +122,9 @@ export const TrialCard: React.FC<TrialCardProps> = ({
         setSelectedRunes(trial.correctRuneOrder.slice(0, 2));
         setDonMessage('👺 ¡El Trasno se saltó el puzle y adelantó dos runas!');
       }
-    } else if (characterId === 'lavandeira') {
-      // 4. LAVANDEIRA: Cantiga Oral de las Corrientes
-      setFluvialCantigaActive(true);
+    } else if (characterId === 'urco') {
       setHighlightedCorrectOption(true);
-      setDonMessage('🌊 ¡La Lavandeira entona la cantiga fluvial donde rima la respuesta exacta!');
-    } else if (characterId === 'lobishome') {
-      // 5. LOBISHOME: Faro del Instinto (Huella Dorada)
-      setHighlightedCorrectOption(true);
-      setDonMessage('🐺 ¡El olfato del Lobishome ilumina el rastro verdadero con un aura dorada!');
-    } else if (characterId === 'caminante') {
-      // 6. CAMINANTE: Crónica Documental de los Mojones
-      setCaminanteChronicleActive(true);
-      setHighlightedCorrectOption(true);
-      setDonMessage('🧭 ¡El Caminante consultó el archivo histórico de los mojones antiguos!');
+      setDonMessage('🐺 ¡El instinto del Urco percibe la respuesta oculta entre las sombras!');
     }
   };
 
@@ -159,8 +148,6 @@ export const TrialCard: React.FC<TrialCardProps> = ({
     setShowGeneralHint(false);
     setDiscardedOptions([]);
     setHighlightedCorrectOption(false);
-    setFluvialCantigaActive(false);
-    setCaminanteChronicleActive(false);
     setDonMessage(null);
   }, [trial?.title, isSolved]);
 
@@ -367,51 +354,6 @@ export const TrialCard: React.FC<TrialCardProps> = ({
           </div>
         )}
 
-        {/* Fluvial Cantiga box for Lavandeira */}
-        {fluvialCantigaActive && !isSolved && (
-          <div className="p-3.5 rounded-xl bg-sky-50 border border-sky-300 flex items-start gap-2.5 animate-in fade-in">
-            <span className="text-2xl shrink-0">🌊</span>
-            <div className="flex flex-col gap-1 min-w-0">
-              <div className="flex items-center gap-1.5">
-                <span className="font-serif text-[12px] font-bold text-sky-950">
-                  Cantiga Fluvial de la Lavandeira
-                </span>
-                <span className="text-[10px] px-1.5 py-0.2 rounded bg-sky-200 text-sky-900 font-semibold uppercase">
-                  Verso Oral
-                </span>
-              </div>
-              <p className="font-serif italic text-[13px] text-sky-950 leading-snug">
-                «Por el río que va manso / por el son del cañaveral / escucha bien el remanso: / la respuesta es sin igual...»
-              </p>
-              {charClue && (
-                <p className="font-sans text-[12px] text-sky-900 mt-1 pl-2 border-l-2 border-sky-400">
-                  {charClue}
-                </p>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* Caminante Chronicle box */}
-        {caminanteChronicleActive && !isSolved && (
-          <div className="p-3.5 rounded-xl bg-amber-50 border border-amber-300 flex items-start gap-2.5 animate-in fade-in">
-            <span className="text-2xl shrink-0">🧭</span>
-            <div className="flex flex-col gap-1 min-w-0">
-              <div className="flex items-center gap-1.5">
-                <span className="font-serif text-[12px] font-bold text-amber-950">
-                  Crónica Documental de los Mojones
-                </span>
-                <span className="text-[10px] px-1.5 py-0.2 rounded bg-amber-200 text-amber-950 font-semibold uppercase">
-                  Archivo Antiguo
-                </span>
-              </div>
-              <p className="font-sans text-[12px] text-amber-900 leading-snug">
-                {charClue || trial.generalHint}
-              </p>
-            </div>
-          </div>
-        )}
-
         {/* Lore Context */}
         <p className="font-sans text-[13px] text-[#4a554d] italic border-l-2 border-[#c48b47] pl-3 py-0.5">
           {trial.loreContext}
@@ -462,7 +404,7 @@ export const TrialCard: React.FC<TrialCardProps> = ({
                   )}
                   {isHighlighted && !isSolved && (
                     <span className="text-[10px] font-sans font-bold text-amber-900 px-2 py-0.5 rounded-full bg-amber-200/90 flex items-center gap-1 shrink-0">
-                      {characterId === 'lobishome' ? '🐺 Rastro' : '✨ Pista'}
+                      {characterId === 'urco' ? '🐺 Instinto' : '✨ Pista'}
                     </span>
                   )}
                   {isSolved && isCorrect && <Check className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />}

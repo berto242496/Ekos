@@ -11,6 +11,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
+import com.ecosdolugar.localization.AppLanguage
 import com.ecosdolugar.model.RouteItem
 import com.ecosdolugar.model.RouteStop
 import kotlin.math.max
@@ -22,7 +23,12 @@ actual fun RouteMapView(
     selectedStopId: String?,
     onRouteSelected: (String) -> Unit,
     onStopSelected: (String) -> Unit,
-    modifier: Modifier
+    modifier: Modifier,
+    onCoordinateSelected: ((Double, Double) -> Unit)?,
+    selectedCoordinates: Pair<Double, Double>?,
+    pickerCoordinates: List<Pair<Double, Double>>,
+    onUserLocationChanged: ((Double, Double) -> Unit)?,
+    language: AppLanguage
 ) {
     val selectedRoute = routes.firstOrNull { it.id == selectedRouteId }
     val selectedStops = selectedRoute?.stops.orEmpty().filter { it.latitude.isFinite() && it.longitude.isFinite() }
@@ -50,6 +56,15 @@ actual fun RouteMapView(
     Canvas(
         modifier = modifier.pointerInput(routes, selectedRouteId) {
             detectTapGestures { tap ->
+                if (onCoordinateSelected != null) {
+                    val x = ((tap.x - paddingPx) / (size.width - paddingPx * 2)).coerceIn(0f, 1f)
+                    val y = ((tap.y - paddingPx) / (size.height - paddingPx * 2)).coerceIn(0f, 1f)
+                    onCoordinateSelected(
+                        43.8 - y * (43.8 - 41.7),
+                        -9.5 + x * (-6.5 - -9.5)
+                    )
+                    return@detectTapGestures
+                }
                 val nearestStart = starts.minByOrNull { (_, stop) ->
                     (position(stop, size.width.toFloat(), size.height.toFloat()) - tap).getDistance()
                 }
@@ -72,6 +87,24 @@ actual fun RouteMapView(
         }
     ) {
         drawRect(Color(0xFFE4EBDD))
+        if (onCoordinateSelected != null) {
+            pickerCoordinates.forEachIndexed { index, (latitude, longitude) ->
+                val point = Offset(
+                    paddingPx + (size.width - paddingPx * 2) * ((longitude + 9.5) / 3.0).toFloat(),
+                    paddingPx + (size.height - paddingPx * 2) * ((43.8 - latitude) / 2.1).toFloat()
+                )
+                drawCircle(Color(0xFF47654E), 11.dp.toPx(), point)
+            }
+            selectedCoordinates?.let { (latitude, longitude) ->
+                val point = Offset(
+                    paddingPx + (size.width - paddingPx * 2) * ((longitude + 9.5) / 3.0).toFloat(),
+                    paddingPx + (size.height - paddingPx * 2) * ((43.8 - latitude) / 2.1).toFloat()
+                )
+                drawCircle(Color(0xFFD49B45), 15.dp.toPx(), point)
+                drawCircle(Color.White, 15.dp.toPx(), point, style = Stroke(width = 2.dp.toPx()))
+            }
+            return@Canvas
+        }
         if (selectedStops.size > 1) {
             val path = Path()
             selectedStops.forEachIndexed { index, stop ->

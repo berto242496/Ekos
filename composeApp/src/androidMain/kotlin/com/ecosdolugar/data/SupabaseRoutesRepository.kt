@@ -4,10 +4,12 @@ import com.ecosdolugar.model.Category
 import com.ecosdolugar.model.Difficulty
 import com.ecosdolugar.model.FieldEnigma
 import com.ecosdolugar.model.GuideAuthor
+import com.ecosdolugar.model.NarrationVoice
 import com.ecosdolugar.model.OverviewFeature
 import com.ecosdolugar.model.RouteItem
 import com.ecosdolugar.model.RouteStop
 import com.ecosdolugar.model.RuneGlyph
+import com.ecosdolugar.model.StopAudioMode
 import com.ecosdolugar.model.StopTrial
 import com.ecosdolugar.model.TrialType
 import kotlinx.coroutines.Dispatchers
@@ -17,6 +19,7 @@ import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
 import java.net.URLEncoder
+import android.util.Base64
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -25,6 +28,7 @@ import java.util.UUID
 
 data class SupabaseAuthSession(
     val accessToken: String,
+    val refreshToken: String,
     val userId: String,
     val email: String,
     val displayName: String
@@ -53,11 +57,12 @@ class SupabaseRoutesRepository(
             requireConfigured()
             require(accessToken.isNotBlank()) { "Inicia sesión para guardar una ruta." }
             val savedRoute = route.withPersistentIds()
+            val routeWithPersistedImage = persistRouteMedia(savedRoute, accessToken)
             require(status == "publicada" || status == "pendiente" || status == "borrador") {
                 "Estado de ruta no válido."
             }
             val persistedStatus = if (status == "publicada") "pendiente" else status
-            val payload = savedRoute.toRouteJson(persistedStatus)
+            val payload = routeWithPersistedImage.toRouteJson(persistedStatus)
             val response = request(
                 method = "POST",
                 path = "/rest/v1/rpc/save_route",
@@ -65,10 +70,10 @@ class SupabaseRoutesRepository(
                 accessToken = accessToken,
                 contentType = "application/json"
             )
-            if (response.isNotBlank() && response != JSONObject.quote(savedRoute.id)) {
+            if (response.isNotBlank() && response != JSONObject.quote(routeWithPersistedImage.id)) {
                 throw IllegalStateException("Supabase devolvió un identificador inesperado al guardar la ruta.")
             }
-            savedRoute.copy(status = persistedStatus)
+            routeWithPersistedImage.copy(status = persistedStatus)
         }
 
     override suspend fun signOut(accessToken: String) = withContext(Dispatchers.IO) {
@@ -133,6 +138,84 @@ class SupabaseRoutesRepository(
             }
         }
 
+    override suspend fun saveDisplayName(userId: String, displayName: String, accessToken: String) =
+        withContext(Dispatchers.IO) {
+            requireConfigured()
+            val normalizedName = displayName.trim()
+            require(normalizedName.isNotEmpty()) { "Escribe el nombre que quieres mostrar." }
+            require(normalizedName.length <= 60) { "El nombre no puede superar los 60 caracteres." }
+            require(userId.isNotBlank()) { "No se pudo identificar al usuario." }
+            require(accessToken.isNotBlank()) { "Inicia sesión para guardar tu nombre." }
+            request(
+                method = "POST",
+                path = "/rest/v1/user_profiles?on_conflict=user_id",
+                body = JSONArray().put(
+                    JSONObject()
+                        .put("user_id", userId)
+                        .put("display_name", normalizedName)
+                ).toString(),
+                accessToken = accessToken,
+                contentType = "application/json",
+                prefer = "resolution=merge-duplicates,return=minimal"
+            )
+            Unit
+        }
+
+    override suspend fun loadSavedRouteIds(userId: String, accessToken: String): Set<String> =
+        withContext(Dispatchers.IO) {
+            requireConfigured()
+            require(userId.isNotBlank()) { "No se pudo identificar al usuario." }
+            require(accessToken.isNotBlank()) { "Inicia sesión para cargar tus rutas guardadas." }
+            val response = request(
+                method = "GET",
+                path = "/rest/v1/user_profiles?select=saved_route_ids&user_id=eq.${encode(userId)}",
+                accessToken = accessToken
+            )
+            val rows = JSONArray(response)
+            if (rows.length() == 0) emptySet() else {
+                val ids = rows.getJSONObject(0).optJSONArray("saved_route_ids") ?: JSONArray()
+                (0 until ids.length()).mapTo(mutableSetOf()) { ids.getString(it) }
+            }
+        }
+
+    override suspend fun saveSavedRouteIds(
+        userId: String,
+        displayName: String,
+        routeIds: Set<String>,
+        accessToken: String
+    ) =
+        withContext(Dispatchers.IO) {
+            requireConfigured()
+            require(userId.isNotBlank()) { "No se pudo identificar al usuario." }
+            require(accessToken.isNotBlank()) { "Inicia sesión para guardar tus rutas favoritas." }
+            val profileResponse = request(
+                method = "GET",
+                path = "/rest/v1/user_profiles?select=display_name&user_id=eq.${encode(userId)}",
+                accessToken = accessToken
+            )
+            val profiles = JSONArray(profileResponse)
+            val storedName = profiles
+                .optJSONObject(0)
+                ?.optString("display_name")
+                ?.takeIf { it.isNotBlank() }
+            val nameToStore = storedName ?: displayName.trim()
+            require(nameToStore.isNotBlank()) { "No se encontró un nombre para completar el perfil del usuario." }
+            request(
+                method = "POST",
+                path = "/rest/v1/user_profiles?on_conflict=user_id",
+                body = JSONArray().put(
+                    JSONObject()
+                        .put("user_id", userId)
+                        .put("display_name", nameToStore)
+                        .put("saved_route_ids", JSONArray(routeIds.sorted()))
+                ).toString(),
+                accessToken = accessToken,
+                contentType = "application/json",
+                prefer = "resolution=merge-duplicates,return=minimal"
+            )
+            Unit
+        }
+
     suspend fun exchangeGoogleIdToken(idToken: String): SupabaseAuthSession =
         withContext(Dispatchers.IO) {
             requireConfigured()
@@ -151,6 +234,32 @@ class SupabaseRoutesRepository(
             val metadata = user.optJSONObject("user_metadata") ?: JSONObject()
             SupabaseAuthSession(
                 accessToken = json.getString("access_token"),
+                refreshToken = json.getString("refresh_token"),
+                userId = user.getString("id"),
+                email = user.optString("email"),
+                displayName = metadata.optString(
+                    "full_name",
+                    metadata.optString("name", user.optString("email"))
+                )
+            )
+        }
+
+    suspend fun refreshAuthSession(refreshToken: String): SupabaseAuthSession =
+        withContext(Dispatchers.IO) {
+            requireConfigured()
+            require(refreshToken.isNotBlank()) { "No hay un token de renovación guardado." }
+            val response = request(
+                method = "POST",
+                path = "/auth/v1/token?grant_type=refresh_token",
+                body = JSONObject().put("refresh_token", refreshToken).toString(),
+                contentType = "application/json"
+            )
+            val json = JSONObject(response)
+            val user = json.getJSONObject("user")
+            val metadata = user.optJSONObject("user_metadata") ?: JSONObject()
+            SupabaseAuthSession(
+                accessToken = json.getString("access_token"),
+                refreshToken = json.getString("refresh_token"),
                 userId = user.getString("id"),
                 email = user.optString("email"),
                 displayName = metadata.optString(
@@ -163,6 +272,79 @@ class SupabaseRoutesRepository(
     private fun requireConfigured() {
         require(projectUrl.startsWith("https://") && publishableKey.isNotBlank()) {
             "Configura SUPABASE_URL y SUPABASE_PUBLISHABLE_KEY en .env.local para Android."
+        }
+    }
+
+    private fun persistRouteMedia(route: RouteItem, accessToken: String): RouteItem {
+        fun persist(url: String): String = if (url.startsWith("data:")) {
+            persistDataUrl(url, route, accessToken)
+        } else {
+            url
+        }
+        return route.copy(
+            imageUrl = persist(route.imageUrl),
+            stops = route.stops.map { stop ->
+                stop.copy(
+                    imageUrl = persist(stop.imageUrl),
+                    recordedAudioUrl = stop.recordedAudioUrl?.let { persist(it) },
+                    trial = stop.trial?.let { trial -> trial.copy(imageUrl = persist(trial.imageUrl)) }
+                )
+            }
+        )
+    }
+
+    private fun persistDataUrl(dataUrl: String, route: RouteItem, accessToken: String): String {
+        val match = Regex(
+            "^data:((?:image/(?:jpeg|png|webp))|(?:audio/(?:mp4|mpeg|webm|ogg)));base64,(.+)$",
+            RegexOption.DOT_MATCHES_ALL
+        ).matchEntire(dataUrl)
+            ?: throw IllegalArgumentException("El archivo multimedia debe ser una imagen JPEG, PNG o WebP, o un audio válido.")
+        val contentType = match.groupValues[1]
+        val imageBytes = try {
+            Base64.decode(match.groupValues[2], Base64.DEFAULT)
+        } catch (error: IllegalArgumentException) {
+            throw IllegalArgumentException("No se pudo decodificar un archivo multimedia de la ruta.", error)
+        }
+        require(imageBytes.isNotEmpty()) { "Un archivo multimedia de la ruta está vacío." }
+        require(imageBytes.size <= 50 * 1024 * 1024) {
+            "Cada archivo multimedia debe ocupar como máximo 50 MB."
+        }
+
+        val creatorId = route.guide.id
+        require(creatorId.isNotBlank()) { "No se pudo determinar el propietario de la imagen." }
+        val extension = when (contentType) {
+            "image/jpeg" -> "jpg"
+            "image/png" -> "png"
+            "image/webp" -> "webp"
+            "audio/mp4" -> "m4a"
+            "audio/mpeg" -> "mp3"
+            "audio/webm" -> "webm"
+            else -> "ogg"
+        }
+        val safeRouteId = route.id.replace(Regex("[^a-zA-Z0-9_-]"), "-")
+        val objectPath = "$creatorId/$safeRouteId/${UUID.randomUUID()}.$extension"
+        val connection = (URL(
+            "${projectUrl.trimEnd('/')}/storage/v1/object/route-media/$objectPath"
+        ).openConnection() as HttpURLConnection).apply {
+            requestMethod = "POST"
+            connectTimeout = 15_000
+            readTimeout = 60_000
+            doOutput = true
+            setRequestProperty("apikey", publishableKey)
+            setRequestProperty("Authorization", "Bearer $accessToken")
+            setRequestProperty("Content-Type", contentType)
+            setRequestProperty("x-upsert", "false")
+        }
+        try {
+            connection.outputStream.use { it.write(imageBytes) }
+            val status = connection.responseCode
+            if (status !in 200..299) {
+                val details = connection.errorStream?.bufferedReader(Charsets.UTF_8)?.use { it.readText() }.orEmpty()
+                throw IllegalStateException("No se pudo guardar la imagen de portada en Supabase: HTTP $status $details")
+            }
+            return "${projectUrl.trimEnd('/')}/storage/v1/object/public/route-media/$objectPath"
+        } finally {
+            connection.disconnect()
         }
     }
 
@@ -313,8 +495,23 @@ private fun JSONObject.toStop(
         latitude = latitude,
         longitude = longitude,
         mapPositionX = mapX,
-        mapPositionY = mapY
+        mapPositionY = mapY,
+        imageUrl = optString("imageUrl"),
+        audioMode = optString("audioMode").toAudioMode(),
+        narrationVoice = optString("narrationVoice").toNarrationVoice(),
+        recordedAudioUrl = optString("recordedAudioUrl").takeIf { it.isNotBlank() }
     )
+}
+
+private fun String.toAudioMode(): StopAudioMode = when (lowercase()) {
+    "tts" -> StopAudioMode.TTS
+    "recorded" -> StopAudioMode.RECORDED
+    else -> StopAudioMode.WRITTEN
+}
+
+private fun String.toNarrationVoice(): NarrationVoice = when (lowercase()) {
+    "male" -> NarrationVoice.MALE
+    else -> NarrationVoice.FEMALE
 }
 
 private fun JSONObject.toTrial(): StopTrial {
@@ -347,6 +544,10 @@ private fun JSONObject.toTrial(): StopTrial {
         cipherWord = optString("cipherWord"),
         scrambledLetters = optJSONArray("scrambledLetters").toStringList(),
         cipherClue = optString("cipherClue"),
+        imageUrl = optString("imageUrl"),
+        puzzleGridSize = optInt("puzzleGridSize", 3),
+        sentence = optString("sentence"),
+        missingWord = optString("missingWord"),
         generalHint = optString("generalHint"),
         characterClues = clues,
         solutionExplanation = optString("solutionExplanation"),
@@ -408,6 +609,9 @@ private fun String.toTrialType(): TrialType = when (lowercase()) {
     "puzle_runico" -> TrialType.PUZLE_RUNICO
     "cifrado_magico" -> TrialType.CIFRADO_MAGICO
     "alineacion_simbolos" -> TrialType.ALINEACION_SIMBOLOS
+    "puzle_imagen" -> TrialType.PUZLE_IMAGEN
+    "ordenar_palabra" -> TrialType.ORDENAR_PALABRA
+    "completar_frase" -> TrialType.COMPLETAR_FRASE
     else -> TrialType.ACERTIJO
 }
 
@@ -469,6 +673,10 @@ private fun RouteStop.toJson(): JSONObject {
         )
         .put("audioDuration", audioDuration)
         .put("audioNarration", audioNarration ?: JSONObject.NULL)
+        .put("imageUrl", imageUrl)
+        .put("audioMode", audioMode.name.lowercase())
+        .put("narrationVoice", narrationVoice.name.lowercase())
+        .put("recordedAudioUrl", recordedAudioUrl ?: JSONObject.NULL)
         .put(
             "coordinates",
             JSONObject()
@@ -505,6 +713,10 @@ private fun StopTrial.toJson() = JSONObject()
     .put("cipherWord", cipherWord)
     .put("scrambledLetters", JSONArray(scrambledLetters))
     .put("cipherClue", cipherClue)
+    .put("imageUrl", imageUrl)
+    .put("puzzleGridSize", puzzleGridSize)
+    .put("sentence", sentence)
+    .put("missingWord", missingWord)
     .put("generalHint", generalHint)
     .put("characterClues", JSONObject(characterClues))
     .put("solutionExplanation", solutionExplanation)

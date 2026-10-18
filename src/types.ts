@@ -206,6 +206,7 @@ export interface UserProfile {
   characterId: string;
   googleId?: string;
   isGoogleAuthenticated?: boolean;
+  isGuideAccount?: boolean;
   savedRouteIds: string[];
   visitedStopIds: string[];
   solvedEnigmaIds: string[];

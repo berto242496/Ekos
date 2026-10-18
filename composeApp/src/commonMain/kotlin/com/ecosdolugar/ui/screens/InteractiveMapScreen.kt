@@ -21,26 +21,44 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.ecosdolugar.localization.AppLanguage
+import com.ecosdolugar.localization.interactiveMapStrings
 import com.ecosdolugar.model.RouteItem
 import com.ecosdolugar.model.RouteStop
+import com.ecosdolugar.platform.PlatformBackHandler
 import com.ecosdolugar.ui.components.RouteMapView
 import com.ecosdolugar.ui.theme.*
 import kotlinx.coroutines.launch
+import kotlin.math.atan2
 import kotlin.math.abs
+import kotlin.math.cos
+import kotlin.math.sin
+import kotlin.math.sqrt
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun InteractiveMapScreen(
     routes: List<RouteItem>,
+    language: AppLanguage,
+    initialRouteId: String? = null,
+    expeditionMode: Boolean = false,
+    solvedStopIds: Set<String> = emptySet(),
+    onBack: () -> Unit,
     onSelectRoute: (RouteItem) -> Unit,
+    onStopReached: ((RouteStop) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
-    var activeRouteId by remember { mutableStateOf<String?>(null) }
+    val strings = interactiveMapStrings(language)
+    var activeRouteId by remember(initialRouteId) { mutableStateOf(initialRouteId) }
     var selectedStop by remember { mutableStateOf<RouteStop?>(null) }
     val listState = rememberLazyListState()
     val coroutineScope = rememberCoroutineScope()
     val selectedRoute = routes.firstOrNull { it.id == activeRouteId }
     val routeIds = routes.map { it.id }
+    var userLocation by remember(activeRouteId) { mutableStateOf<Pair<Double, Double>?>(null) }
+    val triggeredStops = remember(activeRouteId) { mutableSetOf<String>() }
+
+    PlatformBackHandler(onBack = onBack)
 
     LaunchedEffect(listState, routeIds) {
         var previousCenteredRouteId: String? = null
@@ -78,21 +96,85 @@ fun InteractiveMapScreen(
         }
     }
 
+    LaunchedEffect(initialRouteId, routeIds) {
+        initialRouteId?.takeIf { it in routeIds }?.let(::focusRoute)
+    }
+
     Box(
         modifier = modifier
             .fillMaxSize()
             .background(Color(0xFFD4E4E9))
     ) {
         RouteMapView(
-            routes = routes,
+            routes = if (expeditionMode) routes.filter { it.id == activeRouteId } else routes,
             selectedRouteId = activeRouteId,
             selectedStopId = selectedStop?.id,
-            onRouteSelected = ::focusRoute,
+            onRouteSelected = { routeId ->
+                if (!expeditionMode) focusRoute(routeId)
+            },
             onStopSelected = { stopId ->
                 selectedStop = selectedRoute?.stops?.firstOrNull { it.id == stopId }
             },
-            modifier = Modifier.fillMaxSize()
+            modifier = Modifier.fillMaxSize(),
+            onUserLocationChanged = if (expeditionMode) {
+                { latitude, longitude -> userLocation = latitude to longitude }
+            } else {
+                null
+            },
+            language = language
         )
+
+        LaunchedEffect(expeditionMode, selectedRoute, userLocation, solvedStopIds) {
+            val location = userLocation ?: return@LaunchedEffect
+            val route = selectedRoute ?: return@LaunchedEffect
+            if (!expeditionMode || onStopReached == null) return@LaunchedEffect
+            val reached = route.stops.firstOrNull { stop ->
+                stop.id !in solvedStopIds &&
+                    stop.id !in triggeredStops &&
+                    distanceMeters(location.first, location.second, stop.latitude, stop.longitude) <= 10.0
+            } ?: return@LaunchedEffect
+            triggeredStops.add(reached.id)
+            onStopReached(reached)
+        }
+
+        if (expeditionMode) {
+            Surface(
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .fillMaxWidth()
+                    .padding(12.dp),
+                shape = RoundedCornerShape(14.dp),
+                color = PineContainer.copy(alpha = 0.96f),
+                shadowElevation = 6.dp
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    TextButton(onClick = onBack, contentPadding = PaddingValues(4.dp)) {
+                        Text(strings.back, color = TerracottaFixedDim)
+                    }
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            selectedRoute?.title.orEmpty(),
+                            color = Color.White,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1
+                        )
+                        Text(
+                            if (userLocation == null) {
+                                strings.waitingLocation
+                            } else {
+                                strings.locationReady
+                            },
+                            color = SurfaceContainerHighest,
+                            fontSize = 11.sp
+                        )
+                    }
+                }
+            }
+        }
 
         if (routes.isEmpty()) {
             Surface(
@@ -101,7 +183,7 @@ fun InteractiveMapScreen(
                 color = PineContainer.copy(alpha = 0.94f)
             ) {
                 Text(
-                    "No hay rutas disponibles para mostrar.",
+                    strings.noRoutes,
                     modifier = Modifier.padding(14.dp),
                     color = Color.White,
                     fontSize = 13.sp
@@ -109,82 +191,84 @@ fun InteractiveMapScreen(
             }
         }
 
-        Column(
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .fillMaxWidth()
-                .padding(bottom = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
-                val cardWidth = 320.dp.coerceAtMost(maxWidth - 32.dp)
-                val sidePadding = ((maxWidth - cardWidth) / 2).coerceAtLeast(16.dp)
-                LazyRow(
-                    state = listState,
-                    flingBehavior = rememberSnapFlingBehavior(lazyListState = listState),
-                    contentPadding = PaddingValues(horizontal = sidePadding),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    itemsIndexed(routes, key = { _, route -> route.id }) { _, route ->
-                        val focused = route.id == activeRouteId
-                        val cardColor = if (focused) TerracottaGold else PineContainer.copy(alpha = 0.96f)
-                        val textColor = if (focused) PineDeep else Color.White
-                        Surface(
-                            modifier = Modifier
-                                .width(cardWidth)
-                                .heightIn(min = 96.dp),
-                            shape = RoundedCornerShape(18.dp),
-                            color = cardColor,
-                            shadowElevation = 8.dp,
-                            border = if (focused) null else ButtonDefaults.outlinedButtonBorder.copy(
-                                brush = androidx.compose.ui.graphics.SolidColor(TerracottaGold.copy(alpha = 0.55f))
-                            )
-                        ) {
-                            Row(
+        if (!expeditionMode) {
+            Column(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .padding(bottom = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+                    val cardWidth = 320.dp.coerceAtMost(maxWidth - 32.dp)
+                    val sidePadding = ((maxWidth - cardWidth) / 2).coerceAtLeast(16.dp)
+                    LazyRow(
+                        state = listState,
+                        flingBehavior = rememberSnapFlingBehavior(lazyListState = listState),
+                        contentPadding = PaddingValues(horizontal = sidePadding),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        itemsIndexed(routes, key = { _, route -> route.id }) { _, route ->
+                            val focused = route.id == activeRouteId
+                            val cardColor = if (focused) TerracottaGold else PineContainer.copy(alpha = 0.96f)
+                            val textColor = if (focused) PineDeep else Color.White
+                            Surface(
                                 modifier = Modifier
-                                    .clickable { focusRoute(route.id) }
-                                    .padding(start = 16.dp, top = 12.dp, bottom = 12.dp, end = 8.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    .width(cardWidth)
+                                    .heightIn(min = 96.dp),
+                                shape = RoundedCornerShape(18.dp),
+                                color = cardColor,
+                                shadowElevation = 8.dp,
+                                border = if (focused) null else ButtonDefaults.outlinedButtonBorder.copy(
+                                    brush = androidx.compose.ui.graphics.SolidColor(TerracottaGold.copy(alpha = 0.55f))
+                                )
                             ) {
-                                Column(
+                                Row(
                                     modifier = Modifier
-                                        .weight(1f)
-                                        .clip(RoundedCornerShape(8.dp))
-                                        .padding(vertical = 2.dp),
-                                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                                        .clickable { focusRoute(route.id) }
+                                        .padding(start = 16.dp, top = 12.dp, bottom = 12.dp, end = 8.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
-                                    Text(
-                                        route.title,
-                                        color = textColor,
-                                        fontWeight = FontWeight.Bold,
-                                        maxLines = 1
-                                    )
-                                    Text(
-                                        "${route.location} • ${route.distance} • ${route.duration}",
-                                        color = textColor.copy(alpha = 0.82f),
-                                        fontSize = 11.sp,
-                                        maxLines = 1
-                                    )
-                                    Text(
-                                        "${route.stops.size} paradas • ${route.difficulty.label}",
-                                        color = textColor.copy(alpha = 0.72f),
-                                        fontSize = 10.sp,
-                                        maxLines = 1
-                                    )
-                                }
-                                IconButton(
-                                    onClick = {
-                                        activeRouteId = route.id
-                                        onSelectRoute(route)
+                                    Column(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .padding(vertical = 2.dp),
+                                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                                    ) {
+                                        Text(
+                                            route.title,
+                                            color = textColor,
+                                            fontWeight = FontWeight.Bold,
+                                            maxLines = 1
+                                        )
+                                        Text(
+                                            "${route.location} • ${route.distance} • ${route.duration}",
+                                            color = textColor.copy(alpha = 0.82f),
+                                            fontSize = 11.sp,
+                                            maxLines = 1
+                                        )
+                                        Text(
+                                            "${route.stops.size} ${strings.stopsLabel} • ${route.difficulty.label}",
+                                            color = textColor.copy(alpha = 0.72f),
+                                            fontSize = 10.sp,
+                                            maxLines = 1
+                                        )
                                     }
-                                ) {
-                                    Icon(
-                                        Icons.AutoMirrored.Filled.ArrowForward,
-                                        contentDescription = "Ver detalle de ${route.title}",
-                                        tint = textColor
-                                    )
+                                    IconButton(
+                                        onClick = {
+                                            activeRouteId = route.id
+                                            onSelectRoute(route)
+                                        }
+                                    ) {
+                                        Icon(
+                                            Icons.AutoMirrored.Filled.ArrowForward,
+                                            contentDescription = "${strings.viewDetailOf} ${route.title}",
+                                            tint = textColor
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -192,5 +276,52 @@ fun InteractiveMapScreen(
                 }
             }
         }
+
+        selectedStop?.let { stop ->
+            AlertDialog(
+                onDismissRequest = { selectedStop = null },
+                title = {
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text(stop.title)
+                        Text(stop.locationName, color = TerracottaFixedDim, fontSize = 13.sp)
+                    }
+                },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Text(stop.story)
+                        if (stop.historicalNote.isNotBlank()) {
+                            Text(
+                                stop.historicalNote,
+                                color = SurfaceContainerHighest,
+                                fontSize = 13.sp
+                            )
+                        }
+                    }
+                },
+                confirmButton = {
+                    TextButton(onClick = { selectedStop = null }) {
+                        Text(strings.close)
+                    }
+                },
+                containerColor = PineContainer,
+                titleContentColor = Color.White,
+                textContentColor = Color.White
+            )
+        }
     }
+}
+
+private fun distanceMeters(
+    latitude1: Double,
+    longitude1: Double,
+    latitude2: Double,
+    longitude2: Double
+): Double {
+    val earthRadiusMeters = 6_371_000.0
+    val latitudeDelta = Math.toRadians(latitude2 - latitude1)
+    val longitudeDelta = Math.toRadians(longitude2 - longitude1)
+    val a = sin(latitudeDelta / 2) * sin(latitudeDelta / 2) +
+        cos(Math.toRadians(latitude1)) * cos(Math.toRadians(latitude2)) *
+        sin(longitudeDelta / 2) * sin(longitudeDelta / 2)
+    return earthRadiusMeters * 2 * atan2(sqrt(a), sqrt(1 - a))
 }

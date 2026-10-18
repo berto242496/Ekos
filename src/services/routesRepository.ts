@@ -41,6 +41,54 @@ const ALLOWED_MEDIA_TYPES = new Set([
   'audio/ogg',
 ]);
 
+export async function getSavedRouteIds(): Promise<string[]> {
+  const client = getSupabaseClient();
+  const { data: authData, error: authError } = await client.auth.getUser();
+  if (authError) throw new Error(`No se pudo verificar la sesión: ${authError.message}`);
+  if (!authData.user) throw new Error('Inicia sesión para cargar tus rutas guardadas.');
+
+  const { data, error } = await client
+    .from('user_profiles')
+    .select('saved_route_ids')
+    .eq('user_id', authData.user.id)
+    .maybeSingle();
+  if (error) throw new Error(`No se pudieron cargar las rutas guardadas: ${error.message}`);
+  return data?.saved_route_ids ?? [];
+}
+
+export async function saveSavedRouteIds(routeIds: string[], displayName: string): Promise<void> {
+  const client = getSupabaseClient();
+  const { data: authData, error: authError } = await client.auth.getUser();
+  if (authError) throw new Error(`No se pudo verificar la sesión: ${authError.message}`);
+  if (!authData.user) throw new Error('Inicia sesión para guardar tus rutas favoritas.');
+
+  const { data: profile, error: profileError } = await client
+    .from('user_profiles')
+    .select('display_name')
+    .eq('user_id', authData.user.id)
+    .maybeSingle();
+  if (profileError) throw new Error(`No se pudo cargar el perfil: ${profileError.message}`);
+
+  const metadata = authData.user.user_metadata;
+  const name = profile?.display_name ||
+    displayName.trim() ||
+    (typeof metadata.full_name === 'string' ? metadata.full_name.trim() : '') ||
+    (typeof metadata.name === 'string' ? metadata.name.trim() : '') ||
+    authData.user.email?.split('@')[0] ||
+    '';
+  if (!name) throw new Error('No se encontró un nombre para completar el perfil del usuario.');
+
+  const { error } = await client.from('user_profiles').upsert(
+    {
+      user_id: authData.user.id,
+      display_name: name,
+      saved_route_ids: [...new Set(routeIds)],
+    },
+    { onConflict: 'user_id' },
+  );
+  if (error) throw new Error(`No se pudieron sincronizar las rutas guardadas: ${error.message}`);
+}
+
 function mapRoute(row: RouteRow): RouteItem {
   const stops = [...row.route_stops]
     .sort((a, b) => a.position - b.position)

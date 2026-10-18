@@ -27,6 +27,7 @@ import {
 interface ActiveExpeditionProps {
   route: RouteItem;
   user: UserProfile;
+  initialStopId?: string;
   visitedStopIds: string[];
   solvedEnigmaIds: string[];
   onBack: () => void;
@@ -40,6 +41,7 @@ interface ActiveExpeditionProps {
 export const ActiveExpedition: React.FC<ActiveExpeditionProps> = ({
   route,
   user,
+  initialStopId,
   visitedStopIds,
   solvedEnigmaIds,
   onBack,
@@ -49,7 +51,10 @@ export const ActiveExpedition: React.FC<ActiveExpeditionProps> = ({
   onUseCharacterDon,
   onCompleteRoute,
 }) => {
-  const [currentStopIndex, setCurrentStopIndex] = useState(0);
+  const [currentStopIndex, setCurrentStopIndex] = useState(() => {
+    const initialIndex = route.stops.findIndex(stop => stop.id === initialStopId);
+    return initialIndex >= 0 ? initialIndex : 0;
+  });
   const [isPlayingAudio, setIsPlayingAudio] = useState(false);
   const [isPlayingCharAudio, setIsPlayingCharAudio] = useState(false);
   const [isDonActive, setIsDonActive] = useState(false);
@@ -68,6 +73,17 @@ export const ActiveExpedition: React.FC<ActiveExpeditionProps> = ({
   const progressPercent = totalStops > 0 ? Math.round((visitedStopsCount / totalStops) * 100) : 0;
 
   const companionAdvice = getCharacterCompanionAdvice(character.id, currentStop.title);
+
+  useEffect(() => {
+    if (!initialStopId || currentStop.id !== initialStopId) return;
+    const timeout = window.setTimeout(() => {
+      document.getElementById('active-stop-trial')?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'center',
+      });
+    }, 100);
+    return () => window.clearTimeout(timeout);
+  }, [currentStop.id, initialStopId]);
 
   useEffect(() => {
     const unsub = soundEngine.subscribeSpeech(speaking => {
@@ -538,15 +554,17 @@ export const ActiveExpedition: React.FC<ActiveExpeditionProps> = ({
           </div>
 
           {/* Interactive Trial / Puzzle / Riddle Component */}
-          <TrialCard
-            trial={currentStop.trial}
-            enigma={currentStop.enigma}
-            isSolved={isEnigmaSolved}
-            characterId={character.id}
-            isDonActive={isDonActive}
-            onUseDon={handleTriggerDon}
-            onSolve={attempts => onSolveEnigma(currentStop.id, attempts)}
-          />
+          <div id="active-stop-trial">
+            <TrialCard
+              trial={currentStop.trial}
+              enigma={currentStop.enigma}
+              isSolved={isEnigmaSolved}
+              characterId={character.id}
+              isDonActive={isDonActive}
+              onUseDon={handleTriggerDon}
+              onSolve={attempts => onSolveEnigma(currentStop.id, attempts)}
+            />
+          </div>
 
           {/* Action Row: Check-in & Notes */}
           <div className="flex items-center justify-between gap-3 pt-2 border-t border-[#f1eee7]">

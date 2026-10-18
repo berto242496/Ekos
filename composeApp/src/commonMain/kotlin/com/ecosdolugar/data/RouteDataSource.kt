@@ -17,5 +17,16 @@ interface RouteDataSource {
 
     suspend fun loadCompletedChallenges(accessToken: String): Set<String>
 
+    suspend fun saveDisplayName(userId: String, displayName: String, accessToken: String)
+
+    suspend fun loadSavedRouteIds(userId: String, accessToken: String): Set<String>
+
+    suspend fun saveSavedRouteIds(
+        userId: String,
+        displayName: String,
+        routeIds: Set<String>,
+        accessToken: String
+    )
+
     suspend fun signOut(accessToken: String)
 }

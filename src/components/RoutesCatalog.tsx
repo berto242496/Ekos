@@ -41,16 +41,35 @@ interface RoutesCatalogProps {
   onToggleSaved: (routeId: string) => void;
   onOpenCharacterSelection?: () => void;
   onOpenGuideMode?: () => void;
+  isGuideAccount?: boolean;
 }
 
 const CATEGORIES: { id: Category | 'all'; label: string }[] = [
-  { id: 'all', label: 'Todas' },
-  { id: 'historia', label: 'Historia' },
-  { id: 'leyendas', label: 'Leyendas' },
-  { id: 'familias', label: 'Familias' },
-  { id: 'patrimonio', label: 'Patrimonio' },
-  { id: 'naturaleza', label: 'Naturaleza' },
+  { id: 'all', label: 'filter_all' },
+  { id: 'historia', label: 'filter_history' },
+  { id: 'leyendas', label: 'filter_legends' },
+  { id: 'familias', label: 'filter_families' },
+  { id: 'patrimonio', label: 'filter_heritage' },
+  { id: 'naturaleza', label: 'filter_nature' },
 ];
+
+const CATEGORY_TRANSLATION_KEYS: Record<string, string> = {
+  historia: 'filter_history',
+  leyendas: 'filter_legends',
+  familias: 'filter_families',
+  patrimonio: 'filter_heritage',
+  naturaleza: 'filter_nature',
+};
+
+const DIFFICULTY_TRANSLATION_KEYS: Record<string, string> = {
+  fácil: 'difficulty_easy',
+  facil: 'difficulty_easy',
+  easy: 'difficulty_easy',
+  media: 'difficulty_medium',
+  medium: 'difficulty_medium',
+  exigente: 'difficulty_hard',
+  hard: 'difficulty_hard',
+};
 
 export type PriceFilterOption = 'all' | 'free' | 'paid' | 'under2' | 'over2';
 export type ActiveFilterDrawer = 'none' | 'price' | 'guide' | 'zone';
@@ -169,6 +188,7 @@ export const RoutesCatalog: React.FC<RoutesCatalogProps> = ({
   onToggleSaved,
   onOpenCharacterSelection,
   onOpenGuideMode,
+  isGuideAccount = false,
 }) => {
   const { t } = useI18n();
   const [selectedCategory, setSelectedCategory] = useState<Category | 'all'>('all');
@@ -303,26 +323,10 @@ export const RoutesCatalog: React.FC<RoutesCatalogProps> = ({
       (route.guide?.name && route.guide.name.toLowerCase().includes(searchQuery.toLowerCase()));
     const matchesSaved = !onlySaved || savedRouteIds.includes(route.id);
 
-    const pricePass = matchesPrice(route, selectedPriceFilter);
-
-    const guidePass =
-      selectedGuideId === 'all' ||
-      route.guide?.id === selectedGuideId ||
-      (route.guide?.name && route.guide.name.toLowerCase() === selectedGuideId.toLowerCase());
-
-    const zonePass =
-      selectedZone === 'all' ||
-      (selectedZone === 'outras'
-        ? !ZONE_PRESETS.some(p => p.match(route))
-        : (ZONE_PRESETS.find(p => p.id === selectedZone)?.match(route) ?? false));
-
-    return matchesCategory && matchesSearch && matchesSaved && pricePass && guidePass && zonePass;
+    return matchesCategory && matchesSearch && matchesSaved;
   });
 
   const activeFiltersCount =
-    (selectedPriceFilter !== 'all' ? 1 : 0) +
-    (selectedGuideId !== 'all' ? 1 : 0) +
-    (selectedZone !== 'all' ? 1 : 0) +
     (selectedCategory !== 'all' ? 1 : 0) +
     (onlySaved ? 1 : 0);
 
@@ -346,34 +350,34 @@ export const RoutesCatalog: React.FC<RoutesCatalogProps> = ({
         <div className="h-16 px-4 sm:px-5 flex items-center justify-between gap-2 max-w-lg mx-auto">
           <div className="flex items-center gap-2.5 min-w-0">
             <img
-              alt="Ecos do Lugar Logo"
+              alt={t('app_title')}
               className="h-8 w-auto object-contain shrink-0"
               src={APP_LOGO_URL}
             />
             <div className="flex flex-col min-w-0">
               <span className="font-sans text-[11px] uppercase tracking-wider text-[#47654e] font-semibold">
-                Ecos do Lugar
+                {t('app_title')}
               </span>
               <h1 className="font-serif text-[18px] text-[#1c1c18] font-semibold truncate leading-tight">
-                Rutas
+                {t('nav_routes')}
               </h1>
             </div>
           </div>
 
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-3 shrink-0">
             {/* Language Selector */}
             <LanguageSelector variant="compact" />
 
             {/* Soy Guía Link */}
-            {onOpenGuideMode && (
+            {isGuideAccount && onOpenGuideMode && (
               <button
                 id="catalog-soy-guia-btn"
                 onClick={onOpenGuideMode}
                 className="h-8 px-2.5 rounded-full bg-[#c48b47]/15 hover:bg-[#c48b47]/25 text-[#8c5717] border border-[#c48b47]/30 flex items-center gap-1.5 text-xs font-serif font-semibold active:scale-95 transition-all cursor-pointer shadow-xs"
-                title="Acceso para guías turísticos y creadores"
+                title={t('catalog_guide_access')}
               >
                 <Compass className="w-3.5 h-3.5 text-[#c48b47]" />
-                <span className="hidden xs:inline">Soy guía</span>
+                <span className="hidden xs:inline">{t('catalog_guide_button')}</span>
               </button>
             )}
 
@@ -382,7 +386,7 @@ export const RoutesCatalog: React.FC<RoutesCatalogProps> = ({
               <button
                 onClick={onOpenCharacterSelection}
                 className="h-8 px-2.5 rounded-full bg-[#1b3022]/10 hover:bg-[#1b3022]/15 active:scale-95 flex items-center gap-1.5 transition-all cursor-pointer border border-[#1b3022]/15"
-                title={`Personaxe: ${activeChar.name}. Fai clic para cambiar`}
+                title={t('catalog_character_title').replace('{name}', activeChar.name)}
               >
                 <span className="text-base leading-none">{activeChar.avatarEmoji}</span>
                 <span className="font-serif text-xs font-semibold text-[#1b3022] hidden xs:inline">
@@ -394,9 +398,9 @@ export const RoutesCatalog: React.FC<RoutesCatalogProps> = ({
             {/* Google Profile & Session Button */}
             <button
               onClick={onOpenProfile}
-              aria-label="Perfil de explorador Google y cerrar sesión"
-              className="h-8 px-2.5 rounded-full bg-[#061b0e] hover:bg-[#13351f] flex items-center gap-1.5 text-white active:scale-95 transition-all cursor-pointer shadow-xs border border-white/10"
-              title="Tu perfil / Cerrar sesión y empezar de nuevo"
+              aria-label={t('catalog_profile_aria')}
+              className="h-8 ml-1 px-2.5 rounded-full bg-[#061b0e] hover:bg-[#13351f] flex items-center gap-1.5 text-white active:scale-95 transition-all cursor-pointer shadow-xs border border-white/10"
+              title={t('catalog_profile_title')}
             >
               {user?.isGoogleAuthenticated ? (
                 <div className="w-5 h-5 rounded-full flex items-center justify-center font-bold text-[10px] bg-emerald-700 text-white border border-emerald-400 shrink-0">
@@ -406,7 +410,7 @@ export const RoutesCatalog: React.FC<RoutesCatalogProps> = ({
                 <User className="w-3.5 h-3.5 text-white shrink-0" />
               )}
               <span className="text-[11px] font-sans font-medium text-[#fcf9f2]">
-                Perfil
+                {t('catalog_profile')}
               </span>
             </button>
           </div>
@@ -420,19 +424,19 @@ export const RoutesCatalog: React.FC<RoutesCatalogProps> = ({
           <div className="flex items-center gap-1.5">
             <Navigation className="w-4 h-4 text-[#47654e]" />
             <span className="font-sans text-[11px] uppercase tracking-wider text-[#47654e] font-semibold">
-              Toda Galicia · Las 4 Provincias
+              {t('catalog_region_scope')}
             </span>
           </div>
 
           <button
             onClick={() => setOnlySaved(!onlySaved)}
-            aria-label="Rutas guardadas"
+            aria-label={t('catalog_saved_routes')}
             className={`w-9 h-9 rounded-full flex items-center justify-center transition-all active:scale-95 cursor-pointer ${
               onlySaved
                 ? 'bg-[#1b3022] text-white shadow-xs'
                 : 'bg-[#f1eee7] text-[#434843] hover:bg-[#ebe8e1]'
             }`}
-            title={onlySaved ? 'Ver todas las rutas' : 'Filtrar guardadas'}
+            title={onlySaved ? t('catalog_show_all_routes') : t('catalog_filter_saved')}
           >
             <Bookmark className={`w-4 h-4 ${onlySaved ? 'fill-current' : ''}`} />
           </button>
@@ -441,11 +445,13 @@ export const RoutesCatalog: React.FC<RoutesCatalogProps> = ({
         {/* Editorial Title Block */}
         <div className="flex flex-col mb-3">
           <h2 className="font-serif text-[28px] font-semibold text-[#061b0e] tracking-tight leading-tight">
-            Elige tu ruta mágica
+            {t('catalog_heading')}
           </h2>
           <div className="flex items-center justify-between gap-2 mt-1">
             <p className="font-serif text-[15px] text-[#434843] italic">
-              {filteredRoutes.length} experiencia{filteredRoutes.length === 1 ? '' : 's'} {filteredRoutes.length !== routes.length ? `(de ${routes.length})` : 'en catálogo'}
+              {filteredRoutes.length} {t(filteredRoutes.length === 1 ? 'catalog_experience_one' : 'catalog_experience_many')} {filteredRoutes.length !== routes.length
+                ? `(${t('catalog_count_of')} ${routes.length})`
+                : t('catalog_in_catalog')}
             </p>
             {activeFiltersCount > 0 && (
               <button
@@ -453,40 +459,10 @@ export const RoutesCatalog: React.FC<RoutesCatalogProps> = ({
                 className="text-xs font-sans text-[#c48b47] hover:text-[#8c5717] font-semibold flex items-center gap-1 cursor-pointer"
               >
                 <RotateCcw className="w-3 h-3" />
-                Limpiar filtros
+                {t('catalog_clear_filters')}
               </button>
             )}
           </div>
-        </div>
-
-        {/* Selected Character Companion Bar */}
-        <div className="mb-4 p-3.5 rounded-2xl bg-gradient-to-r from-[#1b3022] to-[#0b2414] text-white border border-[#2b4c37] shadow-sm flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3 min-w-0">
-            <div className="w-11 h-11 rounded-xl bg-white/10 flex items-center justify-center text-2xl border border-white/20 shrink-0 shadow-inner">
-              {activeChar.avatarEmoji}
-            </div>
-            <div className="flex flex-col min-w-0">
-              <div className="flex items-center gap-1.5 flex-wrap">
-                <span className="font-serif text-[14px] font-bold text-[#fcf9f2] truncate">
-                  {activeChar.name}
-                </span>
-                <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#faba71]/20 text-[#ffddba] border border-[#faba71]/30 font-semibold tracking-wide uppercase">
-                  {activeChar.archetype}
-                </span>
-              </div>
-              <p className="font-sans text-[11px] text-[#ebe8e1]/85 truncate mt-0.5">
-                Don activo: <span className="text-[#faba71] font-medium">{activeChar.abilityName}</span>
-              </p>
-            </div>
-          </div>
-          {onOpenCharacterSelection && (
-            <button
-              onClick={onOpenCharacterSelection}
-              className="px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 active:scale-95 text-xs text-[#ffddba] font-sans font-semibold shrink-0 border border-white/10 transition-all cursor-pointer"
-            >
-              Cambiar
-            </button>
-          )}
         </div>
 
         {/* Search Input Bar */}
@@ -497,7 +473,7 @@ export const RoutesCatalog: React.FC<RoutesCatalogProps> = ({
               type="text"
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
-              placeholder="Buscar por título, pueblo, zona o guía..."
+              placeholder={t('catalog_search_placeholder')}
               className="bg-transparent font-sans text-[15px] text-[#1c1c18] placeholder:text-[#737973] focus:outline-none w-full"
             />
             {searchQuery && (
@@ -505,114 +481,20 @@ export const RoutesCatalog: React.FC<RoutesCatalogProps> = ({
                 onClick={() => setSearchQuery('')}
                 className="text-[12px] text-[#737973] hover:text-[#1c1c18] font-sans px-1"
               >
-                Limpiar
+                {t('catalog_clear_search')}
               </button>
             )}
             <button
               onClick={handleResetAllFilters}
-              aria-label="Reiniciar filtros"
+              aria-label={t('catalog_reset_filters')}
               className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 active:scale-95 transition-transform ${
                 activeFiltersCount > 0
                   ? 'bg-[#c48b47] text-white'
                   : 'bg-[#f1eee7] text-[#47654e]'
               }`}
-              title="Restablecer todos los filtros"
+              title={t('catalog_reset_filters')}
             >
               <SlidersHorizontal className="w-3.5 h-3.5" />
-            </button>
-          </div>
-
-          {/* 3 Dedicated Filter Triggers: Precio, Guías, Zona */}
-          <div className="grid grid-cols-3 gap-2">
-            {/* 1. Precio Filter Button */}
-            <button
-              id="filter-trigger-price"
-              onClick={() => setActiveDrawer(activeDrawer === 'price' ? 'none' : 'price')}
-              className={`flex items-center justify-between px-2.5 py-2 rounded-xl text-xs font-sans font-medium transition-all active:scale-95 cursor-pointer border ${
-                selectedPriceFilter !== 'all'
-                  ? 'bg-[#c48b47]/15 border-[#c48b47] text-[#8c5717] font-semibold shadow-2xs'
-                  : activeDrawer === 'price'
-                  ? 'bg-[#1b3022] text-[#fcf9f2] border-[#1b3022]'
-                  : 'bg-[#f6f3ec] border-[#1b3022]/10 text-[#434843] hover:bg-[#ebe8e1]'
-              }`}
-            >
-              <div className="flex items-center gap-1.5 min-w-0">
-                <Tag className="w-3.5 h-3.5 text-[#c48b47] shrink-0" />
-                <span className="truncate">
-                  {selectedPriceFilter === 'all'
-                    ? 'Precio'
-                    : selectedPriceFilter === 'free'
-                    ? 'Gratis'
-                    : selectedPriceFilter === 'paid'
-                    ? 'De pago'
-                    : selectedPriceFilter === 'under2'
-                    ? '< 2 €'
-                    : '≥ 2 €'}
-                </span>
-              </div>
-              <ChevronDown
-                className={`w-3 h-3 transition-transform shrink-0 ml-1 ${
-                  activeDrawer === 'price' ? 'rotate-180' : ''
-                }`}
-              />
-            </button>
-
-            {/* 2. Guía Filter Button */}
-            <button
-              id="filter-trigger-guide"
-              onClick={() => setActiveDrawer(activeDrawer === 'guide' ? 'none' : 'guide')}
-              className={`flex items-center justify-between px-2.5 py-2 rounded-xl text-xs font-sans font-medium transition-all active:scale-95 cursor-pointer border ${
-                selectedGuideId !== 'all'
-                  ? 'bg-[#1b3022] border-[#1b3022] text-white font-semibold shadow-2xs'
-                  : activeDrawer === 'guide'
-                  ? 'bg-[#1b3022] text-[#fcf9f2] border-[#1b3022]'
-                  : 'bg-[#f6f3ec] border-[#1b3022]/10 text-[#434843] hover:bg-[#ebe8e1]'
-              }`}
-            >
-              <div className="flex items-center gap-1.5 min-w-0">
-                <UserCheck className="w-3.5 h-3.5 text-[#47654e] shrink-0" />
-                <span className="truncate">
-                  {selectedGuideId === 'all'
-                    ? 'Guías'
-                    : selectedGuideObj
-                    ? selectedGuideObj.name.split(' ')[0]
-                    : 'Guía'}
-                </span>
-              </div>
-              <ChevronDown
-                className={`w-3 h-3 transition-transform shrink-0 ml-1 ${
-                  activeDrawer === 'guide' ? 'rotate-180' : ''
-                }`}
-              />
-            </button>
-
-            {/* 3. Zona Filter Button */}
-            <button
-              id="filter-trigger-zone"
-              onClick={() => setActiveDrawer(activeDrawer === 'zone' ? 'none' : 'zone')}
-              className={`flex items-center justify-between px-2.5 py-2 rounded-xl text-xs font-sans font-medium transition-all active:scale-95 cursor-pointer border ${
-                selectedZone !== 'all'
-                  ? 'bg-[#2b4c37] border-[#2b4c37] text-white font-semibold shadow-2xs'
-                  : activeDrawer === 'zone'
-                  ? 'bg-[#1b3022] text-[#fcf9f2] border-[#1b3022]'
-                  : 'bg-[#f6f3ec] border-[#1b3022]/10 text-[#434843] hover:bg-[#ebe8e1]'
-              }`}
-            >
-              <div className="flex items-center gap-1.5 min-w-0">
-                <MapPin className="w-3.5 h-3.5 text-[#47654e] shrink-0" />
-                <span className="truncate">
-                  {selectedZone === 'all'
-                    ? 'Zona'
-                    : selectedZoneObj
-                    ? selectedZoneObj.short
-                    : 'Zona'}
-                </span>
-              </div>
-              <ChevronDown
-                className={`w-3 h-3 transition-transform shrink-0 ml-1 ${
-                  activeDrawer === 'zone' ? 'rotate-180' : ''
-                }`}
-              />
             </button>
           </div>
 
@@ -895,7 +777,7 @@ export const RoutesCatalog: React.FC<RoutesCatalogProps> = ({
           {activeFiltersCount > 0 && (
             <div className="flex items-center gap-1.5 flex-wrap py-1">
               <span className="text-[11px] font-sans text-[#737973] mr-0.5 font-medium">
-                Filtros:
+                {t('catalog_active_filters')}
               </span>
 
               {/* Price Active Chip */}
@@ -955,11 +837,11 @@ export const RoutesCatalog: React.FC<RoutesCatalogProps> = ({
               {/* Category Active Chip */}
               {selectedCategory !== 'all' && (
                 <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-[#f1eee7] text-[#434843] border border-[#c3c8c1]/40 text-xs font-sans font-semibold">
-                  <span>Cat: {selectedCategory}</span>
+                  <span>{t('catalog_category_prefix')} {t(CATEGORY_TRANSLATION_KEYS[selectedCategory] || selectedCategory)}</span>
                   <button
                     onClick={() => setSelectedCategory('all')}
                     className="hover:text-black ml-0.5"
-                    aria-label="Quitar filtro de categoría"
+                    aria-label={t('catalog_remove_category')}
                   >
                     <X className="w-3 h-3" />
                   </button>
@@ -970,11 +852,11 @@ export const RoutesCatalog: React.FC<RoutesCatalogProps> = ({
               {onlySaved && (
                 <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-[#f1eee7] text-[#434843] border border-[#c3c8c1]/40 text-xs font-sans font-semibold">
                   <Bookmark className="w-3 h-3 fill-current" />
-                  <span>Guardadas</span>
+                  <span>{t('catalog_saved')}</span>
                   <button
                     onClick={() => setOnlySaved(false)}
                     className="hover:text-black ml-0.5"
-                    aria-label="Quitar filtro de guardadas"
+                    aria-label={t('catalog_remove_saved')}
                   >
                     <X className="w-3 h-3" />
                   </button>
@@ -986,7 +868,7 @@ export const RoutesCatalog: React.FC<RoutesCatalogProps> = ({
                 onClick={handleResetAllFilters}
                 className="text-[11px] font-sans text-[#737973] hover:text-[#1c1c18] underline ml-1 cursor-pointer"
               >
-                Restablecer
+                {t('catalog_reset')}
               </button>
             </div>
           )}
@@ -1005,7 +887,7 @@ export const RoutesCatalog: React.FC<RoutesCatalogProps> = ({
                       : 'bg-[#f1eee7] text-[#434843] hover:bg-[#ebe8e1]'
                   }`}
                 >
-                  {cat.label}
+                  {t(cat.label)}
                 </button>
               );
             })}
@@ -1020,17 +902,17 @@ export const RoutesCatalog: React.FC<RoutesCatalogProps> = ({
                 <SlidersHorizontal className="w-5 h-5" />
               </div>
               <p className="font-serif text-[18px] text-[#061b0e] font-semibold mb-1">
-                Non se atoparon rutas con estes filtros
+                {t('catalog_empty_title')}
               </p>
               <p className="font-sans text-[13px] text-[#434843] mb-4 max-w-xs mx-auto leading-relaxed">
-                Proba a cambiar os filtros de precio, guía ou zona xeográfica, ou restablece os criterios.
+                {t('catalog_empty_description')}
               </p>
               <button
                 onClick={handleResetAllFilters}
                 className="px-4 py-2.5 rounded-xl bg-[#1b3022] hover:bg-[#061b0e] text-white font-sans text-[13px] font-medium shadow-xs active:scale-95 transition-all inline-flex items-center gap-1.5 cursor-pointer"
               >
                 <RotateCcw className="w-3.5 h-3.5" />
-                Restablecer todos os filtros
+                {t('catalog_reset_all')}
               </button>
             </div>
           ) : (
@@ -1058,7 +940,7 @@ export const RoutesCatalog: React.FC<RoutesCatalogProps> = ({
                     <div className="absolute top-3 left-3 right-3 flex items-center justify-between pointer-events-none">
                       {route.isFeatured ? (
                         <span className="px-2.5 py-1 rounded-full bg-[#412500]/90 text-[#ffddba] font-sans text-[11px] font-semibold tracking-wide uppercase shadow-xs backdrop-blur-xs">
-                          Destacada
+                          {t('catalog_featured')}
                         </span>
                       ) : (
                         <span className="px-2.5 py-1 rounded-full bg-black/40 text-white font-sans text-[11px] font-medium backdrop-blur-xs">
@@ -1068,7 +950,7 @@ export const RoutesCatalog: React.FC<RoutesCatalogProps> = ({
 
                       <span className="px-2.5 py-1 rounded-full bg-[#e5e2db]/90 text-[#061b0e] font-sans text-[11px] font-semibold shadow-xs backdrop-blur-xs flex items-center gap-1">
                         <Radio className="w-3 h-3 text-[#412500]" />
-                        {route.stopsCount} paradas
+                        {route.stopsCount} {t(route.stopsCount === 1 ? 'catalog_stops_one' : 'stops')}
                       </span>
                     </div>
 
@@ -1091,7 +973,7 @@ export const RoutesCatalog: React.FC<RoutesCatalogProps> = ({
                             ? 'bg-[#c48b47] text-white shadow-xs'
                             : 'bg-white/30 text-white hover:bg-white/50'
                         }`}
-                        aria-label="Guardar ruta"
+                        aria-label={t('catalog_save_route')}
                       >
                         <Bookmark className={`w-3.5 h-3.5 ${isSaved ? 'fill-current' : ''}`} />
                       </button>
@@ -1108,26 +990,15 @@ export const RoutesCatalog: React.FC<RoutesCatalogProps> = ({
                             key={cat}
                             className="px-2 py-0.5 rounded bg-[#f1eee7] text-[#434843] font-sans text-[11px] font-medium uppercase tracking-wider"
                           >
-                            {cat}
+                            {t(CATEGORY_TRANSLATION_KEYS[cat.toLowerCase()] || cat)}
                           </span>
                         ))}
 
-                        {/* Quick filterable Price Badge */}
-                        <button
-                          type="button"
-                          onClick={e => {
-                            e.stopPropagation();
-                            setSelectedPriceFilter(route.isFree ? 'free' : 'paid');
-                          }}
-                          title={`Filtrar por rutas ${route.isFree ? 'gratuitas' : 'de pago'}`}
-                          className={`px-2 py-0.5 rounded font-serif text-[11px] font-bold cursor-pointer transition-transform active:scale-95 ${
-                            route.isFree
-                              ? 'bg-emerald-50 text-emerald-800 border border-emerald-300 hover:bg-emerald-100'
-                              : 'bg-[#1b3022] text-[#ffddba] hover:bg-[#0b2414]'
-                          }`}
-                        >
-                          {route.price || (route.isFree ? 'Gratis' : '1,99 €')}
-                        </button>
+                        {!route.isFree && route.price.toLowerCase() !== 'gratis' && (
+                          <span className="px-2 py-0.5 rounded bg-[#1b3022] text-[#ffddba] font-serif text-[11px] font-bold">
+                            {route.price}
+                          </span>
+                        )}
                       </div>
 
                       <div className="flex items-center gap-2">
@@ -1136,7 +1007,7 @@ export const RoutesCatalog: React.FC<RoutesCatalogProps> = ({
                           {route.duration}
                         </span>
                         <span className="px-2 py-0.5 rounded-full bg-[#c5e8ca] text-[#4b6a52] font-sans text-[11px] font-semibold">
-                          {route.difficulty}
+                          {t(DIFFICULTY_TRANSLATION_KEYS[route.difficulty.toLowerCase()] || route.difficulty)}
                         </span>
                       </div>
                     </div>
@@ -1148,32 +1019,15 @@ export const RoutesCatalog: React.FC<RoutesCatalogProps> = ({
                       {route.title}
                     </h3>
 
-                    {/* Location & Guide Author Line with quick filter click */}
+                    {/* Location & Guide Author Line */}
                     <div className="flex items-center justify-between gap-2 flex-wrap text-xs text-[#47654e] font-serif border-y border-[#f1eee7] py-1.5">
-                      <button
-                        type="button"
-                        onClick={e => {
-                          e.stopPropagation();
-                          const match = ZONE_PRESETS.find(p => p.match(route));
-                          if (match) setSelectedZone(match.id);
-                        }}
-                        className="flex items-center gap-1 hover:text-[#1b3022] cursor-pointer"
-                        title="Filtrar por esta comarca"
-                      >
+                      <span className="flex items-center gap-1">
                         <Navigation className="w-3.5 h-3.5 text-[#c48b47]" />
                         <span className="text-[#1c1c18] font-medium">{route.location}</span>
-                      </button>
+                      </span>
 
                       {route.guide && (
-                        <button
-                          type="button"
-                          onClick={e => {
-                            e.stopPropagation();
-                            if (route.guide) setSelectedGuideId(route.guide.id);
-                          }}
-                          className="flex items-center gap-1.5 hover:text-[#061b0e] cursor-pointer"
-                          title={`Filtrar rutas creadas por ${route.guide.name}`}
-                        >
+                        <span className="flex items-center gap-1.5">
                           {route.guide.avatarUrl ? (
                             <img
                               src={route.guide.avatarUrl}
@@ -1183,14 +1037,14 @@ export const RoutesCatalog: React.FC<RoutesCatalogProps> = ({
                           ) : (
                             <User className="w-3.5 h-3.5 text-[#c48b47]" />
                           )}
-                          <span className="text-[#47654e]">Guía:</span>
-                          <span className="font-semibold text-[#0f2416] underline decoration-dotted decoration-[#c48b47]">
+                          <span className="text-[#47654e]">{t('catalog_guide_label')}</span>
+                          <span className="font-semibold text-[#0f2416]">
                             {route.guide.name}
                           </span>
                           {route.guide.verified && (
                             <CheckCircle2 className="w-3 h-3 text-[#c48b47]" />
                           )}
-                        </button>
+                        </span>
                       )}
                     </div>
 
@@ -1230,7 +1084,7 @@ export const RoutesCatalog: React.FC<RoutesCatalogProps> = ({
                             : 'bg-[#f1eee7] text-[#061b0e] hover:bg-[#ebe8e1]'
                         }`}
                       >
-                        <span>Ver ruta</span>
+                        <span>{t('catalog_view_route')}</span>
                         <ArrowRight className="w-4 h-4" />
                       </button>
                     </div>
@@ -1254,19 +1108,19 @@ export const RoutesCatalog: React.FC<RoutesCatalogProps> = ({
 
             <div className="flex flex-col min-w-0">
               <span className="font-sans text-[11px] font-semibold uppercase tracking-wider text-[#47654e]">
-                Ambiente de la Raia
+                {t('catalog_ambient_title')}
               </span>
               <span className="font-sans text-[13px] text-[#1c1c18] font-medium truncate">
                 {isAmbientPlaying
-                  ? 'Reproduciendo rumor del río y niebla...'
-                  : 'Sonidos del río y niebla matinal'}
+                  ? t('catalog_ambient_playing')
+                  : t('catalog_ambient_idle')}
               </span>
             </div>
           </div>
 
           <button
             onClick={handleToggleAmbient}
-            aria-label={isAmbientPlaying ? 'Pausar sonido' : 'Reproducir sonido ambiente'}
+            aria-label={isAmbientPlaying ? t('catalog_pause_sound') : t('catalog_play_ambient')}
             className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 active:scale-90 transition-transform shadow-xs cursor-pointer ${
               isAmbientPlaying ? 'bg-[#061b0e] text-white' : 'bg-white text-[#061b0e]'
             }`}

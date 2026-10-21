@@ -1,0 +1,606 @@
+package com.ecosdolugar
+
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.ecosdolugar.auth.GoogleAuthResult
+import com.ecosdolugar.auth.GoogleAuthService
+import com.ecosdolugar.data.RouteDataSource
+import com.ecosdolugar.data.RoutesRepository
+import com.ecosdolugar.data.enrichRoutes
+import com.ecosdolugar.data.withRouteTitles
+import com.ecosdolugar.model.GuideAuthor
+import com.ecosdolugar.model.GuideProfileInfo
+import com.ecosdolugar.model.RouteItem
+import com.ecosdolugar.model.RouteReview
+import com.ecosdolugar.model.RouteStop
+import com.ecosdolugar.model.UserProfile
+import com.ecosdolugar.util.ProfanityFilter
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.receiveAsFlow
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+
+internal const val CHALLENGE_SCORE = 100
+internal const val SESSION_EXPIRED_MESSAGE = "La sesión de Google ha caducado. Inicia sesión de nuevo."
+private const val MAX_DISPLAY_NAME_LENGTH = 60
+
+data class AppState(
+    val screen: NavigationScreen = NavigationScreen.RESTORING_SESSION,
+    val routes: List<RouteItem> = emptyList(),
+    val routeReviews: List<RouteReview> = emptyList(),
+    val guideProfiles: List<GuideProfileInfo> = emptyList(),
+    val selectedRoute: RouteItem = RoutesRepository.routes.first(),
+    val selectedGuide: GuideAuthor? = null,
+    val mapRouteToFocus: String? = null,
+    val mapReturnScreen: NavigationScreen = NavigationScreen.CATALOG,
+    val mapIsExpedition: Boolean = false,
+    val activeExpeditionStopId: String? = null,
+    val editingRoute: RouteItem? = null,
+    val userProfile: UserProfile = UserProfile(),
+    val accessToken: String? = null,
+    val googleSignInLoadingFor: NavigationScreen? = null,
+    val displayNameDraft: String = "",
+    val isSavingDisplayName: Boolean = false,
+    val displayNameError: String? = null,
+    val pendingAuthenticatedScreen: NavigationScreen = NavigationScreen.CHARACTER_SELECTION,
+    val googleSignInError: String? = null,
+    val guideSignInError: String? = null,
+    val isSavingRoute: Boolean = false,
+    val triggeredStopIds: Set<String> = emptySet()
+)
+
+/**
+ * Single source of truth for session, data and navigation. All state changes go through
+ * [MutableStateFlow.update] so concurrent async results cannot overwrite each other.
+ */
+class AppViewModel(
+    private val googleAuthService: GoogleAuthService,
+    private val routeDataSource: RouteDataSource
+) : ViewModel() {
+    private val _state = MutableStateFlow(AppState())
+    val state: StateFlow<AppState> = _state.asStateFlow()
+
+    private val _messages = Channel<String>(Channel.BUFFERED)
+
+    /** One-shot user-facing errors, meant to be shown in a snackbar. */
+    val messages: Flow<String> = _messages.receiveAsFlow()
+
+    private val savedRoutesMutex = Mutex()
+    private var dataJob: Job? = null
+
+    init {
+        reloadData()
+        restoreSession()
+    }
+
+    // region Navigation
+
+    fun navigateTo(screen: NavigationScreen) = _state.update { it.copy(screen = screen) }
+
+    fun openMapTab() = _state.update {
+        it.copy(
+            mapRouteToFocus = null,
+            mapReturnScreen = NavigationScreen.CATALOG,
+            mapIsExpedition = false,
+            screen = NavigationScreen.MAP
+        )
+    }
+
+    fun openRoute(route: RouteItem) =
+        _state.update { it.copy(selectedRoute = route, screen = NavigationScreen.DETAIL) }
+
+    fun openRouteById(routeId: String) {
+        _state.value.routes.firstOrNull { it.id == routeId }?.let(::openRoute)
+    }
+
+    fun openGuideProfile(guide: GuideAuthor) =
+        _state.update { it.copy(selectedGuide = guide, screen = NavigationScreen.GUIDE_PROFILE) }
+
+    fun openMapForSelectedRoute() = _state.update {
+        it.copy(
+            mapRouteToFocus = it.selectedRoute.id,
+            mapReturnScreen = NavigationScreen.DETAIL,
+            mapIsExpedition = false,
+            screen = NavigationScreen.MAP
+        )
+    }
+
+    fun startExpedition(route: RouteItem) = _state.update {
+        it.copy(
+            selectedRoute = route,
+            activeExpeditionStopId = null,
+            mapRouteToFocus = route.id,
+            mapReturnScreen = NavigationScreen.DETAIL,
+            mapIsExpedition = true,
+            screen = NavigationScreen.MAP
+        )
+    }
+
+    fun backToExpeditionMap() = _state.update {
+        it.copy(
+            mapRouteToFocus = it.selectedRoute.id,
+            mapReturnScreen = NavigationScreen.DETAIL,
+            mapIsExpedition = true,
+            screen = NavigationScreen.MAP
+        )
+    }
+
+    fun closeMap() = _state.update { it.copy(mapIsExpedition = false, screen = it.mapReturnScreen) }
+
+    fun onStopReached(stop: RouteStop) = _state.update {
+        it.copy(
+            activeExpeditionStopId = stop.id,
+            triggeredStopIds = it.triggeredStopIds + stop.id,
+            userProfile = it.userProfile.copy(visitedStopIds = it.userProfile.visitedStopIds + stop.id),
+            screen = NavigationScreen.EXPEDITION
+        )
+    }
+
+    // endregion
+
+    // region Session
+
+    fun beginGoogleSignIn(destination: NavigationScreen) {
+        if (_state.value.googleSignInLoadingFor != null) return
+        val isGuide = destination == NavigationScreen.GUIDE_DASHBOARD
+        _state.update {
+            it.copy(
+                googleSignInLoadingFor = destination,
+                pendingAuthenticatedScreen = destination,
+                guideSignInError = if (isGuide) null else it.guideSignInError,
+                googleSignInError = if (isGuide) it.googleSignInError else null
+            )
+        }
+        viewModelScope.launch {
+            try {
+                handleSignInResult(destination, googleAuthService.signInWithGoogle())
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Exception) {
+                val message = error.message ?: "No se pudo iniciar sesión con Google."
+                _state.update {
+                    if (isGuide) it.copy(guideSignInError = message) else it.copy(googleSignInError = message)
+                }
+            } finally {
+                _state.update { it.copy(googleSignInLoadingFor = null) }
+            }
+        }
+    }
+
+    private suspend fun handleSignInResult(destination: NavigationScreen, result: GoogleAuthResult) {
+        val isGuideDestination = destination == NavigationScreen.GUIDE_DASHBOARD
+        when (result) {
+            is GoogleAuthResult.Success -> {
+                if (isGuideDestination) {
+                    try {
+                        googleAuthService.setGuideAccount(true)
+                    } catch (error: CancellationException) {
+                        throw error
+                    } catch (error: Exception) {
+                        report(error.message ?: "No se pudo guardar el acceso de guía.")
+                        navigateTo(NavigationScreen.WELCOME)
+                        return
+                    }
+                }
+                val screen = when {
+                    isGuideDestination ->
+                        if (result.profileComplete) NavigationScreen.GUIDE_DASHBOARD else NavigationScreen.GUIDE_WELCOME
+                    result.profileComplete -> NavigationScreen.CATALOG
+                    result.displayNameSet -> NavigationScreen.CHARACTER_SELECTION
+                    else -> NavigationScreen.DISPLAY_NAME
+                }
+                _state.update {
+                    it.copy(
+                        accessToken = result.accessToken,
+                        userProfile = it.userProfile.signedIn(
+                            result,
+                            name = result.displayName.ifBlank { result.email },
+                            isGuideAccount = isGuideDestination || result.isGuideAccount
+                        ),
+                        displayNameDraft = result.displayName.ifBlank { result.email.substringBefore('@') },
+                        displayNameError = null,
+                        screen = screen
+                    )
+                }
+                reloadData()
+            }
+            is GoogleAuthResult.Error ->
+                _state.update {
+                    if (isGuideDestination) it.copy(guideSignInError = result.message)
+                    else it.copy(googleSignInError = result.message)
+                }
+            GoogleAuthResult.Cancelled,
+            GoogleAuthResult.NoStoredSession -> Unit
+        }
+    }
+
+    private fun restoreSession() {
+        viewModelScope.launch {
+            val result = try {
+                googleAuthService.restoreSession()
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Exception) {
+                GoogleAuthResult.Error(error.message ?: "No se pudo recuperar la sesión guardada.")
+            }
+            when (result) {
+                is GoogleAuthResult.Success -> {
+                    val screen = when {
+                        result.isGuideAccount && !result.profileComplete -> NavigationScreen.GUIDE_WELCOME
+                        result.profileComplete -> NavigationScreen.CATALOG
+                        result.displayNameSet -> NavigationScreen.CHARACTER_SELECTION
+                        else -> NavigationScreen.DISPLAY_NAME
+                    }
+                    _state.update {
+                        it.copy(
+                            accessToken = result.accessToken,
+                            userProfile = it.userProfile.signedIn(
+                                result,
+                                name = result.displayName,
+                                isGuideAccount = result.isGuideAccount
+                            ),
+                            screen = screen
+                        )
+                    }
+                    reloadData()
+                }
+                is GoogleAuthResult.Error ->
+                    _state.update { it.copy(googleSignInError = result.message, screen = NavigationScreen.WELCOME) }
+                GoogleAuthResult.NoStoredSession,
+                GoogleAuthResult.Cancelled -> navigateTo(NavigationScreen.WELCOME)
+            }
+        }
+    }
+
+    fun signOut() {
+        viewModelScope.launch {
+            try {
+                googleAuthService.signOut(_state.value.accessToken)
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Exception) {
+                // The service clears the local session even when the remote logout fails.
+                report(error.message ?: "No se pudo cerrar sesión.")
+            }
+            _state.update {
+                it.copy(
+                    accessToken = null,
+                    userProfile = UserProfile(),
+                    triggeredStopIds = emptySet(),
+                    displayNameDraft = "",
+                    screen = NavigationScreen.WELCOME
+                )
+            }
+            reloadData()
+        }
+    }
+
+    // endregion
+
+    // region Profile
+
+    fun onDisplayNameDraftChanged(name: String) = _state.update { it.copy(displayNameDraft = name) }
+
+    fun submitDisplayName(requiredMessage: String) {
+        val current = _state.value
+        val name = current.displayNameDraft.trim()
+        val validationError = when {
+            name.isEmpty() || name.length > MAX_DISPLAY_NAME_LENGTH -> requiredMessage
+            ProfanityFilter.containsProfanity(name) -> ProfanityFilter.displayNameError(name)
+            else -> null
+        }
+        if (validationError != null) {
+            _state.update { it.copy(displayNameError = validationError) }
+            return
+        }
+        if (current.isSavingDisplayName) return
+        val session = current.session()
+        if (session == null) {
+            _state.update { it.copy(displayNameError = SESSION_EXPIRED_MESSAGE) }
+            return
+        }
+        viewModelScope.launch {
+            _state.update { it.copy(isSavingDisplayName = true, displayNameError = null) }
+            try {
+                routeDataSource.saveDisplayName(session.userId, name, session.token)
+                googleAuthService.saveDisplayName(name)
+                val isGuideFlow = _state.value.pendingAuthenticatedScreen == NavigationScreen.GUIDE_DASHBOARD
+                if (isGuideFlow) {
+                    googleAuthService.saveProfile(name, _state.value.userProfile.characterId)
+                }
+                _state.update {
+                    it.copy(
+                        userProfile = it.userProfile.copy(name = name),
+                        screen = if (isGuideFlow) NavigationScreen.GUIDE_DASHBOARD else NavigationScreen.CHARACTER_SELECTION
+                    )
+                }
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Exception) {
+                val message = error.message ?: "No se pudo guardar el nombre en tu perfil."
+                _state.update { it.copy(displayNameError = message) }
+            } finally {
+                _state.update { it.copy(isSavingDisplayName = false) }
+            }
+        }
+    }
+
+    fun saveDisplayNameFromJournal(name: String) {
+        val validationError = ProfanityFilter.displayNameError(name)
+        if (validationError != null) return report(validationError)
+        val session = _state.value.session() ?: return report(SESSION_EXPIRED_MESSAGE)
+        launchReportingErrors("No se pudo guardar el nombre en tu perfil.") {
+            routeDataSource.saveDisplayName(session.userId, name, session.token)
+            googleAuthService.saveDisplayName(name)
+            _state.update { it.copy(userProfile = it.userProfile.copy(name = name)) }
+        }
+    }
+
+    fun saveGuideProfile(name: String, bio: String, photoDataUrl: String?) {
+        val current = _state.value
+        if (current.isSavingDisplayName) return
+        val session = current.session()
+        if (session == null) {
+            _state.update { it.copy(displayNameError = SESSION_EXPIRED_MESSAGE) }
+            return
+        }
+        viewModelScope.launch {
+            _state.update { it.copy(isSavingDisplayName = true, displayNameError = null) }
+            try {
+                routeDataSource.saveGuideProfile(session.userId, name, bio, photoDataUrl, session.token)
+                googleAuthService.completeGuideProfile(name)
+                _state.update {
+                    it.copy(
+                        userProfile = it.userProfile.copy(name = name),
+                        screen = NavigationScreen.GUIDE_DASHBOARD
+                    )
+                }
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Exception) {
+                val message = error.message ?: "No se pudo guardar tu perfil de guía."
+                _state.update { it.copy(displayNameError = message) }
+            } finally {
+                _state.update { it.copy(isSavingDisplayName = false) }
+            }
+        }
+    }
+
+    fun selectCharacter(characterId: String) =
+        _state.update { it.copy(userProfile = it.userProfile.copy(characterId = characterId)) }
+
+    fun confirmCharacter(characterId: String) {
+        launchReportingErrors("No se pudo guardar tu personaje.") {
+            googleAuthService.saveProfile(_state.value.userProfile.name, characterId)
+            _state.update {
+                it.copy(
+                    userProfile = it.userProfile.copy(characterId = characterId),
+                    screen = NavigationScreen.CATALOG
+                )
+            }
+        }
+    }
+
+    // endregion
+
+    // region Routes and progress
+
+    fun toggleSavedRoute(routeId: String) {
+        var nextSaved = emptySet<String>()
+        _state.update {
+            val saved = it.userProfile.savedRouteIds
+            nextSaved = if (routeId in saved) saved - routeId else saved + routeId
+            it.copy(userProfile = it.userProfile.copy(savedRouteIds = nextSaved))
+        }
+        val current = _state.value
+        val session = current.session() ?: return
+        launchReportingErrors("No se pudieron sincronizar las rutas guardadas.") {
+            savedRoutesMutex.withLock {
+                routeDataSource.saveSavedRouteIds(session.userId, current.userProfile.name, nextSaved, session.token)
+            }
+        }
+    }
+
+    fun solveEnigma(stopId: String, attempts: Int) {
+        val current = _state.value
+        val isNewlySolved = stopId !in current.userProfile.solvedEnigmaIds
+        _state.update {
+            it.copy(
+                userProfile = it.userProfile.copy(
+                    solvedEnigmaIds = it.userProfile.solvedEnigmaIds + stopId,
+                    totalScore = it.userProfile.totalScore + if (isNewlySolved) CHALLENGE_SCORE else 0
+                )
+            )
+        }
+        val challengeId = current.selectedRoute.stops.firstOrNull { it.id == stopId }?.challengeId
+        val session = current.session()
+        if (challengeId != null && session != null) {
+            launchReportingErrors("No se pudo sincronizar el progreso del reto.") {
+                routeDataSource.saveChallengeProgress(
+                    userId = session.userId,
+                    challengeId = challengeId,
+                    attempts = attempts,
+                    score = CHALLENGE_SCORE,
+                    completed = true,
+                    accessToken = session.token
+                )
+            }
+        }
+    }
+
+    fun submitReview(routeRating: Int, guideRating: Int, comment: String) {
+        val current = _state.value
+        val session = current.session() ?: return
+        val route = current.selectedRoute
+        launchReportingErrors("No se pudo guardar la valoración.") {
+            routeDataSource.saveRouteReview(
+                userId = session.userId,
+                routeId = route.id,
+                guideId = route.guide.id,
+                routeRating = routeRating,
+                guideRating = guideRating,
+                comment = comment,
+                accessToken = session.token
+            )
+        }
+    }
+
+    fun createNewRoute() {
+        if (_state.value.accessToken == null) {
+            report("Inicia sesión con Google antes de crear una ruta.")
+            navigateTo(NavigationScreen.WELCOME)
+        } else {
+            _state.update { it.copy(editingRoute = null, screen = NavigationScreen.ROUTE_EDITOR) }
+        }
+    }
+
+    fun editRoute(route: RouteItem) =
+        _state.update { it.copy(editingRoute = route, screen = NavigationScreen.ROUTE_EDITOR) }
+
+    fun publishDraft(draft: RouteItem) = saveRoute(draft, "publicada", afterSave = {
+        _state.update { it.copy(screen = NavigationScreen.GUIDE_DASHBOARD) }
+    }, fallbackMessage = "No se pudo publicar el borrador.")
+
+    fun saveEditedRoute(route: RouteItem, status: String) = saveRoute(route, status, afterSave = { saved ->
+        _state.update {
+            if (saved.status == "publicada") it.copy(selectedRoute = saved, screen = NavigationScreen.DETAIL)
+            else it.copy(screen = NavigationScreen.GUIDE_DASHBOARD)
+        }
+    }, fallbackMessage = "No se pudo guardar la ruta.")
+
+    private fun saveRoute(
+        route: RouteItem,
+        status: String,
+        afterSave: (RouteItem) -> Unit,
+        fallbackMessage: String
+    ) {
+        if (_state.value.isSavingRoute) return
+        val token = _state.value.accessToken
+        if (token == null) return report("La sesión ha caducado. Inicia sesión de nuevo.")
+        viewModelScope.launch {
+            _state.update { it.copy(isSavingRoute = true) }
+            try {
+                val saved = routeDataSource.saveRoute(route, status, token)
+                _state.update { it.copy(routes = listOf(saved) + it.routes.filterNot { r -> r.id == saved.id }) }
+                afterSave(saved)
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Exception) {
+                report(error.message ?: fallbackMessage)
+            } finally {
+                _state.update { it.copy(isSavingRoute = false) }
+            }
+        }
+    }
+
+    // endregion
+
+    private fun reloadData() {
+        dataJob?.cancel()
+        dataJob = viewModelScope.launch { loadData() }
+    }
+
+    private suspend fun loadData() {
+        val snapshot = _state.value
+        val token = snapshot.accessToken?.takeIf { it.isNotBlank() }
+        val userId = snapshot.userProfile.googleId?.takeIf { it.isNotBlank() }
+        try {
+            val remoteRoutes = routeDataSource.loadRoutes(token)
+            val savedRouteIds = if (token != null && userId != null) {
+                routeDataSource.loadSavedRouteIds(userId, token)
+            } else {
+                null
+            }
+            val completedChallengeIds = token?.let { routeDataSource.loadCompletedChallenges(it) }.orEmpty()
+            val totalScore = token?.let { routeDataSource.loadTotalChallengeScore(it) } ?: 0
+            val completedStopIds = remoteRoutes
+                .flatMap { it.stops }
+                .filter { it.challengeId in completedChallengeIds }
+                .map { it.id }
+            val reviews = withRouteTitles(
+                orEmptyOnFailure { routeDataSource.loadRouteReviews(token) },
+                remoteRoutes
+            )
+            val profiles = token?.let {
+                orEmptyOnFailure {
+                    routeDataSource.loadGuideProfiles(
+                        remoteRoutes.map { route -> route.guide.id } + listOfNotNull(userId),
+                        it
+                    )
+                }
+            }.orEmpty()
+            val enrichedRoutes = enrichRoutes(remoteRoutes, reviews, profiles)
+            _state.update {
+                it.copy(
+                    routes = enrichedRoutes,
+                    routeReviews = reviews,
+                    guideProfiles = profiles,
+                    selectedRoute = enrichedRoutes.firstOrNull { route -> route.id == it.selectedRoute.id }
+                        ?: enrichedRoutes.firstOrNull()
+                        ?: it.selectedRoute,
+                    userProfile = it.userProfile.copy(
+                        solvedEnigmaIds = it.userProfile.solvedEnigmaIds + completedStopIds,
+                        savedRouteIds = savedRouteIds ?: it.userProfile.savedRouteIds,
+                        totalScore = totalScore
+                    )
+                )
+            }
+        } catch (error: CancellationException) {
+            throw error
+        } catch (error: Exception) {
+            report(error.message ?: "No se pudieron cargar las rutas de Supabase.")
+        }
+    }
+
+    private fun launchReportingErrors(fallbackMessage: String, block: suspend () -> Unit) {
+        viewModelScope.launch {
+            try {
+                block()
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Exception) {
+                report(error.message ?: fallbackMessage)
+            }
+        }
+    }
+
+    private fun report(message: String) {
+        _messages.trySend(message)
+    }
+}
+
+private class Session(val userId: String, val token: String)
+
+private fun AppState.session(): Session? {
+    val token = accessToken?.takeIf { it.isNotBlank() }
+    val userId = userProfile.googleId?.takeIf { it.isNotBlank() }
+    return if (token != null && userId != null) Session(userId, token) else null
+}
+
+private fun UserProfile.signedIn(result: GoogleAuthResult.Success, name: String, isGuideAccount: Boolean) = copy(
+    name = name,
+    email = result.email,
+    isVisitor = false,
+    isGoogleAuthenticated = true,
+    isGuideAccount = isGuideAccount,
+    googleId = result.googleId,
+    characterId = result.characterId ?: characterId
+)
+
+/** Optional data: a failed load yields an empty list, but cancellation must still propagate. */
+private suspend inline fun <T> orEmptyOnFailure(block: () -> List<T>): List<T> =
+    try {
+        block()
+    } catch (error: CancellationException) {
+        throw error
+    } catch (error: Exception) {
+        emptyList()
+    }

@@ -57,7 +57,7 @@ fun RoutesCatalogScreen(
     }
     val charColor = Color(activeCharacter.accentColorHex)
 
-    val filteredRoutes = remember(searchQuery, selectedCategories, onlySaved, routes) {
+    val filteredRoutes = remember(searchQuery, selectedCategories, onlySaved, routes, savedRouteIds) {
         routes.filter { route ->
             val matchesCategory = selectedCategories.isEmpty() || route.categories.any { it in selectedCategories }
             val matchesSearch = searchQuery.isBlank() ||
@@ -339,7 +339,7 @@ fun RoutesCatalogScreen(
                     }
                 }
             } else {
-                items(filteredRoutes) { route ->
+                items(filteredRoutes, key = { it.id }) { route ->
                     val isSaved = savedRouteIds.contains(route.id)
                     RouteCard(
                         route = route,

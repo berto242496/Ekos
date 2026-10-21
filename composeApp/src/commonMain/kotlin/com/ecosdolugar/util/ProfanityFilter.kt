@@ -31,7 +31,8 @@ object ProfanityFilter {
     }
 
     fun containsProfanity(text: String): Boolean {
-        val words = text.split(Regex("[^\\p{L}\\p{N}]+"))
+        // "@" and "$" are kept because normalize() maps them to letters (leetspeak).
+        val words = text.split(Regex("[^\\p{L}\\p{N}@$]+"))
             .map { normalize(it) }
             .filter { it.isNotEmpty() }
         if (words.any { it in blockedWords }) return true

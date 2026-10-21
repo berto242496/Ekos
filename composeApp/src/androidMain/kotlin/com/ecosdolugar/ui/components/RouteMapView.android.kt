@@ -32,9 +32,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import com.ecosdolugar.localization.AppLanguage
 import com.ecosdolugar.localization.interactiveMapStrings
 import com.ecosdolugar.model.RouteItem
@@ -43,6 +46,12 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 private data class MapLocation(val latitude: Double, val longitude: Double, val accuracy: Float)
+
+// An expedition needs fresh GPS fixes to detect arrival at a stop; plain browsing only draws a marker.
+private const val EXPEDITION_UPDATE_INTERVAL_MS = 2_000L
+private const val EXPEDITION_MIN_DISTANCE_METERS = 3f
+private const val BROWSING_UPDATE_INTERVAL_MS = 15_000L
+private const val BROWSING_MIN_DISTANCE_METERS = 20f
 
 @Composable
 actual fun RouteMapView(
@@ -65,6 +74,16 @@ actual fun RouteMapView(
     val userLocation = remember { mutableStateOf<MapLocation?>(null) }
     val permissionGranted = remember { mutableStateOf(hasLocationPermission(context)) }
     val locationUnavailable = remember { mutableStateOf(false) }
+    val isExpedition = onUserLocationChanged != null
+    val lifecycleOwner = LocalLifecycleOwner.current
+    val isResumed = remember { mutableStateOf(lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) }
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, _ ->
+            isResumed.value = lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
     val requestLocationPermission = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { grants ->
@@ -91,8 +110,9 @@ actual fun RouteMapView(
         }
     }
 
-    DisposableEffect(context, permissionGranted.value) {
-        if (!permissionGranted.value) {
+    // Updates stop while the app is in the background and resume with the last known fix.
+    DisposableEffect(context, permissionGranted.value, isResumed.value, isExpedition) {
+        if (!permissionGranted.value || !isResumed.value) {
             onDispose { }
         } else {
             val manager = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
@@ -101,7 +121,7 @@ actual fun RouteMapView(
                 Manifest.permission.ACCESS_FINE_LOCATION
             ) == PackageManager.PERMISSION_GRANTED
             val providers = (
-                if (hasFinePermission) {
+                if (hasFinePermission && isExpedition) {
                     listOf(LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER)
                 } else {
                     listOf(LocationManager.NETWORK_PROVIDER)
@@ -123,7 +143,13 @@ actual fun RouteMapView(
             try {
                 providers.forEach { provider ->
                     manager.getLastKnownLocation(provider)?.let { userLocation.value = it.toMapLocation() }
-                    manager.requestLocationUpdates(provider, 1000L, 0f, listener, Looper.getMainLooper())
+                    manager.requestLocationUpdates(
+                        provider,
+                        if (isExpedition) EXPEDITION_UPDATE_INTERVAL_MS else BROWSING_UPDATE_INTERVAL_MS,
+                        if (isExpedition) EXPEDITION_MIN_DISTANCE_METERS else BROWSING_MIN_DISTANCE_METERS,
+                        listener,
+                        Looper.getMainLooper()
+                    )
                 }
             } catch (error: SecurityException) {
                 locationUnavailable.value = true

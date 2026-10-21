@@ -11,6 +11,7 @@ import java.net.URL
 
 private const val MAX_IMAGE_SIDE = 2048
 private const val CACHE_KILOBYTES = 48 * 1024
+private const val NETWORK_TIMEOUT_MS = 15_000
 
 private val routeImageCache = object : LruCache<String, ImageBitmap>(CACHE_KILOBYTES) {
     override fun sizeOf(key: String, value: ImageBitmap): Int =
@@ -30,7 +31,11 @@ private fun decodeRouteImage(url: String): ImageBitmap? {
     val bytes = if (url.startsWith("data:")) {
         Base64.decode(url.substringAfter("base64,"), Base64.DEFAULT)
     } else {
-        URL(url).openStream().use { it.readBytes() }
+        val connection = URL(url).openConnection().apply {
+            connectTimeout = NETWORK_TIMEOUT_MS
+            readTimeout = NETWORK_TIMEOUT_MS
+        }
+        connection.getInputStream().use { it.readBytes() }
     }
     val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
     BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)

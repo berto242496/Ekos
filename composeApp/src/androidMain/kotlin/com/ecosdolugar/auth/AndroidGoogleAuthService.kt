@@ -12,6 +12,7 @@ import androidx.credentials.exceptions.GetCredentialCancellationException
 import com.google.android.libraries.identity.googleid.GetGoogleIdOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import com.ecosdolugar.R
+import com.ecosdolugar.data.SupabaseAuthSession
 import com.ecosdolugar.data.SupabaseRoutesRepository
 import kotlinx.coroutines.CancellationException
 import android.util.Base64
@@ -48,8 +49,11 @@ class AndroidGoogleAuthService(
             .addCredentialOption(googleOption)
             .build()
 
+        val activity = CurrentActivity.get()
+            ?: return GoogleAuthResult.Error("No hay una pantalla activa para iniciar sesión con Google.")
+
         return try {
-            val response = credentialManager.getCredential(context, request)
+            val response = credentialManager.getCredential(activity, request)
             val credential = response.credential
             if (credential !is CustomCredential ||
                 credential.type != GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL
@@ -75,32 +79,29 @@ class AndroidGoogleAuthService(
                 )
             }
             val session = routesRepository.exchangeGoogleIdToken(googleCredential.idToken)
-            val storedProfile = readStoredSession()
+            // A session saved by a previous install or key may be unreadable; sign-in must still work.
+            val storedProfile = runCatching { readStoredSession() }.getOrNull()
                 ?.takeIf { it.optString("user_id") == session.userId }
-            persistSession(
-                session,
-                displayName = storedProfile?.optString("display_name")
-                    ?.takeIf(String::isNotBlank)
-                    ?: session.displayName.ifBlank { googleCredential.displayName.orEmpty() },
-                characterId = storedProfile?.optString("character_id")?.takeIf(String::isNotBlank),
-                displayNameSet = storedProfile?.optBoolean("display_name_set") == true,
-                profileComplete = storedProfile?.optBoolean("profile_complete") == true,
-                isGuideAccount = storedProfile?.optBoolean("is_guide_account") == true
-            )
+            val displayName = storedProfile?.optString("display_name")
+                ?.takeIf(String::isNotBlank)
+                ?: session.displayName.ifBlank { googleCredential.displayName.orEmpty() }
+            val characterId = storedProfile?.optString("character_id")?.takeIf(String::isNotBlank)
+            val displayNameSet = storedProfile?.optBoolean("display_name_set") == true
+            val profileComplete = storedProfile?.optBoolean("profile_complete") == true
+            val isGuideAccount = storedProfile?.optBoolean("is_guide_account") == true
+            persistSession(session, displayName, characterId, displayNameSet, profileComplete, isGuideAccount)
             GoogleAuthResult.Success(
                 googleId = session.userId,
                 email = session.email,
-                displayName = storedProfile?.optString("display_name")
-                    ?.takeIf(String::isNotBlank)
-                    ?: session.displayName.ifBlank { googleCredential.displayName.orEmpty() },
+                displayName = displayName,
                 photoUrl = googleCredential.profilePictureUri?.toString(),
                 idToken = googleCredential.idToken,
                 accessToken = session.accessToken,
                 refreshToken = session.refreshToken,
-                characterId = storedProfile?.optString("character_id")?.takeIf(String::isNotBlank),
-                displayNameSet = storedProfile?.optBoolean("display_name_set") == true,
-                profileComplete = storedProfile?.optBoolean("profile_complete") == true,
-                isGuideAccount = storedProfile?.optBoolean("is_guide_account") == true
+                characterId = characterId,
+                displayNameSet = displayNameSet,
+                profileComplete = profileComplete,
+                isGuideAccount = isGuideAccount
             )
         } catch (_: GetCredentialCancellationException) {
             GoogleAuthResult.Cancelled
@@ -138,16 +139,10 @@ class AndroidGoogleAuthService(
             val displayName = stored.optString("display_name").ifBlank { session.displayName }
             val characterId = stored.optString("character_id").takeIf(String::isNotBlank)
             val isGuideAccount = stored.optBoolean("is_guide_account")
+            val displayNameSet = stored.optBoolean("display_name_set")
             val profileComplete = stored.optBoolean("profile_complete") &&
                 (characterId != null || isGuideAccount)
-            persistSession(
-                session,
-                displayName,
-                characterId,
-                stored.optBoolean("display_name_set"),
-                profileComplete,
-                isGuideAccount
-            )
+            persistSession(session, displayName, characterId, displayNameSet, profileComplete, isGuideAccount)
             GoogleAuthResult.Success(
                 googleId = session.userId,
                 email = session.email,
@@ -157,7 +152,7 @@ class AndroidGoogleAuthService(
                 accessToken = session.accessToken,
                 refreshToken = session.refreshToken,
                 characterId = characterId,
-                displayNameSet = stored.optBoolean("display_name_set"),
+                displayNameSet = displayNameSet,
                 profileComplete = profileComplete,
                 isGuideAccount = isGuideAccount
             )
@@ -170,38 +165,33 @@ class AndroidGoogleAuthService(
         }
     }
 
-    override suspend fun saveProfile(displayName: String, characterId: String) {
-        val stored = readStoredSession()
-            ?: throw IllegalStateException("No hay una sesión guardada para actualizar el perfil.")
-        stored.put("display_name", displayName.trim())
-        stored.put("display_name_set", true)
-        stored.put("character_id", characterId)
-        stored.put("profile_complete", true)
-        writeStoredSession(stored)
+    override suspend fun saveProfile(displayName: String, characterId: String) = updateStoredSession {
+        put("display_name", displayName.trim())
+        put("display_name_set", true)
+        put("character_id", characterId)
+        put("profile_complete", true)
     }
 
-    override suspend fun setGuideAccount(isGuideAccount: Boolean) {
-        val stored = readStoredSession()
-            ?: throw IllegalStateException("No hay una sesión guardada para actualizar el perfil.")
-        stored.put("is_guide_account", isGuideAccount)
-        writeStoredSession(stored)
+    override suspend fun setGuideAccount(isGuideAccount: Boolean) = updateStoredSession {
+        put("is_guide_account", isGuideAccount)
     }
 
-    override suspend fun saveDisplayName(displayName: String) {
-        val stored = readStoredSession()
-            ?: throw IllegalStateException("No hay una sesión guardada para actualizar el perfil.")
-        stored.put("display_name", displayName.trim())
-        stored.put("display_name_set", true)
-        stored.put("profile_complete", false)
-        writeStoredSession(stored)
+    override suspend fun saveDisplayName(displayName: String) = updateStoredSession {
+        put("display_name", displayName.trim())
+        put("display_name_set", true)
+        put("profile_complete", false)
     }
 
-    override suspend fun completeGuideProfile(displayName: String) {
+    override suspend fun completeGuideProfile(displayName: String) = updateStoredSession {
+        put("display_name", displayName.trim())
+        put("display_name_set", true)
+        put("profile_complete", true)
+    }
+
+    private fun updateStoredSession(update: JSONObject.() -> Unit) {
         val stored = readStoredSession()
             ?: throw IllegalStateException("No hay una sesión guardada para actualizar el perfil.")
-        stored.put("display_name", displayName.trim())
-        stored.put("display_name_set", true)
-        stored.put("profile_complete", true)
+        stored.update()
         writeStoredSession(stored)
     }
 
@@ -218,7 +208,7 @@ class AndroidGoogleAuthService(
     }
 
     private fun persistSession(
-        session: com.ecosdolugar.data.SupabaseAuthSession,
+        session: SupabaseAuthSession,
         displayName: String,
         characterId: String?,
         displayNameSet: Boolean,

@@ -106,7 +106,6 @@ data class GuideAuthor(
     val location: String = "Tui - Valença",
     val verified: Boolean = true,
     val routesCount: Int = 3,
-    val availableBalance: Double = 142.50,
     val avatarUrl: String? = null
 )
 
@@ -185,10 +184,8 @@ data class UserProfile(
     val isGuideAccount: Boolean = false,
     val googleId: String? = null,
     val savedRouteIds: Set<String> = emptySet(),
-    val visitedStopIds: Set<String> = setOf("stop-c1"),
-    val solvedEnigmaIds: Set<String> = setOf("stop-c1"),
-    val completedRouteIds: Set<String> = emptySet(),
-    val unlockedAchievementIds: Set<String> = setOf("primera_ruta", "espiritu_raiano"),
+    val visitedStopIds: Set<String> = emptySet(),
+    val solvedEnigmaIds: Set<String> = emptySet(),
     val totalScore: Int = 0
 )
 

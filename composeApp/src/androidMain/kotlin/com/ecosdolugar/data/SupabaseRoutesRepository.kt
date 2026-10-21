@@ -106,11 +106,10 @@ class SupabaseRoutesRepository(
         withContext(Dispatchers.IO) {
             requireConfigured()
             require(accessToken.isNotBlank()) { "Inicia sesión para guardar una ruta." }
-            val savedRoute = route.withPersistentIds()
-            val routeWithPersistedImage = persistRouteMedia(savedRoute, accessToken)
             require(status == "publicada" || status == "pendiente" || status == "borrador") {
                 "Estado de ruta no válido."
             }
+            val routeWithPersistedImage = persistRouteMedia(route.withPersistentIds(), accessToken)
             val persistedStatus = if (status == "publicada") "pendiente" else status
             val payload = routeWithPersistedImage.toRouteJson(persistedStatus)
             val response = request(
@@ -362,19 +361,8 @@ class SupabaseRoutesRepository(
                     .toString(),
                 contentType = "application/json"
             )
-            val json = JSONObject(response)
-            val user = json.getJSONObject("user")
-            val metadata = user.optJSONObject("user_metadata") ?: JSONObject()
-            SupabaseAuthSession(
-                accessToken = json.getString("access_token"),
-                refreshToken = json.getString("refresh_token"),
-                userId = user.getString("id"),
-                email = user.optString("email"),
-                displayName = metadata.optString(
-                    "full_name",
-                    metadata.optString("name", user.optString("email"))
-                )
-            )
+            JSONObject(response).toAuthSession()
+
         }
 
     suspend fun refreshAuthSession(refreshToken: String): SupabaseAuthSession =
@@ -387,19 +375,8 @@ class SupabaseRoutesRepository(
                 body = JSONObject().put("refresh_token", refreshToken).toString(),
                 contentType = "application/json"
             )
-            val json = JSONObject(response)
-            val user = json.getJSONObject("user")
-            val metadata = user.optJSONObject("user_metadata") ?: JSONObject()
-            SupabaseAuthSession(
-                accessToken = json.getString("access_token"),
-                refreshToken = json.getString("refresh_token"),
-                userId = user.getString("id"),
-                email = user.optString("email"),
-                displayName = metadata.optString(
-                    "full_name",
-                    metadata.optString("name", user.optString("email"))
-                )
-            )
+            JSONObject(response).toAuthSession()
+
         }
 
     private fun requireConfigured() {
@@ -472,7 +449,7 @@ class SupabaseRoutesRepository(
             val status = connection.responseCode
             if (status !in 200..299) {
                 val details = connection.errorStream?.bufferedReader(Charsets.UTF_8)?.use { it.readText() }.orEmpty()
-                throw IllegalStateException("No se pudo guardar la imagen de portada en Supabase: HTTP $status $details")
+                throw IllegalStateException("No se pudo subir el archivo multimedia a Supabase: HTTP $status $details")
             }
             return "${projectUrl.trimEnd('/')}/storage/v1/object/public/route-media/$objectPath"
         } finally {
@@ -528,6 +505,21 @@ class SupabaseRoutesRepository(
 }
 
 private fun encode(value: String): String = URLEncoder.encode(value, "UTF-8")
+
+private fun JSONObject.toAuthSession(): SupabaseAuthSession {
+    val user = getJSONObject("user")
+    val metadata = user.optJSONObject("user_metadata") ?: JSONObject()
+    return SupabaseAuthSession(
+        accessToken = getString("access_token"),
+        refreshToken = getString("refresh_token"),
+        userId = user.getString("id"),
+        email = user.optString("email"),
+        displayName = metadata.optString(
+            "full_name",
+            metadata.optString("name", user.optString("email"))
+        )
+    )
+}
 
 private fun RouteItem.withPersistentIds(): RouteItem {
     val stableRouteId = id.ifBlank { "route-${System.currentTimeMillis()}" }

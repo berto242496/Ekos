@@ -34,13 +34,12 @@ import com.ecosdolugar.platform.PlatformBackHandler
 import com.ecosdolugar.ui.components.RouteCoverImage
 import com.ecosdolugar.ui.components.RouteMapView
 import com.ecosdolugar.ui.theme.*
+import com.ecosdolugar.util.distanceMeters
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlin.math.atan2
 import kotlin.math.abs
-import kotlin.math.cos
-import kotlin.math.sin
-import kotlin.math.sqrt
+
+private const val STOP_REACHED_RADIUS_METERS = 10.0
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -62,7 +61,7 @@ fun InteractiveMapScreen(
     val listState = rememberLazyListState()
     val coroutineScope = rememberCoroutineScope()
     val selectedRoute = routes.firstOrNull { it.id == activeRouteId }
-    val routeIds = routes.map { it.id }
+    val routeIds = remember(routes) { routes.map { it.id } }
     var userLocation by remember(activeRouteId) { mutableStateOf<Pair<Double, Double>?>(null) }
     var showApproachBanner by remember { mutableStateOf(false) }
 
@@ -133,7 +132,7 @@ fun InteractiveMapScreen(
                 if (stop != null) {
                     val location = userLocation
                     val isNear = expeditionMode && location != null &&
-                        distanceMeters(location.first, location.second, stop.latitude, stop.longitude) <= 10.0
+                        distanceMeters(location.first, location.second, stop.latitude, stop.longitude) <= STOP_REACHED_RADIUS_METERS
                     if (isNear) onStopReached?.invoke(stop) else selectedStop = stop
                 }
             },
@@ -154,7 +153,7 @@ fun InteractiveMapScreen(
             val reached = route.stops.firstOrNull { stop ->
                 stop.id !in solvedStopIds &&
                     stop.id !in triggeredStopIds &&
-                    distanceMeters(location.first, location.second, stop.latitude, stop.longitude) <= 10.0
+                    distanceMeters(location.first, location.second, stop.latitude, stop.longitude) <= STOP_REACHED_RADIUS_METERS
             } ?: return@LaunchedEffect
             onStopReached(reached)
         }
@@ -328,19 +327,4 @@ fun InteractiveMapScreen(
             )
         }
     }
-}
-
-private fun distanceMeters(
-    latitude1: Double,
-    longitude1: Double,
-    latitude2: Double,
-    longitude2: Double
-): Double {
-    val earthRadiusMeters = 6_371_000.0
-    val latitudeDelta = Math.toRadians(latitude2 - latitude1)
-    val longitudeDelta = Math.toRadians(longitude2 - longitude1)
-    val a = sin(latitudeDelta / 2) * sin(latitudeDelta / 2) +
-        cos(Math.toRadians(latitude1)) * cos(Math.toRadians(latitude2)) *
-        sin(longitudeDelta / 2) * sin(longitudeDelta / 2)
-    return earthRadiusMeters * 2 * atan2(sqrt(a), sqrt(1 - a))
 }

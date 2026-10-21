@@ -76,7 +76,10 @@ import com.ecosdolugar.model.RouteStop
 import com.ecosdolugar.model.StopTrial
 import com.ecosdolugar.model.TrialType
 import com.ecosdolugar.model.UserProfile
+import com.ecosdolugar.platform.PlatformBackHandler
 import com.ecosdolugar.ui.theme.PineContainer
+import com.ecosdolugar.util.formatKilometers
+import com.ecosdolugar.util.pathDistanceMeters
 import com.ecosdolugar.ui.theme.SurfaceCream
 import com.ecosdolugar.ui.theme.TerracottaGold
 
@@ -219,9 +222,7 @@ fun RouteEditorScreen(
             bio = "Creador de rutas culturales.",
             location = location
         )
-        val distanceHundredths = stops.size * 80
-        val formattedDistance =
-            "${distanceHundredths / 100},${(distanceHundredths % 100).toString().padStart(2, '0')} km"
+        val formattedDistance = formatKilometers(pathDistanceMeters(stops.map { it.latitude to it.longitude }))
         val routeStops = stops.mapIndexed { index, draft -> draft.toRouteStop(index, routeId) }
         val route = initialRoute?.copy(
             title = title.trim(),
@@ -271,10 +272,18 @@ fun RouteEditorScreen(
         location != initialRoute?.location.orEmpty() ||
         description != initialRoute?.description.orEmpty() ||
         imageUrl != (initialRoute?.imageUrl ?: RoutesRepository.HERO_FOREST_URL) ||
+        durationHours != parseDurationPart(initialRoute?.duration, isHours = true) ||
+        durationMinutes != parseDurationPart(initialRoute?.duration, isHours = false) ||
         selectedCategories != initialCategories(initialRoute) ||
         difficulty != (initialRoute?.difficulty ?: Difficulty.FACIL) ||
         (initialRoute == null && stops.isNotEmpty()) ||
         (initialRoute != null && stops.size != initialRoute.stops.size)
+
+    fun requestExit() {
+        if (hasUnsavedData) showExitConfirmation = true else onBack()
+    }
+
+    PlatformBackHandler(onBack = ::requestExit)
 
     Scaffold(
         topBar = {
@@ -288,9 +297,7 @@ fun RouteEditorScreen(
                     )
                 },
                 navigationIcon = {
-                    IconButton(onClick = {
-                        if (hasUnsavedData) showExitConfirmation = true else onBack()
-                    }) {
+                    IconButton(onClick = ::requestExit) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Volver", tint = InkDeep)
                     }
                 },

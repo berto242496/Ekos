@@ -197,7 +197,18 @@ class AndroidGoogleAuthService(
 
     override suspend fun signOut(accessToken: String?) {
         try {
-            routesRepository.signOut(accessToken.orEmpty())
+            // The in-memory access token expires after about an hour, so renew it before the remote logout.
+            val storedRefreshToken = runCatching { readStoredSession()?.optString("refresh_token") }
+                .getOrNull()
+                ?.takeIf(String::isNotBlank)
+            val freshAccessToken = storedRefreshToken?.let { refreshToken ->
+                runCatching { routesRepository.refreshAuthSession(refreshToken).accessToken }.getOrNull()
+            }
+            routesRepository.signOut(freshAccessToken ?: accessToken.orEmpty())
+        } catch (error: CancellationException) {
+            throw error
+        } catch (_: Exception) {
+            // The remote logout is best-effort; the local session is cleared below regardless.
         } finally {
             try {
                 credentialManager.clearCredentialState(ClearCredentialStateRequest())

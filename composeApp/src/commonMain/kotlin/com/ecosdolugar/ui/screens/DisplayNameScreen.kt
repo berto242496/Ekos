@@ -1,7 +1,9 @@
 package com.ecosdolugar.ui.screens
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -16,13 +18,22 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ecosdolugar.localization.AppLanguageStrings
 import com.ecosdolugar.ui.theme.PineDeep
+import com.ecosdolugar.ui.theme.SurfaceContainerHigh
 import com.ecosdolugar.ui.theme.SurfaceCream
+import com.ecosdolugar.ui.theme.TerracottaFixedDim
 import com.ecosdolugar.ui.theme.TerracottaGold
+import ecosdolugar.composeapp.generated.resources.Res
+import ecosdolugar.composeapp.generated.resources.hero_forest
+import org.jetbrains.compose.resources.painterResource
 
 @Composable
 fun DisplayNameScreen(
@@ -33,51 +44,95 @@ fun DisplayNameScreen(
     onNameChanged: (String) -> Unit,
     onContinue: () -> Unit
 ) {
-    Column(
+    Box(
         modifier = Modifier
             .fillMaxSize()
             .background(PineDeep)
-            .padding(horizontal = 24.dp),
-        verticalArrangement = Arrangement.Center
     ) {
-        Text(strings.displayNameTitle, color = SurfaceCream, fontSize = 24.sp)
-        Spacer(Modifier.height(10.dp))
-        Text(strings.displayNameDescription, color = SurfaceCream.copy(alpha = 0.75f), fontSize = 14.sp)
-        Spacer(Modifier.height(22.dp))
-        OutlinedTextField(
-            value = initialName,
-            onValueChange = onNameChanged,
-            label = { Text(strings.displayNameLabel) },
-            singleLine = true,
-            modifier = Modifier.fillMaxWidth(),
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedContainerColor = Color(0xFF0F2618),
-                unfocusedContainerColor = Color(0xFF0F2618),
-                focusedTextColor = SurfaceCream,
-                unfocusedTextColor = SurfaceCream,
-                focusedLabelColor = TerracottaGold,
-                unfocusedLabelColor = SurfaceCream.copy(alpha = 0.7f),
-                cursorColor = TerracottaGold,
-                focusedBorderColor = TerracottaGold,
-                unfocusedBorderColor = SurfaceCream.copy(alpha = 0.5f)
-            )
+        Image(
+            painter = painterResource(Res.drawable.hero_forest),
+            contentDescription = null,
+            contentScale = ContentScale.Crop,
+            modifier = Modifier.fillMaxSize()
         )
-        if (errorMessage != null) {
-            Spacer(Modifier.height(8.dp))
-            Text(errorMessage, color = Color(0xFFFFB4AB), fontSize = 12.sp)
-        }
-        Spacer(Modifier.height(18.dp))
-        Button(
-            onClick = onContinue,
-            enabled = !isSaving,
-            modifier = Modifier.fillMaxWidth().height(50.dp),
-            shape = RoundedCornerShape(12.dp),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = TerracottaGold,
-                contentColor = PineDeep
-            )
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.verticalGradient(
+                        colorStops = arrayOf(
+                            0f to PineDeep.copy(alpha = 0.78f),
+                            0.42f to PineDeep.copy(alpha = 0.6f),
+                            1f to PineDeep
+                        )
+                    )
+                )
+        )
+
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 24.dp),
+            verticalArrangement = Arrangement.Center
         ) {
-            Text(if (isSaving) strings.connecting else strings.displayNameContinue)
+            Text(
+                text = strings.displayNameTitle,
+                color = SurfaceCream,
+                fontFamily = FontFamily.Serif,
+                fontSize = 33.sp,
+                lineHeight = 37.sp,
+                fontWeight = FontWeight.SemiBold
+            )
+            Spacer(Modifier.height(11.dp))
+            Text(
+                text = strings.displayNameDescription,
+                color = SurfaceContainerHigh,
+                fontSize = 14.sp,
+                lineHeight = 21.sp
+            )
+            Spacer(Modifier.height(22.dp))
+            OutlinedTextField(
+                value = initialName,
+                onValueChange = onNameChanged,
+                label = { Text(strings.displayNameLabel) },
+                singleLine = true,
+                enabled = !isSaving,
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedContainerColor = Color.White.copy(alpha = 0.12f),
+                    unfocusedContainerColor = Color.White.copy(alpha = 0.12f),
+                    disabledContainerColor = Color.White.copy(alpha = 0.08f),
+                    focusedTextColor = SurfaceCream,
+                    unfocusedTextColor = SurfaceCream,
+                    disabledTextColor = SurfaceCream.copy(alpha = 0.6f),
+                    focusedLabelColor = TerracottaFixedDim,
+                    unfocusedLabelColor = SurfaceContainerHigh,
+                    cursorColor = TerracottaGold,
+                    focusedBorderColor = TerracottaGold,
+                    unfocusedBorderColor = Color.White.copy(alpha = 0.16f)
+                )
+            )
+            if (errorMessage != null) {
+                Spacer(Modifier.height(8.dp))
+                Text(errorMessage, color = Color(0xFFFFD5D5), fontSize = 11.sp, lineHeight = 15.sp)
+            }
+            Spacer(Modifier.height(18.dp))
+            Button(
+                onClick = onContinue,
+                enabled = !isSaving,
+                modifier = Modifier.fillMaxWidth().height(52.dp),
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = TerracottaGold,
+                    contentColor = PineDeep
+                )
+            ) {
+                Text(
+                    if (isSaving) strings.connecting else strings.displayNameContinue,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
         }
     }
 }

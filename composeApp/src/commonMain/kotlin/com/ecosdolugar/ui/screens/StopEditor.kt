@@ -4,6 +4,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import com.ecosdolugar.localization.StopEditorStrings
 import com.ecosdolugar.model.FieldEnigma
 import com.ecosdolugar.model.NarrationVoice
 import com.ecosdolugar.model.RouteStop
@@ -34,7 +35,7 @@ internal data class StopDraft(
     val source: RouteStop? = null
 ) {
     companion object {
-        fun fromRouteStop(stop: RouteStop): StopDraft {
+        fun fromRouteStop(stop: RouteStop, strings: StopEditorStrings): StopDraft {
             val trial = stop.trial
             return StopDraft(
                 title = stop.title,
@@ -53,7 +54,7 @@ internal data class StopDraft(
                 wrongAnswers = trial?.options
                     ?.filterIndexed { index, _ -> index != trial.correctOptionIndex }
                     ?.takeIf { it.isNotEmpty() }
-                    ?: listOf("No lo sé"),
+                    ?: listOf(strings.defaultWrongAnswer),
                 puzzleImageUrl = trial?.imageUrl.orEmpty(),
                 puzzleGridSize = trial?.puzzleGridSize ?: 3,
                 word = trial?.cipherWord.orEmpty(),
@@ -87,40 +88,36 @@ internal class StopFormState {
     var sentence by mutableStateOf("")
     var missingWord by mutableStateOf("")
 
-    fun validate(): String? {
+    fun validate(strings: StopEditorStrings): String? {
         val lat = latitude.toDoubleOrNull()
         val lng = longitude.toDoubleOrNull()
         val common = when {
-            title.isBlank() -> "Pon un nombre a la parada."
-            location.isBlank() -> "Indica el lugar de la parada."
-            lat == null || lat !in -90.0..90.0 -> "La latitud debe estar entre -90 y 90."
-            lng == null || lng !in -180.0..180.0 -> "La longitud debe estar entre -180 y 180."
-            audioMode == StopAudioMode.TTS && story.isBlank() ->
-                "Escribe el relato para que la voz generada pueda leerlo."
-            audioMode == StopAudioMode.RECORDED && recordedAudioUrl == null ->
-                "Graba el relato o cambia la forma de narrarlo."
+            title.isBlank() -> strings.stopNameRequired
+            location.isBlank() -> strings.stopLocationRequired
+            lat == null || lat !in -90.0..90.0 -> strings.latitudeRange
+            lng == null || lng !in -180.0..180.0 -> strings.longitudeRange
+            audioMode == StopAudioMode.TTS && story.isBlank() -> strings.storyRequiredForTts
+            audioMode == StopAudioMode.RECORDED && recordedAudioUrl == null -> strings.recordingRequired
             else -> null
         }
         if (common != null) return common
         return when (trialType) {
             TrialType.ACERTIJO -> when {
-                question.isBlank() -> "Escribe el enigma de esta parada."
-                answer.isBlank() || wrongAnswers.any { it.isBlank() } ->
-                    "Completa la respuesta correcta y todas las incorrectas."
+                question.isBlank() -> strings.riddleRequired
+                answer.isBlank() || wrongAnswers.any { it.isBlank() } -> strings.answersIncomplete
                 (listOf(answer) + wrongAnswers).map { it.trim() }.distinct().size != wrongAnswers.size + 1 ->
-                    "Las respuestas deben ser distintas."
+                    strings.answersMustDiffer
                 else -> null
             }
             TrialType.PUZLE_IMAGEN -> when {
-                puzzleImageUrl.isBlank() -> "Sube la imagen que se usará en el puzle."
+                puzzleImageUrl.isBlank() -> strings.puzzleImageRequired
                 else -> null
             }
             TrialType.ORDENAR_PALABRA -> {
                 val cleanWord = word.trim()
                 when {
-                    cleanWord.length !in 4..12 || !cleanWord.all { it.isLetter() } ->
-                        "La palabra debe tener entre 4 y 12 letras, sin espacios."
-                    cleanWord.toSet().size < 2 -> "La palabra necesita al menos dos letras distintas."
+                    cleanWord.length !in 4..12 || !cleanWord.all { it.isLetter() } -> strings.wordLengthInvalid
+                    cleanWord.toSet().size < 2 -> strings.wordNeedsTwoLetters
                     else -> null
                 }
             }
@@ -128,10 +125,10 @@ internal class StopFormState {
                 val cleanSentence = sentence.trim()
                 val cleanWord = missingWord.trim()
                 when {
-                    cleanSentence.isBlank() -> "Escribe la frase completa."
-                    cleanWord.isBlank() -> "Indica la palabra que falta en la frase."
+                    cleanSentence.isBlank() -> strings.sentenceRequired
+                    cleanWord.isBlank() -> strings.missingWordRequired
                     !Regex("(?iu)(?<!\\p{L})${Regex.escape(cleanWord)}(?!\\p{L})").containsMatchIn(cleanSentence) ->
-                        "La palabra que falta debe aparecer en la frase."
+                        strings.missingWordNotInSentence
                     else -> null
                 }
             }
@@ -218,7 +215,7 @@ internal fun scrambleLetters(word: String): List<String> {
     return letters.reversed()
 }
 
-internal fun StopDraft.toRouteStop(index: Int, routeId: String): RouteStop {
+internal fun StopDraft.toRouteStop(index: Int, routeId: String, strings: StopEditorStrings): RouteStop {
     val mapX = (20 + index * 15).coerceAtMost(85).toFloat()
     val mapY = (30 + index * 12).coerceAtMost(85).toFloat()
     val existing = source
@@ -229,48 +226,48 @@ internal fun StopDraft.toRouteStop(index: Int, routeId: String): RouteStop {
     val trial = when (trialType) {
         TrialType.ACERTIJO -> StopTrial(
             type = TrialType.ACERTIJO,
-            title = "Enigma: $title",
+            title = strings.enigmaTitle(title),
             loreContext = story,
             question = question,
             options = listOf(answer) + wrongAnswers,
             correctOptionIndex = 0,
             generalHint = hint,
             solutionExplanation = answer,
-            magicalReward = "Reto superado"
+            magicalReward = strings.magicalReward
         )
         TrialType.PUZLE_IMAGEN -> StopTrial(
             type = TrialType.PUZLE_IMAGEN,
-            title = "Puzle: $title",
+            title = strings.puzzleTitle(title),
             loreContext = story,
-            question = "Reconstruye la imagen uniendo las piezas.",
+            question = strings.puzzleQuestion,
             imageUrl = puzzleImageUrl,
             puzzleGridSize = puzzleGridSize,
             generalHint = hint,
-            solutionExplanation = "Imagen original de la parada.",
-            magicalReward = "Reto superado"
+            solutionExplanation = strings.puzzleSolutionNote,
+            magicalReward = strings.magicalReward
         )
         TrialType.ORDENAR_PALABRA -> StopTrial(
             type = TrialType.ORDENAR_PALABRA,
-            title = "Palabra: $title",
+            title = strings.wordTitle(title),
             loreContext = story,
-            question = "Ordena las letras para formar la palabra.",
+            question = strings.wordQuestion,
             cipherWord = word,
             scrambledLetters = scrambleLetters(word),
             cipherClue = hint,
             generalHint = hint,
             solutionExplanation = word,
-            magicalReward = "Reto superado"
+            magicalReward = strings.magicalReward
         )
         TrialType.COMPLETAR_FRASE -> StopTrial(
             type = TrialType.COMPLETAR_FRASE,
-            title = "Frase: $title",
+            title = strings.phraseTitle(title),
             loreContext = story,
-            question = "Escribe la palabra que falta en la frase.",
+            question = strings.phraseQuestion,
             sentence = sentence,
             missingWord = missingWord,
             generalHint = hint,
             solutionExplanation = missingWord,
-            magicalReward = "Reto superado"
+            magicalReward = strings.magicalReward
         )
         else -> error("Tipo de prueba no editable: $trialType")
     }
@@ -293,7 +290,7 @@ internal fun StopDraft.toRouteStop(index: Int, routeId: String): RouteStop {
             answer = answerText
         ),
         trial = trial,
-        audioDuration = "Lectura",
+        audioDuration = strings.readingDuration,
         audioNarration = story.takeIf { it.isNotBlank() },
         latitude = latitude,
         longitude = longitude,

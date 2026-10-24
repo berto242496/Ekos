@@ -27,6 +27,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ecosdolugar.data.CharactersRepository
 import com.ecosdolugar.localization.AppLanguage
+import com.ecosdolugar.localization.JournalStrings
+import com.ecosdolugar.localization.journalStrings
 import com.ecosdolugar.model.RouteItem
 import com.ecosdolugar.model.RouteReview
 import com.ecosdolugar.model.UserAchievementStatus
@@ -48,11 +50,11 @@ private val WebLogoutText = Color(0xFFB91C1C)
 private val WebLogoutBg = Color(0xFFFEF2F2)
 private val WebLogoutBorder = Color(0xFFFECACA)
 
-private enum class JournalTab(val label: String) {
-    SAVED("Guardadas"),
-    COMPLETED("Completadas"),
-    ACHIEVEMENTS("Logros"),
-    REVIEWS("Reseñas")
+private enum class JournalTab {
+    SAVED,
+    COMPLETED,
+    ACHIEVEMENTS,
+    REVIEWS
 }
 
 @Composable
@@ -79,8 +81,9 @@ fun JournalScreen(
     val completedRoutes = remember(userProfile, routes) {
         completedRoutesOf(userProfile, routes)
     }
-    val achievements = remember(userProfile, completedRoutes) {
-        userAchievementStatuses(userProfile, completedRoutes)
+    val strings = journalStrings(language)
+    val achievements = remember(userProfile, completedRoutes, language) {
+        userAchievementStatuses(userProfile, completedRoutes, language)
     }
     val unlockedCount = achievements.count { it.isUnlocked }
 
@@ -103,14 +106,14 @@ fun JournalScreen(
             item {
                 Column {
                     Text(
-                        text = "ARCHIVO VIVO PERSONAL",
+                        text = strings.kicker,
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold,
                         color = WebMuted,
                         letterSpacing = 2.sp
                     )
                     Text(
-                        text = "Mi aventura",
+                        text = strings.title,
                         fontSize = 30.sp,
                         fontWeight = FontWeight.Bold,
                         fontFamily = FontFamily.Serif,
@@ -130,7 +133,8 @@ fun JournalScreen(
                     achievementsCount = unlockedCount,
                     totalScore = userProfile.totalScore,
                     canEditName = userProfile.isGoogleAuthenticated,
-                    onEditName = { showNameDialog = true }
+                    onEditName = { showNameDialog = true },
+                    strings = strings
                 )
             }
 
@@ -181,39 +185,39 @@ fun JournalScreen(
             }
 
             item {
-                JournalTabBar(selected = selectedTab, onSelect = { selectedTab = it })
+                JournalTabBar(selected = selectedTab, onSelect = { selectedTab = it }, strings = strings)
             }
 
             when (selectedTab) {
                 JournalTab.SAVED -> {
                     if (savedRoutes.isEmpty()) {
-                        item { EmptyJournalMessage("Aún no has guardado ninguna ruta en tu cuaderno de campo.") }
+                        item { EmptyJournalMessage(strings.emptySaved) }
                     } else {
                         items(savedRoutes, key = { it.id }) { route ->
-                            JournalRouteCard(route = route, onClick = { onOpenRoute(route.id) })
+                            JournalRouteCard(route = route, onClick = { onOpenRoute(route.id) }, strings = strings)
                         }
                     }
                 }
                 JournalTab.COMPLETED -> {
                     if (completedRoutes.isEmpty()) {
-                        item { EmptyJournalMessage("Todavía no has completado ninguna ruta.") }
+                        item { EmptyJournalMessage(strings.emptyCompleted) }
                     } else {
                         items(completedRoutes, key = { it.id }) { route ->
-                            JournalRouteCard(route = route, onClick = { onOpenRoute(route.id) })
+                            JournalRouteCard(route = route, onClick = { onOpenRoute(route.id) }, strings = strings)
                         }
                     }
                 }
                 JournalTab.ACHIEVEMENTS -> {
                     items(achievements, key = { it.id }) { achievement ->
-                        AchievementCard(achievement)
+                        AchievementCard(achievement, strings)
                     }
                 }
                 JournalTab.REVIEWS -> {
                     if (myReviews.isEmpty()) {
-                        item { EmptyJournalMessage("Todavía no has dejado ninguna reseña.") }
+                        item { EmptyJournalMessage(strings.emptyReviews) }
                     } else {
                         items(myReviews.size) { index ->
-                            MyReviewCard(myReviews[index])
+                            MyReviewCard(myReviews[index], strings)
                         }
                     }
                 }
@@ -243,7 +247,7 @@ fun JournalScreen(
                             )
                             Spacer(Modifier.width(8.dp))
                             Text(
-                                "Cerrar sesión",
+                                strings.signOut,
                                 color = WebLogoutText,
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 14.sp
@@ -262,7 +266,9 @@ fun JournalScreen(
             onSave = { name ->
                 onSaveDisplayName(name.trim())
                 showNameDialog = false
-            }
+            },
+            strings = strings,
+            language = language
         )
     }
 }
@@ -278,7 +284,8 @@ private fun PassportCard(
     achievementsCount: Int,
     totalScore: Int,
     canEditName: Boolean,
-    onEditName: () -> Unit
+    onEditName: () -> Unit,
+    strings: JournalStrings
 ) {
     Surface(
         shape = RoundedCornerShape(24.dp),
@@ -301,7 +308,7 @@ private fun PassportCard(
                 }
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = "PASAPORTE",
+                        text = strings.passportLabel,
                         fontSize = 10.sp,
                         fontWeight = FontWeight.Bold,
                         color = TerracottaFixedDim,
@@ -322,7 +329,7 @@ private fun PassportCard(
                             IconButton(onClick = onEditName, modifier = Modifier.size(36.dp)) {
                                 Icon(
                                     Icons.Default.Edit,
-                                    contentDescription = "Editar nombre",
+                                    contentDescription = strings.editName,
                                     tint = TerracottaFixedDim,
                                     modifier = Modifier.size(18.dp)
                                 )
@@ -330,7 +337,7 @@ private fun PassportCard(
                         }
                     }
                     Text(
-                        text = "Compañero: $characterName",
+                        text = strings.companionOf(characterName),
                         fontSize = 12.sp,
                         color = accentColor
                     )
@@ -340,13 +347,13 @@ private fun PassportCard(
             Spacer(Modifier.height(18.dp))
 
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                MetricTile("Completadas", completedCount.toString(), Modifier.weight(1f))
-                MetricTile("Pruebas superadas", trialsCount.toString(), Modifier.weight(1f))
+                MetricTile(strings.completedMetric, completedCount.toString(), Modifier.weight(1f))
+                MetricTile(strings.trialsMetric, trialsCount.toString(), Modifier.weight(1f))
             }
             Spacer(Modifier.height(10.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                MetricTile("Logros", achievementsCount.toString(), Modifier.weight(1f))
-                MetricTile("Puntuación total", totalScore.toString(), Modifier.weight(1f))
+                MetricTile(strings.achievementsMetric, achievementsCount.toString(), Modifier.weight(1f))
+                MetricTile(strings.totalScoreMetric, totalScore.toString(), Modifier.weight(1f))
             }
         }
     }
@@ -378,7 +385,7 @@ private fun MetricTile(label: String, value: String, modifier: Modifier = Modifi
 }
 
 @Composable
-private fun JournalTabBar(selected: JournalTab, onSelect: (JournalTab) -> Unit) {
+private fun JournalTabBar(selected: JournalTab, onSelect: (JournalTab) -> Unit, strings: JournalStrings) {
     Surface(
         shape = RoundedCornerShape(16.dp),
         color = WebTabTrack,
@@ -402,7 +409,12 @@ private fun JournalTabBar(selected: JournalTab, onSelect: (JournalTab) -> Unit) 
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = tab.label,
+                            text = when (tab) {
+                                JournalTab.SAVED -> strings.savedTab
+                                JournalTab.COMPLETED -> strings.completedTab
+                                JournalTab.ACHIEVEMENTS -> strings.achievementsTab
+                                JournalTab.REVIEWS -> strings.reviewsTab
+                            },
                             fontSize = 13.sp,
                             fontWeight = FontWeight.SemiBold,
                             color = if (isSelected) WebPine else WebMuted,
@@ -417,7 +429,7 @@ private fun JournalTabBar(selected: JournalTab, onSelect: (JournalTab) -> Unit) 
 }
 
 @Composable
-private fun JournalRouteCard(route: RouteItem, onClick: () -> Unit) {
+private fun JournalRouteCard(route: RouteItem, onClick: () -> Unit, strings: JournalStrings) {
     Surface(
         onClick = onClick,
         shape = RoundedCornerShape(16.dp),
@@ -459,7 +471,7 @@ private fun JournalRouteCard(route: RouteItem, onClick: () -> Unit) {
                 )
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    text = "${route.duration} • ${route.stopsCount} paradas",
+                    text = "${route.duration} • ${strings.stopsCount(route.stopsCount)}",
                     fontSize = 12.sp,
                     color = WebMuted,
                     maxLines = 1,
@@ -476,7 +488,7 @@ private fun JournalRouteCard(route: RouteItem, onClick: () -> Unit) {
 }
 
 @Composable
-private fun AchievementCard(achievement: UserAchievementStatus) {
+private fun AchievementCard(achievement: UserAchievementStatus, strings: JournalStrings) {
     Surface(
         shape = RoundedCornerShape(16.dp),
         color = Color.White,
@@ -521,7 +533,7 @@ private fun AchievementCard(achievement: UserAchievementStatus) {
                 color = if (achievement.isUnlocked) Color(0xFFDCFCE7) else WebTabTrack
             ) {
                 Text(
-                    text = if (achievement.isUnlocked) "Conseguido" else "Pendiente",
+                    text = if (achievement.isUnlocked) strings.unlocked else strings.pending,
                     fontSize = 10.sp,
                     fontWeight = FontWeight.Bold,
                     color = if (achievement.isUnlocked) Color(0xFF166534) else WebMuted,
@@ -533,7 +545,7 @@ private fun AchievementCard(achievement: UserAchievementStatus) {
 }
 
 @Composable
-private fun MyReviewCard(review: RouteReview) {
+private fun MyReviewCard(review: RouteReview, strings: JournalStrings) {
     Surface(
         shape = RoundedCornerShape(16.dp),
         color = Color.White,
@@ -542,7 +554,7 @@ private fun MyReviewCard(review: RouteReview) {
     ) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text(
-                text = review.routeTitle.ifBlank { "Ruta" },
+                text = review.routeTitle.ifBlank { strings.routeFallback },
                 color = WebInk,
                 fontSize = 15.sp,
                 fontWeight = FontWeight.Bold,
@@ -550,7 +562,7 @@ private fun MyReviewCard(review: RouteReview) {
                 overflow = TextOverflow.Ellipsis
             )
             Text(
-                text = "Ruta ${review.routeRating}/5 · Guía ${review.guideRating}/5",
+                text = strings.reviewRatings(review.routeRating, review.guideRating),
                 color = WebMuted,
                 fontSize = 12.sp,
                 fontWeight = FontWeight.SemiBold
@@ -588,17 +600,19 @@ private fun EmptyJournalMessage(text: String) {
 private fun EditDisplayNameDialog(
     currentName: String,
     onDismiss: () -> Unit,
-    onSave: (String) -> Unit
+    onSave: (String) -> Unit,
+    strings: JournalStrings,
+    language: AppLanguage
 ) {
     var draft by remember { mutableStateOf(currentName) }
-    val error = ProfanityFilter.displayNameError(draft)
+    val error = ProfanityFilter.displayNameError(draft, language)
 
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = WebBackground,
         title = {
             Text(
-                "Editar nombre",
+                strings.editNameTitle,
                 fontFamily = FontFamily.Serif,
                 fontWeight = FontWeight.Bold,
                 color = WebPine
@@ -610,7 +624,7 @@ private fun EditDisplayNameDialog(
                 onValueChange = { draft = it },
                 singleLine = true,
                 isError = error != null,
-                label = { Text("Nombre") },
+                label = { Text(strings.nameFieldLabel) },
                 supportingText = {
                     Text(
                         text = error ?: "${draft.trim().length}/60",
@@ -627,12 +641,12 @@ private fun EditDisplayNameDialog(
                 onClick = { onSave(draft) },
                 enabled = error == null
             ) {
-                Text("Guardar", color = WebPine, fontWeight = FontWeight.Bold)
+                Text(strings.save, color = WebPine, fontWeight = FontWeight.Bold)
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Cancelar", color = WebMuted)
+                Text(strings.cancel, color = WebMuted)
             }
         }
     )

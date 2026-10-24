@@ -26,6 +26,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ecosdolugar.data.CharactersRepository
 import com.ecosdolugar.localization.AppLanguage
+import com.ecosdolugar.localization.appLanguageStrings
 import com.ecosdolugar.localization.categoryDisplayName
 import com.ecosdolugar.localization.routeCatalogStrings
 import com.ecosdolugar.model.Category
@@ -102,7 +103,7 @@ fun RoutesCatalogScreen(
                         }
                         Column {
                             Text(
-                                text = "ECOS DO LUGAR",
+                                text = appLanguageStrings(language).brandName,
                                 fontSize = 10.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = PineMoss,

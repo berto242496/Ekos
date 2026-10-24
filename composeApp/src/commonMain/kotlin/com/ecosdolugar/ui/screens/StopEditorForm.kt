@@ -36,6 +36,8 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupProperties
 import com.ecosdolugar.localization.AppLanguage
+import com.ecosdolugar.localization.StopEditorStrings
+import com.ecosdolugar.localization.stopEditorStrings
 import com.ecosdolugar.model.NarrationVoice
 import com.ecosdolugar.model.StopAudioMode
 import com.ecosdolugar.model.TrialType
@@ -50,13 +52,6 @@ import com.ecosdolugar.ui.theme.PineContainer
 import com.ecosdolugar.ui.theme.SurfaceCream
 import com.ecosdolugar.ui.theme.TerracottaGold
 
-private val trialTypeOptions = listOf(
-    TrialType.ACERTIJO to "Test de preguntas",
-    TrialType.PUZLE_IMAGEN to "Puzle de imagen",
-    TrialType.ORDENAR_PALABRA to "Ordenar palabra",
-    TrialType.COMPLETAR_FRASE to "Completar frase"
-)
-
 @Composable
 internal fun StopEditorForm(
     form: StopFormState,
@@ -66,6 +61,13 @@ internal fun StopEditorForm(
     onAddStop: () -> Unit,
     addLabel: String
 ) {
+    val strings = stopEditorStrings(language)
+    val trialTypeOptions = listOf(
+        TrialType.ACERTIJO to strings.trialTypeQuiz,
+        TrialType.PUZLE_IMAGEN to strings.trialTypePuzzle,
+        TrialType.ORDENAR_PALABRA to strings.trialTypeWord,
+        TrialType.COMPLETAR_FRASE to strings.trialTypePhrase
+    )
     val previewer = rememberVoicePreviewer()
     val clipPlayer = rememberAudioClipPlayer()
     val recorder = rememberVoiceRecorder(
@@ -73,32 +75,32 @@ internal fun StopEditorForm(
         onError = onMessage
     )
 
-    FieldLabel("Datos de la parada")
+    FieldLabel(strings.stopDataSection)
     RouteEditorTextField(
         value = form.title,
         onValueChange = { form.title = it },
-        label = "Nombre de la parada",
+        label = strings.stopNameLabel,
         singleLine = true
     )
     RouteEditorTextField(
         value = form.location,
         onValueChange = { form.location = it },
-        label = "Lugar o dirección",
+        label = strings.placeLabel,
         singleLine = true
     )
     RouteEditorTextField(
         value = form.story,
         onValueChange = { form.story = it },
-        label = "Relato de la parada",
+        label = strings.storyLabel,
         minLines = 2
     )
 
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        FieldLabel("Imagen de la parada")
+        FieldLabel(strings.stopImageSection)
         RouteEditorTextField(
             value = form.imageUrl.takeUnless { it.startsWith("data:") }.orEmpty(),
             onValueChange = { form.imageUrl = it },
-            label = "URL de la imagen (opcional)",
+            label = strings.imageUrlLabel,
             singleLine = true
         )
         RouteCoverImagePicker(
@@ -117,38 +119,36 @@ internal fun StopEditorForm(
     }
 
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        FieldLabel("Narración del relato")
+        FieldLabel(strings.narrationSection)
         StyledDropdown(
             selected = form.audioMode,
-            options = StopAudioMode.entries.map { it to narrationModeLabel(it) },
+            options = StopAudioMode.entries.map { it to narrationModeLabel(it, strings) },
             onSelected = { form.audioMode = it }
         )
         when (form.audioMode) {
-            StopAudioMode.WRITTEN -> HelperText("El visitante leerá el relato en pantalla.")
+            StopAudioMode.WRITTEN -> HelperText(strings.narrationWrittenHelper)
             StopAudioMode.TTS -> {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     SelectableChip(
-                        text = "Voz femenina",
+                        text = strings.femaleVoice,
                         selected = form.narrationVoice == NarrationVoice.FEMALE,
                         onClick = { form.narrationVoice = NarrationVoice.FEMALE },
                         modifier = Modifier.weight(1f)
                     )
                     SelectableChip(
-                        text = "Voz masculina",
+                        text = strings.maleVoice,
                         selected = form.narrationVoice == NarrationVoice.MALE,
                         onClick = { form.narrationVoice = NarrationVoice.MALE },
                         modifier = Modifier.weight(1f)
                     )
                 }
-                HelperText(
-                    "La voz la genera el dispositivo a partir del relato. Su calidad depende de las voces instaladas en el móvil."
-                )
+                HelperText(strings.ttsHelper)
                 SecondaryButton(
-                    text = if (previewer.isSpeaking) "Detener ejemplo" else "Escuchar ejemplo",
+                    text = if (previewer.isSpeaking) strings.stopExample else strings.listenExample,
                     onClick = {
                         when {
                             previewer.isSpeaking -> previewer.stop()
-                            form.story.isBlank() -> onMessage("Escribe el relato para escuchar un ejemplo.")
+                            form.story.isBlank() -> onMessage(strings.writeStoryForExample)
                             else -> {
                                 onMessage(null)
                                 previewer.speak(form.story, form.narrationVoice)
@@ -160,18 +160,18 @@ internal fun StopEditorForm(
             StopAudioMode.RECORDED -> {
                 HelperText(
                     if (recorder.isRecording) {
-                        "Grabando… pulsa de nuevo para terminar."
+                        strings.recordingInProgress
                     } else if (form.recordedAudioUrl != null) {
-                        "Grabación guardada. Se subirá al publicar la ruta."
+                        strings.recordingSaved
                     } else {
-                        "Graba el relato con tu propia voz."
+                        strings.recordHelper
                     }
                 )
                 SecondaryButton(
                     text = when {
-                        recorder.isRecording -> "Detener grabación"
-                        form.recordedAudioUrl != null -> "Grabar de nuevo"
-                        else -> "Grabar relato"
+                        recorder.isRecording -> strings.stopRecording
+                        form.recordedAudioUrl != null -> strings.recordAgain
+                        else -> strings.recordStory
                     },
                     onClick = {
                         onMessage(null)
@@ -181,7 +181,7 @@ internal fun StopEditorForm(
                 )
                 if (form.recordedAudioUrl != null && !recorder.isRecording) {
                     SecondaryButton(
-                        text = if (clipPlayer.isPlaying) "Detener reproducción" else "Escuchar grabación",
+                        text = if (clipPlayer.isPlaying) strings.stopPlayback else strings.listenRecording,
                         onClick = {
                             if (clipPlayer.isPlaying) {
                                 clipPlayer.stop()
@@ -191,7 +191,7 @@ internal fun StopEditorForm(
                         }
                     )
                     SecondaryButton(
-                        text = "Eliminar grabación",
+                        text = strings.deleteRecording,
                         onClick = {
                             clipPlayer.stop()
                             form.recordedAudioUrl = null
@@ -203,8 +203,8 @@ internal fun StopEditorForm(
     }
 
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        FieldLabel("Ubicación")
-        HelperText("Marca la ubicación de la parada en el mapa o introduce las coordenadas.")
+        FieldLabel(strings.locationSection)
+        HelperText(strings.locationHelper)
         RouteMapView(
             routes = emptyList(),
             selectedRouteId = null,
@@ -226,7 +226,7 @@ internal fun StopEditorForm(
             RouteEditorTextField(
                 value = form.latitude,
                 onValueChange = { form.latitude = it },
-                label = "Latitud",
+                label = strings.latitudeLabel,
                 modifier = Modifier.weight(1f),
                 singleLine = true,
                 keyboardType = KeyboardType.Number
@@ -234,7 +234,7 @@ internal fun StopEditorForm(
             RouteEditorTextField(
                 value = form.longitude,
                 onValueChange = { form.longitude = it },
-                label = "Longitud",
+                label = strings.longitudeLabel,
                 modifier = Modifier.weight(1f),
                 singleLine = true,
                 keyboardType = KeyboardType.Number
@@ -243,7 +243,7 @@ internal fun StopEditorForm(
     }
 
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        FieldLabel("Tipo de prueba")
+        FieldLabel(strings.trialTypeSection)
         StyledDropdown(
             selected = form.trialType,
             options = trialTypeOptions,
@@ -256,19 +256,19 @@ internal fun StopEditorForm(
             RouteEditorTextField(
                 value = form.question,
                 onValueChange = { form.question = it },
-                label = "Pregunta del reto",
+                label = strings.questionLabel,
                 minLines = 2
             )
             RouteEditorTextField(
                 value = form.hint,
                 onValueChange = { form.hint = it },
-                label = "Pista",
+                label = strings.hintLabel,
                 singleLine = true
             )
             RouteEditorTextField(
                 value = form.answer,
                 onValueChange = { form.answer = it },
-                label = "Respuesta correcta",
+                label = strings.correctAnswerLabel,
                 singleLine = true
             )
             form.wrongAnswers.forEachIndexed { index, wrongAnswer ->
@@ -280,23 +280,24 @@ internal fun StopEditorForm(
                     RouteEditorTextField(
                         value = wrongAnswer,
                         onValueChange = { form.wrongAnswers[index] = it },
-                        label = "Respuesta incorrecta ${index + 1}",
+                        label = strings.wrongAnswerLabel(index + 1),
                         modifier = Modifier.weight(1f),
                         singleLine = true
                     )
                     RemoveAnswerButton(
                         enabled = form.wrongAnswers.size > 1,
+                        description = strings.removeWrongAnswer,
                         onClick = { if (form.wrongAnswers.size > 1) form.wrongAnswers.removeAt(index) }
                     )
                 }
             }
             SecondaryButton(
-                text = "Añadir otra respuesta incorrecta",
+                text = strings.addWrongAnswer,
                 onClick = { form.wrongAnswers += "" }
             )
         }
         TrialType.PUZLE_IMAGEN -> {
-            HelperText("La imagen se parte en piezas y se desordena para el visitante.")
+            HelperText(strings.puzzleHelper)
             if (form.puzzleImageUrl.isNotBlank()) {
                 RouteCoverImage(
                     url = form.puzzleImageUrl,
@@ -313,7 +314,7 @@ internal fun StopEditorForm(
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 listOf(3, 4).forEach { size ->
                     SelectableChip(
-                        text = "$size × $size (${size * size} piezas)",
+                        text = strings.puzzleGridLabel(size),
                         selected = form.puzzleGridSize == size,
                         onClick = { form.puzzleGridSize = size },
                         modifier = Modifier.weight(1f)
@@ -323,43 +324,43 @@ internal fun StopEditorForm(
             RouteEditorTextField(
                 value = form.hint,
                 onValueChange = { form.hint = it },
-                label = "Pista (opcional)",
+                label = strings.optionalHintLabel,
                 singleLine = true
             )
         }
         TrialType.ORDENAR_PALABRA -> {
-            HelperText("Al visitante se le mostrarán las letras desordenadas y deberá ordenarlas.")
+            HelperText(strings.wordHelper)
             RouteEditorTextField(
                 value = form.word,
                 onValueChange = { form.word = it },
-                label = "Palabra a ordenar",
+                label = strings.wordLabel,
                 singleLine = true
             )
             RouteEditorTextField(
                 value = form.hint,
                 onValueChange = { form.hint = it },
-                label = "Pista (opcional)",
+                label = strings.optionalHintLabel,
                 singleLine = true
             )
         }
         TrialType.COMPLETAR_FRASE -> {
-            HelperText("Escribe la frase completa y la palabra que el visitante debe deducir.")
+            HelperText(strings.phraseHelper)
             RouteEditorTextField(
                 value = form.sentence,
                 onValueChange = { form.sentence = it },
-                label = "Frase completa",
+                label = strings.fullSentenceLabel,
                 minLines = 2
             )
             RouteEditorTextField(
                 value = form.missingWord,
                 onValueChange = { form.missingWord = it },
-                label = "Palabra que falta",
+                label = strings.missingWordLabel,
                 singleLine = true
             )
             RouteEditorTextField(
                 value = form.hint,
                 onValueChange = { form.hint = it },
-                label = "Pista (opcional)",
+                label = strings.optionalHintLabel,
                 singleLine = true
             )
         }
@@ -436,10 +437,10 @@ internal fun <T> StyledDropdown(selected: T, options: List<Pair<T, String>>, onS
     }
 }
 
-private fun narrationModeLabel(mode: StopAudioMode): String = when (mode) {
-    StopAudioMode.WRITTEN -> "Solo texto"
-    StopAudioMode.TTS -> "Voz generada"
-    StopAudioMode.RECORDED -> "Mi grabación"
+private fun narrationModeLabel(mode: StopAudioMode, strings: StopEditorStrings): String = when (mode) {
+    StopAudioMode.WRITTEN -> strings.narrationWrittenLabel
+    StopAudioMode.TTS -> strings.narrationTtsLabel
+    StopAudioMode.RECORDED -> strings.narrationRecordedLabel
 }
 
 @Composable
@@ -453,8 +454,8 @@ private fun HelperText(text: String) {
 }
 
 @Composable
-private fun RemoveAnswerButton(enabled: Boolean, onClick: () -> Unit) {
+private fun RemoveAnswerButton(enabled: Boolean, description: String, onClick: () -> Unit) {
     IconButton(onClick = onClick, enabled = enabled) {
-        Icon(Icons.Default.Delete, contentDescription = "Eliminar respuesta incorrecta", tint = TerracottaGold)
+        Icon(Icons.Default.Delete, contentDescription = description, tint = TerracottaGold)
     }
 }

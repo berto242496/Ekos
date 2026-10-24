@@ -21,6 +21,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ecosdolugar.data.formatRating
+import com.ecosdolugar.localization.AppLanguage
+import com.ecosdolugar.localization.GuideDashboardStrings
+import com.ecosdolugar.localization.guideDashboardStrings
 import com.ecosdolugar.model.GuideAuthor
 import com.ecosdolugar.model.RouteItem
 import com.ecosdolugar.model.RouteReview
@@ -35,11 +38,13 @@ fun GuideDashboardScreen(
     routes: List<RouteItem>,
     reviews: List<RouteReview> = emptyList(),
     isSaving: Boolean = false,
+    language: AppLanguage = AppLanguage.SPANISH,
     onBack: () -> Unit,
     onCreateNewRoute: () -> Unit,
     onEditRoute: (RouteItem) -> Unit,
     onPublishDraft: (RouteItem) -> Unit
 ) {
+    val strings = guideDashboardStrings(language)
     val publishedRoutes = routes.filter { it.status == "publicada" }
     val pendingRoutes = routes.filter { it.status != "publicada" }
     var selectedTab by remember { mutableStateOf(0) }
@@ -55,7 +60,7 @@ fun GuideDashboardScreen(
             TopAppBar(
                 title = {
                     Text(
-                        text = "Panel del guía",
+                        text = strings.title,
                         style = MaterialTheme.typography.titleMedium.copy(
                             fontWeight = FontWeight.Bold,
                             color = PineDeep
@@ -64,7 +69,7 @@ fun GuideDashboardScreen(
                 },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Volver")
+                        Icon(Icons.Default.ArrowBack, contentDescription = strings.back)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = SurfaceCream)
@@ -76,7 +81,7 @@ fun GuideDashboardScreen(
                 containerColor = PineDeep,
                 contentColor = SurfaceCream,
                 icon = { Icon(Icons.Default.Add, contentDescription = null) },
-                text = { Text("Nueva ruta", fontWeight = FontWeight.SemiBold) }
+                text = { Text(strings.newRoute, fontWeight = FontWeight.SemiBold) }
             )
         },
         containerColor = SurfaceCream
@@ -89,7 +94,7 @@ fun GuideDashboardScreen(
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             item {
-                GuideIdentityCard(guide = guide)
+                GuideIdentityCard(guide = guide, strings = strings)
             }
 
             item {
@@ -98,13 +103,13 @@ fun GuideDashboardScreen(
                     horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     StatTile(
-                        label = "Publicadas",
+                        label = strings.publishedStat,
                         value = publishedRoutes.size.toString(),
                         icon = Icons.Default.CheckCircle,
                         modifier = Modifier.weight(1f)
                     )
                     StatTile(
-                        label = "Pendientes",
+                        label = strings.pendingStat,
                         value = routes.count { it.status == "pendiente" }.toString(),
                         icon = Icons.Default.Schedule,
                         modifier = Modifier.weight(1f)
@@ -118,13 +123,13 @@ fun GuideDashboardScreen(
                     horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     StatTile(
-                        label = "Exploradores",
+                        label = strings.explorersStat,
                         value = explorers.toString(),
                         icon = Icons.Default.Explore,
                         modifier = Modifier.weight(1f)
                     )
                     StatTile(
-                        label = "Valoración",
+                        label = strings.ratingStat,
                         value = if (guide.reviewsCount > 0) formatRating(guide.rating) else "—",
                         icon = Icons.Default.Star,
                         modifier = Modifier.weight(1f)
@@ -143,7 +148,7 @@ fun GuideDashboardScreen(
                         onClick = { selectedTab = 0 },
                         text = {
                             Text(
-                                "Publicadas (${publishedRoutes.size})",
+                                strings.publishedTab(publishedRoutes.size),
                                 fontWeight = FontWeight.SemiBold,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
@@ -155,7 +160,7 @@ fun GuideDashboardScreen(
                         onClick = { selectedTab = 1 },
                         text = {
                             Text(
-                                "Pendientes (${pendingRoutes.size})",
+                                strings.pendingTab(pendingRoutes.size),
                                 fontWeight = FontWeight.SemiBold,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
@@ -167,7 +172,7 @@ fun GuideDashboardScreen(
                         onClick = { selectedTab = 2 },
                         text = {
                             Text(
-                                "Reseñas (${reviews.size})",
+                                strings.reviewsTab(reviews.size),
                                 fontWeight = FontWeight.SemiBold,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
@@ -181,21 +186,21 @@ fun GuideDashboardScreen(
                 if (reviews.isEmpty()) {
                     item {
                         Text(
-                            text = "Todavía no tienes reseñas de exploradores.",
+                            text = strings.noReviews,
                             fontSize = 14.sp,
                             color = OnSurfaceVariant
                         )
                     }
                 }
                 items(reviews.size) { index ->
-                    GuideReviewCard(review = reviews[index])
+                    GuideReviewCard(review = reviews[index], strings = strings)
                 }
             } else {
                 if (visibleRoutes.isEmpty()) {
                     item {
                         Text(
-                            text = if (selectedTab == 0) "Todavía no tienes rutas publicadas."
-                            else "No hay rutas pendientes de revisión.",
+                            text = if (selectedTab == 0) strings.noPublishedRoutes
+                            else strings.noPendingRoutes,
                             fontSize = 14.sp,
                             color = OnSurfaceVariant
                         )
@@ -208,7 +213,8 @@ fun GuideDashboardScreen(
                         route = route,
                         isSaving = isSaving,
                         onEdit = { onEditRoute(route) },
-                        onPublish = { onPublishDraft(route) }
+                        onPublish = { onPublishDraft(route) },
+                        strings = strings
                     )
                 }
             }
@@ -221,7 +227,7 @@ fun GuideDashboardScreen(
 }
 
 @Composable
-private fun GuideReviewCard(review: RouteReview) {
+private fun GuideReviewCard(review: RouteReview, strings: GuideDashboardStrings) {
     Surface(
         shape = RoundedCornerShape(18.dp),
         color = Color.White,
@@ -233,7 +239,7 @@ private fun GuideReviewCard(review: RouteReview) {
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Text(
-                text = review.routeTitle.ifBlank { "Ruta" },
+                text = review.routeTitle.ifBlank { strings.defaultRouteTitle },
                 fontWeight = FontWeight.Bold,
                 fontSize = 16.sp,
                 color = OnSurfaceDark,
@@ -241,8 +247,8 @@ private fun GuideReviewCard(review: RouteReview) {
                 overflow = TextOverflow.Ellipsis
             )
             Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                ReviewStars(label = "Ruta", value = review.routeRating)
-                ReviewStars(label = "Guía", value = review.guideRating)
+                ReviewStars(label = strings.routeLabel, value = review.routeRating)
+                ReviewStars(label = strings.guideLabel, value = review.guideRating)
             }
             if (review.comment.isNotBlank()) {
                 Text(
@@ -282,7 +288,7 @@ private fun ReviewStars(label: String, value: Int) {
 }
 
 @Composable
-private fun GuideIdentityCard(guide: GuideAuthor) {
+private fun GuideIdentityCard(guide: GuideAuthor, strings: GuideDashboardStrings) {
     Surface(
         shape = RoundedCornerShape(20.dp),
         color = Color.White,
@@ -310,7 +316,7 @@ private fun GuideIdentityCard(guide: GuideAuthor) {
                         Spacer(Modifier.width(6.dp))
                         Icon(
                             imageVector = Icons.Default.Verified,
-                            contentDescription = "Guía verificado",
+                            contentDescription = strings.verifiedGuide,
                             tint = TerracottaGold,
                             modifier = Modifier.size(18.dp)
                         )
@@ -329,7 +335,7 @@ private fun GuideIdentityCard(guide: GuideAuthor) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                     Icon(Icons.Default.Star, contentDescription = null, tint = TerracottaGold, modifier = Modifier.size(14.dp))
                     Text(
-                        text = if (guide.reviewsCount > 0) "${formatRating(guide.rating)} (${guide.reviewsCount} reseñas)" else "Sin reseñas todavía",
+                        text = if (guide.reviewsCount > 0) strings.ratingWithReviews(formatRating(guide.rating), guide.reviewsCount) else strings.noReviewsYet,
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
                         color = OnSurfaceDark
@@ -385,14 +391,15 @@ private fun GuideRouteCard(
     route: RouteItem,
     isSaving: Boolean,
     onEdit: () -> Unit,
-    onPublish: () -> Unit
+    onPublish: () -> Unit,
+    strings: GuideDashboardStrings
 ) {
     val isDraft = route.status == "borrador"
     val isPending = route.status == "pendiente"
     val statusLabel = when {
-        isDraft -> "Borrador"
-        isPending -> "Pendiente de verificación"
-        else -> "Publicada"
+        isDraft -> strings.statusDraft
+        isPending -> strings.statusPending
+        else -> strings.statusPublished
     }
     val statusColor = when {
         isDraft -> Color(0xFFFEF3C7)
@@ -462,7 +469,7 @@ private fun GuideRouteCard(
                     overflow = TextOverflow.Ellipsis
                 )
                 Text(
-                    text = "${route.location} · ${route.duration} · ${route.stopsCount} paradas",
+                    text = strings.routeSummary(route.location, route.duration, route.stopsCount),
                     fontSize = 12.sp,
                     color = PineMoss,
                     maxLines = 1,
@@ -483,17 +490,17 @@ private fun GuideRouteCard(
                 ) {
                     Row(modifier = Modifier.padding(vertical = 10.dp, horizontal = 12.dp)) {
                         Column(modifier = Modifier.weight(1f)) {
-                            Text("INICIOS", fontSize = 10.sp, color = PineMoss, fontWeight = FontWeight.Bold)
+                            Text(strings.startsLabel, fontSize = 10.sp, color = PineMoss, fontWeight = FontWeight.Bold)
                             Text(route.startedCount.toString(), fontWeight = FontWeight.Bold, color = OnSurfaceDark)
                         }
                         Column(modifier = Modifier.weight(1f)) {
-                            Text("PARADAS", fontSize = 10.sp, color = PineMoss, fontWeight = FontWeight.Bold)
+                            Text(strings.stopsLabel, fontSize = 10.sp, color = PineMoss, fontWeight = FontWeight.Bold)
                             Text(route.stopsCount.toString(), fontWeight = FontWeight.Bold, color = OnSurfaceDark)
                         }
                         Column(modifier = Modifier.weight(1f)) {
-                            Text("DIFICULTAD", fontSize = 10.sp, color = PineMoss, fontWeight = FontWeight.Bold)
+                            Text(strings.difficultyLabel, fontSize = 10.sp, color = PineMoss, fontWeight = FontWeight.Bold)
                             Text(
-                                route.difficulty.name.lowercase().replaceFirstChar { it.uppercase() },
+                                strings.difficulty(route.difficulty),
                                 fontWeight = FontWeight.Bold,
                                 color = OnSurfaceDark,
                                 maxLines = 1,
@@ -520,7 +527,7 @@ private fun GuideRouteCard(
                         shape = RoundedCornerShape(12.dp),
                         colors = ButtonDefaults.outlinedButtonColors(contentColor = PineDeep)
                     ) {
-                        Text("Publicar")
+                        Text(strings.publishAction)
                     }
                     Spacer(Modifier.width(8.dp))
                 }
@@ -532,7 +539,7 @@ private fun GuideRouteCard(
                 ) {
                     Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(Modifier.width(6.dp))
-                    Text(if (isDraft) "Continuar borrador" else "Editar ruta")
+                    Text(if (isDraft) strings.continueDraftAction else strings.editRouteAction)
                 }
             }
         }

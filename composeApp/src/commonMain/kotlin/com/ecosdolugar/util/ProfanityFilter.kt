@@ -1,5 +1,10 @@
 package com.ecosdolugar.util
 
+import com.ecosdolugar.localization.AppLanguage
+import com.ecosdolugar.localization.appMessageStrings
+
+private const val MAX_DISPLAY_NAME_LENGTH = 60
+
 object ProfanityFilter {
     private val blockedWords = setOf(
         // Castellano
@@ -20,12 +25,13 @@ object ProfanityFilter {
         "pussy", "cunt", "whore", "slut", "motherfucker", "nigger", "faggot"
     ).map { normalize(it) }.toSet()
 
-    fun displayNameError(name: String): String? {
+    fun displayNameError(name: String, language: AppLanguage = AppLanguage.SPANISH): String? {
         val trimmed = name.trim()
+        val strings = appMessageStrings(language)
         return when {
-            trimmed.isEmpty() -> "Escribe el nombre que quieres mostrar."
-            trimmed.length > 60 -> "El nombre no puede superar los 60 caracteres."
-            containsProfanity(trimmed) -> "Ese nombre contiene palabras no permitidas."
+            trimmed.isEmpty() -> strings.displayNameEmpty
+            trimmed.length > MAX_DISPLAY_NAME_LENGTH -> strings.displayNameTooLong(MAX_DISPLAY_NAME_LENGTH)
+            containsProfanity(trimmed) -> strings.displayNameProfanity
             else -> null
         }
     }

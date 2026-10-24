@@ -65,6 +65,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ecosdolugar.data.CharactersRepository
+import com.ecosdolugar.localization.AppLanguage
+import com.ecosdolugar.localization.StopTrialStrings
+import com.ecosdolugar.localization.stopTrialStrings
 import com.ecosdolugar.model.RouteStop
 import com.ecosdolugar.model.TrialType
 import com.ecosdolugar.ui.components.RouteCoverImage
@@ -82,10 +85,12 @@ internal fun StopTrialContent(
     isSolved: Boolean,
     onSolved: (attempts: Int) -> Unit,
     onFinish: () -> Unit,
-    isRouteCompleted: Boolean = false
+    isRouteCompleted: Boolean = false,
+    language: AppLanguage = AppLanguage.SPANISH
 ) {
+    val strings = stopTrialStrings(language)
     if (isSolved) {
-        TrialCompletedContent(stop.id, characterId, onFinish, isRouteCompleted)
+        TrialCompletedContent(stop.id, characterId, onFinish, isRouteCompleted, language, strings)
         return
     }
 
@@ -95,7 +100,7 @@ internal fun StopTrialContent(
     var feedback by remember(stop.id) { mutableStateOf<String?>(null) }
     var showHint by remember(stop.id) { mutableStateOf(false) }
     val hint = trial?.generalHint?.takeIf { it.isNotBlank() } ?: stop.enigma.hint
-    val title = trial?.title?.takeIf { it.isNotBlank() } ?: "Prueba"
+    val title = trial?.title?.takeIf { it.isNotBlank() } ?: strings.untitledTrial
     val question = trial?.question?.takeIf { it.isNotBlank() } ?: stop.enigma.question
 
     val onAnswer: (Boolean) -> Unit = { correct ->
@@ -103,7 +108,7 @@ internal fun StopTrialContent(
         if (correct) {
             onSolved(attempts)
         } else {
-            feedback = "Todavía no es correcto. Puedes volver a intentarlo."
+            feedback = strings.notCorrectYet
         }
     }
 
@@ -127,12 +132,13 @@ internal fun StopTrialContent(
             TrialType.PUZLE_IMAGEN -> {
                 val imageUrl = trial?.imageUrl?.takeIf { it.isNotBlank() } ?: stop.imageUrl
                 if (imageUrl.isBlank()) {
-                    MissingDataNotice("Esta prueba no tiene imagen configurada.")
+                    MissingDataNotice(strings.noImageConfigured)
                 } else {
                     PuzzleTrial(
                         stopId = stop.id,
                         imageUrl = imageUrl,
                         gridSize = trial?.puzzleGridSize ?: 3,
+                        strings = strings,
                         onAnswer = onAnswer
                     )
                 }
@@ -142,12 +148,12 @@ internal fun StopTrialContent(
                 val letters = remember(stop.id) {
                     trial?.scrambledLetters?.takeIf { it.isNotEmpty() } ?: scrambleLetters(answer)
                 }
-                WordTrial(stopId = stop.id, letters = letters, answer = answer, onAnswer = onAnswer)
+                WordTrial(stopId = stop.id, letters = letters, answer = answer, strings = strings, onAnswer = onAnswer)
             }
             TrialType.COMPLETAR_FRASE -> {
                 val sentence = trial?.sentence?.takeIf { it.isNotBlank() } ?: stop.enigma.question
                 val missing = trial?.missingWord?.takeIf { it.isNotBlank() } ?: stop.enigma.answer
-                SentenceTrial(stopId = stop.id, sentence = sentence, missingWord = missing, onAnswer = onAnswer)
+                SentenceTrial(stopId = stop.id, sentence = sentence, missingWord = missing, strings = strings, onAnswer = onAnswer)
             }
             else -> {
                 val options = trial?.options.orEmpty()
@@ -162,7 +168,8 @@ internal fun StopTrialContent(
                     TextAnswerTrial(
                         stopId = stop.id,
                         expected = stop.enigma.answer,
-                        label = "Tu respuesta",
+                        label = strings.yourAnswer,
+                        strings = strings,
                         onAnswer = onAnswer
                     )
                 }
@@ -187,7 +194,7 @@ internal fun StopTrialContent(
 
         if (hint.isNotBlank()) {
             TextButton(onClick = { showHint = !showHint }) {
-                Text(if (showHint) "Ocultar pista" else "Ver pista", color = PineContainer, fontWeight = FontWeight.SemiBold)
+                Text(if (showHint) strings.hideHint else strings.showHint, color = PineContainer, fontWeight = FontWeight.SemiBold)
             }
             if (showHint) {
                 Surface(
@@ -211,10 +218,17 @@ private fun MissingDataNotice(message: String) {
 }
 
 @Composable
-private fun TrialCompletedContent(stopId: String, characterId: String, onFinish: () -> Unit, isRouteCompleted: Boolean) {
+private fun TrialCompletedContent(
+    stopId: String,
+    characterId: String,
+    onFinish: () -> Unit,
+    isRouteCompleted: Boolean,
+    language: AppLanguage,
+    strings: StopTrialStrings
+) {
     val character = remember(characterId) { CharactersRepository.getById(characterId) }
     val accent = Color(character.accentColorHex)
-    val message = remember(stopId) { stopCompletionTexts.random() }
+    val message = remember(stopId, language) { stopCompletionTexts(language).random() }
 
     Column(
         modifier = Modifier
@@ -247,7 +261,7 @@ private fun TrialCompletedContent(stopId: String, characterId: String, onFinish:
         }
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             Icon(Icons.Default.CheckCircle, contentDescription = null, tint = PineContainer, modifier = Modifier.size(18.dp))
-            Text("Prueba completada", color = PineContainer, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+            Text(strings.challengeCompleted, color = PineContainer, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
         }
         Button(
             onClick = onFinish,
@@ -255,7 +269,7 @@ private fun TrialCompletedContent(stopId: String, characterId: String, onFinish:
             shape = RoundedCornerShape(12.dp),
             colors = ButtonDefaults.buttonColors(containerColor = PineContainer, contentColor = SurfaceCream)
         ) {
-            Text(if (isRouteCompleted) "Finalizar ruta" else "Finalizar prueba", fontWeight = FontWeight.Bold)
+            Text(if (isRouteCompleted) strings.finishRoute else strings.finishChallenge, fontWeight = FontWeight.Bold)
         }
     }
 }
@@ -307,6 +321,7 @@ private fun TextAnswerTrial(
     stopId: String,
     expected: String,
     label: String,
+    strings: StopTrialStrings,
     onAnswer: (Boolean) -> Unit
 ) {
     var input by remember(stopId) { mutableStateOf("") }
@@ -325,7 +340,7 @@ private fun TextAnswerTrial(
         shape = RoundedCornerShape(12.dp),
         colors = ButtonDefaults.buttonColors(containerColor = PineContainer, contentColor = SurfaceCream)
     ) {
-        Text("Comprobar", fontWeight = FontWeight.Bold)
+        Text(strings.check, fontWeight = FontWeight.Bold)
     }
 }
 
@@ -334,6 +349,7 @@ private fun SentenceTrial(
     stopId: String,
     sentence: String,
     missingWord: String,
+    strings: StopTrialStrings,
     onAnswer: (Boolean) -> Unit
 ) {
     val index = if (missingWord.isBlank()) -1 else sentence.indexOf(missingWord, ignoreCase = true)
@@ -356,7 +372,13 @@ private fun SentenceTrial(
             modifier = Modifier.padding(18.dp)
         )
     }
-    TextAnswerTrial(stopId = stopId, expected = missingWord, label = "Palabra que falta", onAnswer = onAnswer)
+    TextAnswerTrial(
+        stopId = stopId,
+        expected = missingWord,
+        label = strings.missingWordLabel,
+        strings = strings,
+        onAnswer = onAnswer
+    )
 }
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -365,6 +387,7 @@ private fun WordTrial(
     stopId: String,
     letters: List<String>,
     answer: String,
+    strings: StopTrialStrings,
     onAnswer: (Boolean) -> Unit
 ) {
     var picked by remember(stopId) { mutableStateOf(listOf<Int>()) }
@@ -384,7 +407,7 @@ private fun WordTrial(
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             if (picked.isEmpty()) {
-                Text("Toca las letras en orden", color = InkMuted, fontSize = 13.sp, modifier = Modifier.padding(8.dp))
+                Text(strings.tapLettersInOrder, color = InkMuted, fontSize = 13.sp, modifier = Modifier.padding(8.dp))
             }
             picked.forEachIndexed { slot, letterIndex ->
                 LetterTile(letter = letters[letterIndex], placed = true) {
@@ -412,7 +435,7 @@ private fun WordTrial(
         horizontalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         TextButton(onClick = { picked = emptyList() }, enabled = picked.isNotEmpty()) {
-            Text("Borrar", color = PineContainer, fontWeight = FontWeight.SemiBold)
+            Text(strings.clear, color = PineContainer, fontWeight = FontWeight.SemiBold)
         }
         Button(
             onClick = { onAnswer(normalizeAnswer(built) == normalizeAnswer(answer)) },
@@ -421,7 +444,7 @@ private fun WordTrial(
             shape = RoundedCornerShape(12.dp),
             colors = ButtonDefaults.buttonColors(containerColor = PineContainer, contentColor = SurfaceCream)
         ) {
-            Text("Comprobar", fontWeight = FontWeight.Bold)
+            Text(strings.check, fontWeight = FontWeight.Bold)
         }
     }
 }
@@ -458,6 +481,7 @@ private fun PuzzleTrial(
     stopId: String,
     imageUrl: String,
     gridSize: Int,
+    strings: StopTrialStrings,
     onAnswer: (Boolean) -> Unit
 ) {
     val grid = gridSize.coerceIn(2, 5)
@@ -481,7 +505,7 @@ private fun PuzzleTrial(
             contentAlignment = Alignment.Center
         ) {
             if (imageState is RouteImageState.Failed) {
-                Text("No se pudo cargar la imagen", color = SurfaceCream)
+                Text(strings.imageLoadError, color = SurfaceCream)
             } else {
                 CircularProgressIndicator(color = TerracottaGold)
             }
@@ -586,7 +610,7 @@ private fun PuzzleTrial(
         shape = RoundedCornerShape(12.dp),
         colors = ButtonDefaults.buttonColors(containerColor = PineContainer, contentColor = SurfaceCream)
     ) {
-        Text("Comprobar", fontWeight = FontWeight.Bold)
+        Text(strings.check, fontWeight = FontWeight.Bold)
     }
 }
 

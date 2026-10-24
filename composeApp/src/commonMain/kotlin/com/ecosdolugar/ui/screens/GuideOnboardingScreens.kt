@@ -28,6 +28,8 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.ecosdolugar.localization.AppLanguage
+import com.ecosdolugar.localization.guideOnboardingStrings
 import com.ecosdolugar.ui.components.RouteCoverImagePicker
 import com.ecosdolugar.ui.theme.*
 import com.ecosdolugar.util.ProfanityFilter
@@ -41,28 +43,30 @@ private data class GuideKeyPoint(
 @Composable
 fun GuideWelcomeScreen(
     onContinue: () -> Unit,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    language: AppLanguage = AppLanguage.SPANISH
 ) {
+    val strings = guideOnboardingStrings(language)
     val points = listOf(
         GuideKeyPoint(
             Icons.Default.Explore,
-            "Crea rutas propias",
-            "Diseña itinerarios a tu ritmo, destacando los rincones, historias y leyendas que solo los locales conocen."
+            strings.keyPointCreateTitle,
+            strings.keyPointCreateDescription
         ),
         GuideKeyPoint(
             Icons.Default.AutoStories,
-            "Publica experiencias culturales",
-            "Enriquece cada parada con relatos orales, misterios históricos, pistas secretas y retos participativos."
+            strings.keyPointPublishTitle,
+            strings.keyPointPublishDescription
         ),
         GuideKeyPoint(
             Icons.Default.Groups,
-            "Llega a más visitantes",
-            "Conecta con viajeros y amantes del patrimonio que buscan descubrir el territorio de forma inmersiva y respetuosa."
+            strings.keyPointReachTitle,
+            strings.keyPointReachDescription
         ),
         GuideKeyPoint(
             Icons.Default.Payments,
-            "Monetiza tu conocimiento",
-            "Fija el precio de tus rutas con micropagos accesibles (0,99 € – 4,99 €) u ofrécelas gratis con total libertad."
+            strings.keyPointMonetizeTitle,
+            strings.keyPointMonetizeDescription
         )
     )
 
@@ -75,11 +79,11 @@ fun GuideWelcomeScreen(
             .padding(top = 12.dp, bottom = 24.dp)
     ) {
         IconButton(onClick = onBack) {
-            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver", tint = PineContainer)
+            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = strings.back, tint = PineContainer)
         }
         Spacer(Modifier.height(12.dp))
         Text(
-            "Espacio para guías y divulgadores",
+            strings.welcomeEyebrow,
             color = TerracottaGold,
             fontSize = 12.sp,
             fontWeight = FontWeight.SemiBold,
@@ -87,7 +91,7 @@ fun GuideWelcomeScreen(
         )
         Spacer(Modifier.height(8.dp))
         Text(
-            "Crea y monetiza tus propias rutas",
+            strings.welcomeTitle,
             color = PineDeep,
             fontFamily = FontFamily.Serif,
             fontSize = 28.sp,
@@ -96,7 +100,7 @@ fun GuideWelcomeScreen(
         )
         Spacer(Modifier.height(10.dp))
         Text(
-            "Convierte tu conocimiento local en experiencias digitales para visitantes.",
+            strings.welcomeIntro,
             color = PineMoss,
             fontFamily = FontFamily.Serif,
             fontSize = 16.sp,
@@ -148,7 +152,7 @@ fun GuideWelcomeScreen(
             shape = RoundedCornerShape(14.dp),
             colors = ButtonDefaults.buttonColors(containerColor = PineContainer, contentColor = SurfaceCream)
         ) {
-            Text("Crear mi perfil de guía", fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
+            Text(strings.welcomeCreateProfile, fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
             Spacer(Modifier.width(8.dp))
             Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null, modifier = Modifier.size(18.dp))
         }
@@ -161,15 +165,17 @@ fun GuideProfileSetupScreen(
     isSaving: Boolean,
     errorMessage: String?,
     onBack: () -> Unit,
-    onSave: (name: String, bio: String, photoDataUrl: String?) -> Unit
+    onSave: (name: String, bio: String, photoDataUrl: String?) -> Unit,
+    language: AppLanguage = AppLanguage.SPANISH
 ) {
+    val strings = guideOnboardingStrings(language)
     var name by remember { mutableStateOf(initialName) }
     var bio by remember { mutableStateOf("") }
     var photo by remember { mutableStateOf<String?>(null) }
     var photoError by remember { mutableStateOf<String?>(null) }
     var localError by remember { mutableStateOf<String?>(null) }
 
-    val nameError = ProfanityFilter.displayNameError(name)
+    val nameError = ProfanityFilter.displayNameError(name, language)
     val bioHasProfanity = ProfanityFilter.containsProfanity(bio)
 
     Column(
@@ -181,11 +187,11 @@ fun GuideProfileSetupScreen(
             .padding(top = 12.dp, bottom = 24.dp)
     ) {
         IconButton(onClick = onBack, enabled = !isSaving) {
-            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver", tint = PineContainer)
+            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = strings.back, tint = PineContainer)
         }
         Spacer(Modifier.height(8.dp))
         Text(
-            "Crea tu perfil de guía",
+            strings.profileTitle,
             color = PineDeep,
             fontFamily = FontFamily.Serif,
             fontSize = 26.sp,
@@ -193,7 +199,7 @@ fun GuideProfileSetupScreen(
         )
         Spacer(Modifier.height(6.dp))
         Text(
-            "Así te verán los visitantes en tus rutas.",
+            strings.profileSubtitle,
             color = PineMoss,
             fontSize = 14.sp,
             lineHeight = 20.sp
@@ -203,7 +209,7 @@ fun GuideProfileSetupScreen(
         OutlinedTextField(
             value = name,
             onValueChange = { if (it.length <= 60) name = it },
-            label = { Text("Nombre") },
+            label = { Text(strings.nameLabel) },
             singleLine = true,
             enabled = !isSaving,
             isError = nameError != null && name.isNotEmpty(),
@@ -218,13 +224,13 @@ fun GuideProfileSetupScreen(
         OutlinedTextField(
             value = bio,
             onValueChange = { if (it.length <= 500) bio = it },
-            label = { Text("Descripción") },
+            label = { Text(strings.descriptionLabel) },
             enabled = !isSaving,
             minLines = 4,
             isError = bioHasProfanity,
             supportingText = {
                 Text(
-                    if (bioHasProfanity) "La descripción contiene palabras no permitidas."
+                    if (bioHasProfanity) strings.descriptionProfanity
                     else "${bio.length}/500"
                 )
             },
@@ -243,7 +249,7 @@ fun GuideProfileSetupScreen(
                 Icon(Icons.Default.PhotoCamera, contentDescription = null, tint = TerracottaGold)
                 Spacer(Modifier.height(6.dp))
                 Text(
-                    if (photo != null) "Foto seleccionada" else "Añade una foto de perfil",
+                    if (photo != null) strings.photoSelected else strings.photoAdd,
                     color = PineDeep,
                     fontWeight = FontWeight.SemiBold,
                     fontSize = 14.sp
@@ -277,7 +283,7 @@ fun GuideProfileSetupScreen(
                 val trimmedName = name.trim()
                 localError = when {
                     nameError != null -> nameError
-                    bioHasProfanity -> "La descripción contiene palabras no permitidas."
+                    bioHasProfanity -> strings.descriptionProfanity
                     else -> null
                 }
                 if (localError == null && !isSaving) {
@@ -297,7 +303,7 @@ fun GuideProfileSetupScreen(
                 )
                 Spacer(Modifier.width(10.dp))
             }
-            Text("Guardar y continuar", fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
+            Text(strings.saveAndContinue, fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
         }
     }
 }

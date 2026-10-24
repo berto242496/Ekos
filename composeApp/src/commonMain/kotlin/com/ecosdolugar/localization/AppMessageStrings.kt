@@ -1,0 +1,90 @@
+package com.ecosdolugar.localization
+
+data class AppMessageStrings(
+    val signInFailed: String,
+    val guideAccessSaveFailed: String,
+    val restoreSessionFailed: String,
+    val signOutFailed: String,
+    val saveDisplayNameFailed: String,
+    val saveGuideProfileFailed: String,
+    val saveCharacterFailed: String,
+    val syncSavedRoutesFailed: String,
+    val syncChallengeFailed: String,
+    val saveReviewFailed: String,
+    val signInBeforeCreatingRoute: String,
+    val publishDraftFailed: String,
+    val saveRouteFailed: String,
+    val sessionExpired: String,
+    val googleSessionExpired: String,
+    val loadRoutesFailed: String,
+    val displayNameEmpty: String,
+    val displayNameTooLong: (maxLength: Int) -> String,
+    val displayNameProfanity: String
+)
+
+fun appMessageStrings(language: AppLanguage): AppMessageStrings =
+    when (language) {
+        AppLanguage.SPANISH -> AppMessageStrings(
+            signInFailed = "No se pudo iniciar sesión con Google.",
+            guideAccessSaveFailed = "No se pudo guardar el acceso de guía.",
+            restoreSessionFailed = "No se pudo recuperar la sesión guardada.",
+            signOutFailed = "No se pudo cerrar sesión.",
+            saveDisplayNameFailed = "No se pudo guardar el nombre en tu perfil.",
+            saveGuideProfileFailed = "No se pudo guardar tu perfil de guía.",
+            saveCharacterFailed = "No se pudo guardar tu personaje.",
+            syncSavedRoutesFailed = "No se pudieron sincronizar las rutas guardadas.",
+            syncChallengeFailed = "No se pudo sincronizar el progreso del reto.",
+            saveReviewFailed = "No se pudo guardar la valoración.",
+            signInBeforeCreatingRoute = "Inicia sesión con Google antes de crear una ruta.",
+            publishDraftFailed = "No se pudo publicar el borrador.",
+            saveRouteFailed = "No se pudo guardar la ruta.",
+            sessionExpired = "La sesión ha caducado. Inicia sesión de nuevo.",
+            googleSessionExpired = "La sesión de Google ha caducado. Inicia sesión de nuevo.",
+            loadRoutesFailed = "No se pudieron cargar las rutas de Supabase.",
+            displayNameEmpty = "Escribe el nombre que quieres mostrar.",
+            displayNameTooLong = { maxLength -> "El nombre no puede superar los $maxLength caracteres." },
+            displayNameProfanity = "Ese nombre contiene palabras no permitidas."
+        )
+        AppLanguage.GALICIAN -> AppMessageStrings(
+            signInFailed = "Non se puido iniciar sesión con Google.",
+            guideAccessSaveFailed = "Non se puido gardar o acceso de guía.",
+            restoreSessionFailed = "Non se puido recuperar a sesión gardada.",
+            signOutFailed = "Non se puido pechar sesión.",
+            saveDisplayNameFailed = "Non se puido gardar o nome no teu perfil.",
+            saveGuideProfileFailed = "Non se puido gardar o teu perfil de guía.",
+            saveCharacterFailed = "Non se puido gardar o teu personaxe.",
+            syncSavedRoutesFailed = "Non se puideron sincronizar as rutas gardadas.",
+            syncChallengeFailed = "Non se puido sincronizar o progreso do reto.",
+            saveReviewFailed = "Non se puido gardar a valoración.",
+            signInBeforeCreatingRoute = "Inicia sesión con Google antes de crear unha ruta.",
+            publishDraftFailed = "Non se puido publicar o borrador.",
+            saveRouteFailed = "Non se puido gardar a ruta.",
+            sessionExpired = "A sesión caducou. Inicia sesión de novo.",
+            googleSessionExpired = "A sesión de Google caducou. Inicia sesión de novo.",
+            loadRoutesFailed = "Non se puideron cargar as rutas de Supabase.",
+            displayNameEmpty = "Escribe o nome que queres amosar.",
+            displayNameTooLong = { maxLength -> "O nome non pode superar os $maxLength caracteres." },
+            displayNameProfanity = "Ese nome contén palabras non permitidas."
+        )
+        AppLanguage.ENGLISH -> AppMessageStrings(
+            signInFailed = "Could not sign in with Google.",
+            guideAccessSaveFailed = "Could not save guide access.",
+            restoreSessionFailed = "The saved session could not be restored.",
+            signOutFailed = "Could not sign out.",
+            saveDisplayNameFailed = "Could not save your name to your profile.",
+            saveGuideProfileFailed = "Could not save your guide profile.",
+            saveCharacterFailed = "Could not save your character.",
+            syncSavedRoutesFailed = "The saved routes could not be synced.",
+            syncChallengeFailed = "The challenge progress could not be synced.",
+            saveReviewFailed = "The review could not be saved.",
+            signInBeforeCreatingRoute = "Sign in with Google before creating a route.",
+            publishDraftFailed = "The draft could not be published.",
+            saveRouteFailed = "The route could not be saved.",
+            sessionExpired = "Your session has expired. Sign in again.",
+            googleSessionExpired = "Your Google session has expired. Sign in again.",
+            loadRoutesFailed = "The routes could not be loaded from Supabase.",
+            displayNameEmpty = "Enter the name you want to display.",
+            displayNameTooLong = { maxLength -> "The name cannot exceed $maxLength characters." },
+            displayNameProfanity = "That name contains words that are not allowed."
+        )
+    }

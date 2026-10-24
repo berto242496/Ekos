@@ -1,0 +1,98 @@
+package com.ecosdolugar.localization
+
+data class GuideOnboardingStrings(
+    val back: String,
+    val welcomeEyebrow: String,
+    val welcomeTitle: String,
+    val welcomeIntro: String,
+    val keyPointCreateTitle: String,
+    val keyPointCreateDescription: String,
+    val keyPointPublishTitle: String,
+    val keyPointPublishDescription: String,
+    val keyPointReachTitle: String,
+    val keyPointReachDescription: String,
+    val keyPointMonetizeTitle: String,
+    val keyPointMonetizeDescription: String,
+    val welcomeCreateProfile: String,
+    val profileTitle: String,
+    val profileSubtitle: String,
+    val nameLabel: String,
+    val descriptionLabel: String,
+    val descriptionProfanity: String,
+    val photoSelected: String,
+    val photoAdd: String,
+    val saveAndContinue: String
+)
+
+fun guideOnboardingStrings(language: AppLanguage): GuideOnboardingStrings =
+    when (language) {
+        AppLanguage.SPANISH -> GuideOnboardingStrings(
+            back = "Volver",
+            welcomeEyebrow = "Espacio para guías y divulgadores",
+            welcomeTitle = "Crea y monetiza tus propias rutas",
+            welcomeIntro = "Convierte tu conocimiento local en experiencias digitales para visitantes.",
+            keyPointCreateTitle = "Crea rutas propias",
+            keyPointCreateDescription = "Diseña itinerarios a tu ritmo, destacando los rincones, historias y leyendas que solo los locales conocen.",
+            keyPointPublishTitle = "Publica experiencias culturales",
+            keyPointPublishDescription = "Enriquece cada parada con relatos orales, misterios históricos, pistas secretas y retos participativos.",
+            keyPointReachTitle = "Llega a más visitantes",
+            keyPointReachDescription = "Conecta con viajeros y amantes del patrimonio que buscan descubrir el territorio de forma inmersiva y respetuosa.",
+            keyPointMonetizeTitle = "Monetiza tu conocimiento",
+            keyPointMonetizeDescription = "Fija el precio de tus rutas con micropagos accesibles (0,99 € – 4,99 €) u ofrécelas gratis con total libertad.",
+            welcomeCreateProfile = "Crear mi perfil de guía",
+            profileTitle = "Crea tu perfil de guía",
+            profileSubtitle = "Así te verán los visitantes en tus rutas.",
+            nameLabel = "Nombre",
+            descriptionLabel = "Descripción",
+            descriptionProfanity = "La descripción contiene palabras no permitidas.",
+            photoSelected = "Foto seleccionada",
+            photoAdd = "Añade una foto de perfil",
+            saveAndContinue = "Guardar y continuar"
+        )
+        AppLanguage.GALICIAN -> GuideOnboardingStrings(
+            back = "Volver",
+            welcomeEyebrow = "Espazo para guías e divulgadores",
+            welcomeTitle = "Crea e monetiza as túas propias rutas",
+            welcomeIntro = "Converte o teu coñecemento local en experiencias dixitais para visitantes.",
+            keyPointCreateTitle = "Crea rutas propias",
+            keyPointCreateDescription = "Deseña itinerarios ao teu ritmo, destacando os recunchos, historias e lendas que só os locais coñecen.",
+            keyPointPublishTitle = "Publica experiencias culturais",
+            keyPointPublishDescription = "Enriquece cada parada con relatos orais, misterios históricos, pistas secretas e retos participativos.",
+            keyPointReachTitle = "Chega a máis visitantes",
+            keyPointReachDescription = "Conecta con viaxeiros e amantes do patrimonio que buscan descubrir o territorio de forma inmersiva e respectuosa.",
+            keyPointMonetizeTitle = "Monetiza o teu coñecemento",
+            keyPointMonetizeDescription = "Fixa o prezo das túas rutas con micropagos accesibles (0,99 € – 4,99 €) ou ofréceas gratis con total liberdade.",
+            welcomeCreateProfile = "Crear o meu perfil de guía",
+            profileTitle = "Crea o teu perfil de guía",
+            profileSubtitle = "Así te verán os visitantes nas túas rutas.",
+            nameLabel = "Nome",
+            descriptionLabel = "Descrición",
+            descriptionProfanity = "A descrición contén palabras non permitidas.",
+            photoSelected = "Foto seleccionada",
+            photoAdd = "Engade unha foto de perfil",
+            saveAndContinue = "Gardar e continuar"
+        )
+        AppLanguage.ENGLISH -> GuideOnboardingStrings(
+            back = "Back",
+            welcomeEyebrow = "Space for guides and storytellers",
+            welcomeTitle = "Create and monetize your own routes",
+            welcomeIntro = "Turn your local knowledge into digital experiences for visitors.",
+            keyPointCreateTitle = "Create your own routes",
+            keyPointCreateDescription = "Design itineraries at your own pace, highlighting the corners, stories and legends only locals know.",
+            keyPointPublishTitle = "Publish cultural experiences",
+            keyPointPublishDescription = "Enrich every stop with oral tales, historical mysteries, secret clues and participatory challenges.",
+            keyPointReachTitle = "Reach more visitors",
+            keyPointReachDescription = "Connect with travellers and heritage lovers who want to discover the territory in an immersive and respectful way.",
+            keyPointMonetizeTitle = "Monetize your knowledge",
+            keyPointMonetizeDescription = "Set the price of your routes with affordable micropayments (€0.99 – €4.99) or offer them for free, entirely up to you.",
+            welcomeCreateProfile = "Create my guide profile",
+            profileTitle = "Create your guide profile",
+            profileSubtitle = "This is how visitors will see you on your routes.",
+            nameLabel = "Name",
+            descriptionLabel = "Description",
+            descriptionProfanity = "The description contains words that are not allowed.",
+            photoSelected = "Photo selected",
+            photoAdd = "Add a profile photo",
+            saveAndContinue = "Save and continue"
+        )
+    }

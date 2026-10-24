@@ -17,6 +17,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ecosdolugar.data.formatRating
+import com.ecosdolugar.localization.AppLanguage
+import com.ecosdolugar.localization.guideProfileStrings
 import com.ecosdolugar.model.GuideAuthor
 import com.ecosdolugar.model.RouteItem
 import com.ecosdolugar.model.RouteReview
@@ -30,9 +32,11 @@ fun GuideProfileScreen(
     guide: GuideAuthor,
     allRoutes: List<RouteItem>,
     reviews: List<RouteReview> = emptyList(),
+    language: AppLanguage = AppLanguage.SPANISH,
     onBack: () -> Unit,
     onSelectRoute: (String) -> Unit
 ) {
+    val strings = guideProfileStrings(language)
     val guideRoutes = allRoutes.filter { it.guide.id == guide.id }
     val firstName = guide.name.substringBefore(' ')
 
@@ -41,7 +45,7 @@ fun GuideProfileScreen(
             TopAppBar(
                 title = {
                     Text(
-                        text = "Perfil del guía",
+                        text = strings.title,
                         style = MaterialTheme.typography.titleMedium.copy(
                             fontWeight = FontWeight.Bold,
                             color = PineDeep
@@ -50,7 +54,7 @@ fun GuideProfileScreen(
                 },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Volver")
+                        Icon(Icons.Default.ArrowBack, contentDescription = strings.back)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = SurfaceCream)
@@ -93,7 +97,7 @@ fun GuideProfileScreen(
                                     Spacer(Modifier.width(6.dp))
                                     Icon(
                                         imageVector = Icons.Default.Verified,
-                                        contentDescription = "Guía verificado",
+                                        contentDescription = strings.verifiedGuide,
                                         tint = TerracottaGold,
                                         modifier = Modifier.size(18.dp)
                                     )
@@ -109,7 +113,7 @@ fun GuideProfileScreen(
                                 Icon(Icons.Default.LocationOn, contentDescription = null, tint = TerracottaGold, modifier = Modifier.size(14.dp))
                                 Spacer(Modifier.width(2.dp))
                                 Text(
-                                    text = guide.location.ifBlank { "Galicia" },
+                                    text = guide.location.ifBlank { strings.defaultLocation },
                                     fontSize = 12.sp,
                                     color = PineMoss,
                                     maxLines = 1,
@@ -119,7 +123,7 @@ fun GuideProfileScreen(
                             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                                 Icon(Icons.Default.Star, contentDescription = null, tint = TerracottaGold, modifier = Modifier.size(14.dp))
                                 Text(
-                                    text = if (guide.reviewsCount > 0) "${formatRating(guide.rating)} (${guide.reviewsCount} reseñas)" else "Sin reseñas todavía",
+                                    text = if (guide.reviewsCount > 0) strings.ratingWithReviews(formatRating(guide.rating), guide.reviewsCount) else strings.noReviewsYet,
                                     fontSize = 12.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = OnSurfaceDark
@@ -140,7 +144,7 @@ fun GuideProfileScreen(
                     ) {
                         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             Text(
-                                text = "SOBRE EL GUÍA",
+                                text = strings.aboutGuide,
                                 style = MaterialTheme.typography.labelSmall.copy(
                                     color = PineMoss,
                                     fontWeight = FontWeight.Bold,
@@ -161,7 +165,7 @@ fun GuideProfileScreen(
             if (reviews.isNotEmpty()) {
                 item {
                     Text(
-                        text = "Reseñas (${reviews.size})",
+                        text = strings.reviewsTitle(reviews.size),
                         style = MaterialTheme.typography.titleMedium.copy(
                             fontWeight = FontWeight.Bold,
                             color = OnSurfaceDark
@@ -178,7 +182,7 @@ fun GuideProfileScreen(
                     ) {
                         Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                             Text(
-                                text = review.routeTitle.ifBlank { "Ruta" },
+                                text = review.routeTitle.ifBlank { strings.defaultRouteTitle },
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 14.sp,
                                 color = OnSurfaceDark,
@@ -186,7 +190,7 @@ fun GuideProfileScreen(
                                 overflow = TextOverflow.Ellipsis
                             )
                             Text(
-                                text = "Ruta ${review.routeRating}/5 · Guía ${review.guideRating}/5",
+                                text = strings.routeAndGuideRating(review.routeRating, review.guideRating),
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.SemiBold,
                                 color = TerracottaGold
@@ -206,7 +210,7 @@ fun GuideProfileScreen(
 
             item {
                 Text(
-                    text = "Rutas creadas por $firstName (${guideRoutes.size})",
+                    text = strings.routesCreatedBy(firstName, guideRoutes.size),
                     style = MaterialTheme.typography.titleMedium.copy(
                         fontWeight = FontWeight.Bold,
                         color = OnSurfaceDark
@@ -217,7 +221,7 @@ fun GuideProfileScreen(
             if (guideRoutes.isEmpty()) {
                 item {
                     Text(
-                        text = "Este guía todavía no tiene rutas publicadas.",
+                        text = strings.noPublishedRoutes,
                         fontSize = 14.sp,
                         color = OnSurfaceVariant
                     )
@@ -255,7 +259,7 @@ fun GuideProfileScreen(
                                 overflow = TextOverflow.Ellipsis
                             )
                             Text(
-                                text = "${route.location} · ${route.duration} · ${route.stopsCount} paradas",
+                                text = strings.routeSummary(route.location, route.duration, route.stopsCount),
                                 fontSize = 12.sp,
                                 color = OnSurfaceVariant,
                                 maxLines = 2,
@@ -268,7 +272,7 @@ fun GuideProfileScreen(
                                 color = PineMoss
                             )
                         }
-                        Icon(Icons.Default.ChevronRight, contentDescription = "Ver ruta", tint = PineMoss)
+                        Icon(Icons.Default.ChevronRight, contentDescription = strings.viewRoute, tint = PineMoss)
                     }
                 }
             }

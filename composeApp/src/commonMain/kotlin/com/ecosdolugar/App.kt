@@ -19,6 +19,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.ecosdolugar.data.enrichGuide
 import com.ecosdolugar.localization.appLanguageStrings
+import com.ecosdolugar.localization.appShellStrings
 import com.ecosdolugar.localization.rememberAppLanguageController
 import com.ecosdolugar.model.GuideAuthor
 import com.ecosdolugar.platform.PlatformBackHandler
@@ -82,8 +83,13 @@ fun App(viewModel: AppViewModel) {
         val state by viewModel.state.collectAsStateWithLifecycle()
         val appLanguage = rememberAppLanguageController()
         val welcomeStrings = appLanguageStrings(appLanguage.current)
+        val shellStrings = appShellStrings(appLanguage.current)
         val snackbarHostState = remember { SnackbarHostState() }
         val userProfile = state.userProfile
+
+        LaunchedEffect(appLanguage.current) {
+            viewModel.onLanguageChanged(appLanguage.current)
+        }
 
         LaunchedEffect(viewModel) {
             viewModel.messages.collect { snackbarHostState.showSnackbar(it) }
@@ -109,19 +115,19 @@ fun App(viewModel: AppViewModel) {
                             selected = state.screen == NavigationScreen.CATALOG,
                             onClick = { viewModel.navigateTo(NavigationScreen.CATALOG) },
                             icon = Icons.Default.Explore,
-                            label = "Rutas"
+                            label = shellStrings.routesTab
                         )
                         AppNavigationBarItem(
                             selected = state.screen == NavigationScreen.MAP,
                             onClick = viewModel::openMapTab,
                             icon = Icons.Default.Map,
-                            label = "Mapa"
+                            label = shellStrings.mapTab
                         )
                         AppNavigationBarItem(
                             selected = state.screen == NavigationScreen.JOURNAL,
                             onClick = { viewModel.navigateTo(NavigationScreen.JOURNAL) },
                             icon = Icons.Default.AutoStories,
-                            label = "Mi aventura"
+                            label = shellStrings.journalTab
                         )
                     }
                 }
@@ -157,12 +163,14 @@ fun App(viewModel: AppViewModel) {
                         }
                         NavigationScreen.GUIDE_WELCOME -> {
                             GuideWelcomeScreen(
+                                language = appLanguage.current,
                                 onContinue = { viewModel.navigateTo(NavigationScreen.GUIDE_PROFILE_SETUP) },
                                 onBack = { viewModel.navigateTo(NavigationScreen.WELCOME) }
                             )
                         }
                         NavigationScreen.GUIDE_PROFILE_SETUP -> {
                             GuideProfileSetupScreen(
+                                language = appLanguage.current,
                                 initialName = state.displayNameDraft,
                                 isSaving = state.isSavingDisplayName,
                                 errorMessage = state.displayNameError,
@@ -210,6 +218,7 @@ fun App(viewModel: AppViewModel) {
                         NavigationScreen.DETAIL -> {
                             RouteDetailScreen(
                                 route = state.selectedRoute,
+                                language = appLanguage.current,
                                 isSaved = state.selectedRoute.id in userProfile.savedRouteIds,
                                 onBack = { viewModel.navigateTo(NavigationScreen.CATALOG) },
                                 onToggleSaved = viewModel::toggleSavedRoute,
@@ -223,6 +232,7 @@ fun App(viewModel: AppViewModel) {
                             state.selectedGuide?.let { guide ->
                                 GuideProfileScreen(
                                     guide = guide,
+                                    language = appLanguage.current,
                                     allRoutes = state.routes,
                                     reviews = state.routeReviews.filter { it.guideId == guide.id },
                                     onBack = { viewModel.navigateTo(NavigationScreen.DETAIL) },
@@ -235,6 +245,7 @@ fun App(viewModel: AppViewModel) {
                                 route = state.selectedRoute,
                                 userProfile = userProfile,
                                 initialStopId = state.activeExpeditionStopId,
+                                language = appLanguage.current,
                                 onBack = viewModel::backToExpeditionMap,
                                 onSolveEnigma = viewModel::solveEnigma,
                                 onSubmitReview = viewModel::submitReview
@@ -281,7 +292,7 @@ fun App(viewModel: AppViewModel) {
                                     GuideAuthor(
                                         id = userProfile.googleId.orEmpty(),
                                         name = userProfile.name,
-                                        title = "Guía",
+                                        title = shellStrings.guideTitle,
                                         bio = "",
                                         rating = 0.0,
                                         reviewsCount = 0,
@@ -293,6 +304,7 @@ fun App(viewModel: AppViewModel) {
                             }
                             GuideDashboardScreen(
                                 guide = currentGuide,
+                                language = appLanguage.current,
                                 routes = guideRoutes,
                                 reviews = state.routeReviews.filter { it.guideId == userProfile.googleId },
                                 isSaving = state.isSavingRoute,

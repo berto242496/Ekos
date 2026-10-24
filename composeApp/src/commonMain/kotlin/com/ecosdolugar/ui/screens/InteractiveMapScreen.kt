@@ -27,6 +27,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ecosdolugar.localization.AppLanguage
+import com.ecosdolugar.localization.difficultyLabel
 import com.ecosdolugar.localization.interactiveMapStrings
 import com.ecosdolugar.model.RouteItem
 import com.ecosdolugar.model.RouteStop
@@ -280,7 +281,7 @@ fun InteractiveMapScreen(
                                             maxLines = 1
                                         )
                                         Text(
-                                            "${route.stops.size} ${strings.stopsLabel} • ${route.difficulty.label}",
+                                            "${route.stops.size} ${strings.stopsLabel} • ${difficultyLabel(route.difficulty, language)}",
                                             color = textColor.copy(alpha = 0.72f),
                                             fontSize = 10.sp,
                                             maxLines = 1

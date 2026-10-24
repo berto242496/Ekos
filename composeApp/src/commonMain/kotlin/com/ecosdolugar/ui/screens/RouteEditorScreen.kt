@@ -66,6 +66,11 @@ import com.ecosdolugar.ui.components.RouteMapView
 import com.ecosdolugar.ui.components.RouteCoverImagePicker
 import com.ecosdolugar.data.RoutesRepository
 import com.ecosdolugar.localization.AppLanguage
+import com.ecosdolugar.localization.categoryLabel
+import com.ecosdolugar.localization.difficultyDetail
+import com.ecosdolugar.localization.difficultyLabel
+import com.ecosdolugar.localization.routeEditorStrings
+import com.ecosdolugar.localization.stopEditorStrings
 import com.ecosdolugar.model.Category
 import com.ecosdolugar.model.Difficulty
 import com.ecosdolugar.model.FieldEnigma
@@ -108,12 +113,14 @@ fun RouteEditorScreen(
     onBack: () -> Unit,
     onSave: (RouteItem, String) -> Unit
 ) {
+    val strings = routeEditorStrings(language)
+    val stopStrings = stopEditorStrings(language)
     val routeId = remember(initialRoute?.id) {
         initialRoute?.id ?: "route-${Random.nextLong().toULong().toString(16)}"
     }
     val stops = remember(initialRoute?.id) {
         mutableStateListOf<StopDraft>().apply {
-            initialRoute?.stops.orEmpty().forEach { add(StopDraft.fromRouteStop(it)) }
+            initialRoute?.stops.orEmpty().forEach { add(StopDraft.fromRouteStop(it, stopStrings)) }
         }
     }
     val scrollState = rememberScrollState()
@@ -152,17 +159,17 @@ fun RouteEditorScreen(
 
     fun continueToStops() {
         validationMessage = when {
-            title.isBlank() || location.isBlank() -> "Indica el nombre y la ubicación de la ruta."
-            selectedCategories.isEmpty() -> "Selecciona al menos un tipo de ruta."
+            title.isBlank() || location.isBlank() -> strings.routeNameAndLocationRequired
+            selectedCategories.isEmpty() -> strings.routeTypeRequired
             formatDuration(durationHours, durationMinutes) == null ->
-                "Indica una duración válida (minutos entre 0 y 59)."
+                strings.invalidDuration
             else -> null
         }
         if (validationMessage == null) currentStep = 2
     }
 
     fun addStop() {
-        val invalid = stopForm.validate()
+        val invalid = stopForm.validate(stopStrings)
         if (invalid != null) {
             validationMessage = invalid
             return
@@ -194,39 +201,38 @@ fun RouteEditorScreen(
     fun save(status: String): Boolean {
         if (isSaving) return false
         if (title.isBlank() || location.isBlank()) {
-            validationMessage = "Indica el nombre y la ubicación de la ruta."
-            return false
+            validationMessage = strings.routeNameAndLocationRequired
         }
         if (selectedCategories.isEmpty()) {
-            validationMessage = "Selecciona al menos un tipo de ruta."
+            validationMessage = strings.routeTypeRequired
             return false
         }
         val formattedDuration = formatDuration(durationHours, durationMinutes)
         if (formattedDuration == null) {
-            validationMessage = "Indica una duración válida (minutos entre 0 y 59)."
+            validationMessage = strings.invalidDuration
             return false
         }
         if (status != "borrador" && stops.isEmpty()) {
-            validationMessage = "Añade al menos una parada con su ubicación y reto."
+            validationMessage = strings.stopRequired
             return false
         }
         val creatorId = userProfile.googleId
         if (creatorId.isNullOrBlank()) {
-            validationMessage = "Vuelve a iniciar sesión para guardar la ruta."
+            validationMessage = strings.loginRequired
             return false
         }
         val guide = GuideAuthor(
             id = creatorId,
             name = userProfile.name,
-            title = "Guía local",
-            bio = "Creador de rutas culturales.",
+            title = strings.guideTitle,
+            bio = strings.guideBio,
             location = location
         )
         val formattedDistance = formatKilometers(pathDistanceMeters(stops.map { it.latitude to it.longitude }))
-        val routeStops = stops.mapIndexed { index, draft -> draft.toRouteStop(index, routeId) }
+        val routeStops = stops.mapIndexed { index, draft -> draft.toRouteStop(index, routeId, stopStrings) }
         val route = initialRoute?.copy(
             title = title.trim(),
-            subtitle = "Ruta cultural en ${location.trim()}",
+            subtitle = strings.routeSubtitle(location.trim()),
             description = description.trim(),
             location = location.trim(),
             region = location.trim().uppercase(),
@@ -240,7 +246,7 @@ fun RouteEditorScreen(
         ) ?: RouteItem(
                 id = routeId,
                 title = title.trim(),
-                subtitle = "Ruta cultural en ${location.trim()}",
+                subtitle = strings.routeSubtitle(location.trim()),
                 description = description.trim(),
                 location = location.trim(),
                 region = location.trim().uppercase(),
@@ -250,14 +256,14 @@ fun RouteEditorScreen(
                 distance = formattedDistance,
                 difficulty = difficulty,
                 categories = selectedCategories,
-                audioTag = "Retos interactivos",
-                tomoRef = "Cuaderno del Guía",
+                audioTag = strings.audioTag,
+                tomoRef = strings.tomoRef,
                 guide = guide,
                 overviewFeatures = listOf(
                     OverviewFeature(
                         iconName = "explore",
-                        title = "${routeStops.size} paradas",
-                        description = "Enigmas geolocalizados creados por un guía local.",
+                        title = strings.stopsOverviewTitle(routeStops.size),
+                        description = strings.stopsOverviewDescription,
                         accentTag = "primary"
                     )
                 ),
@@ -290,7 +296,7 @@ fun RouteEditorScreen(
             TopAppBar(
                 title = {
                     Text(
-                        if (initialRoute == null) "Crear ruta" else "Continuar borrador",
+                        if (initialRoute == null) strings.createRoute else strings.continueDraft,
                         color = InkDeep,
                         fontFamily = FontFamily.Serif,
                         fontWeight = FontWeight.Bold
@@ -298,7 +304,7 @@ fun RouteEditorScreen(
                 },
                 navigationIcon = {
                     IconButton(onClick = ::requestExit) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Volver", tint = InkDeep)
+                        Icon(Icons.Default.ArrowBack, contentDescription = strings.back, tint = InkDeep)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -319,7 +325,7 @@ fun RouteEditorScreen(
             verticalArrangement = Arrangement.spacedBy(20.dp)
         ) {
             Text(
-                "Paso $currentStep de 2",
+                strings.stepOf(currentStep),
                 color = InkMuted,
                 fontFamily = FontFamily.Serif,
                 fontWeight = FontWeight.SemiBold,
@@ -327,32 +333,32 @@ fun RouteEditorScreen(
             )
             if (currentStep == 1) {
                 EditorSection(
-                    badge = "Datos generales",
-                    title = "Datos de la ruta",
-                    description = "Nombre, lugar, tipo, duración y dificultad de la ruta."
+                    badge = strings.generalDetailsBadge,
+                    title = strings.routeDetailsTitle,
+                    description = strings.routeDetailsDescription
                 ) {
                     RouteEditorTextField(
                         value = title,
                         onValueChange = { title = it },
-                        label = "Nombre de la ruta",
+                        label = strings.routeNameLabel,
                         singleLine = true
                     )
                     RouteEditorTextField(
                         value = location,
                         onValueChange = { location = it },
-                        label = "Localidad o zona",
+                        label = strings.localityLabel,
                         singleLine = true
                     )
                     RouteEditorTextField(
                         value = description,
                         onValueChange = { description = it },
-                        label = "Descripción",
+                        label = strings.descriptionLabel,
                         minLines = 3
                     )
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        FieldLabel("Tipo de ruta")
+                        FieldLabel(strings.routeTypeLabel)
                         Text(
-                            "Puedes seleccionar varios tipos.",
+                            strings.multipleTypesHelper,
                             color = InkMuted,
                             fontFamily = FontFamily.Serif,
                             fontSize = 12.sp
@@ -361,7 +367,7 @@ fun RouteEditorScreen(
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 rowOptions.forEach { option ->
                                     SelectableChip(
-                                        text = option.displayName,
+                                        text = categoryLabel(option, language),
                                         selected = option in selectedCategories,
                                         onClick = { toggleCategory(option) },
                                         modifier = Modifier.weight(1f)
@@ -375,7 +381,7 @@ fun RouteEditorScreen(
                         RouteEditorTextField(
                             value = durationHours,
                             onValueChange = { durationHours = it.filter(Char::isDigit).take(2) },
-                            label = "Horas",
+                            label = strings.hoursLabel,
                             modifier = Modifier.weight(1f),
                             singleLine = true,
                             keyboardType = KeyboardType.Number
@@ -383,17 +389,18 @@ fun RouteEditorScreen(
                         RouteEditorTextField(
                             value = durationMinutes,
                             onValueChange = { durationMinutes = it.filter(Char::isDigit).take(2) },
-                            label = "Minutos",
+                            label = strings.minutesLabel,
                             modifier = Modifier.weight(1f),
                             singleLine = true,
                             keyboardType = KeyboardType.Number
                         )
                     }
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        FieldLabel("Dificultad")
+                        FieldLabel(strings.difficultyLabel)
                         Difficulty.values().forEach { option ->
                             DifficultyOption(
                                 option = option,
+                                language = language,
                                 selected = difficulty == option,
                                 onClick = { difficulty = option }
                             )
@@ -402,7 +409,7 @@ fun RouteEditorScreen(
                     RouteEditorTextField(
                         value = imageUrl.takeUnless { it.startsWith("data:image/") }.orEmpty(),
                         onValueChange = { imageUrl = it },
-                        label = "URL de la imagen de la ruta",
+                        label = strings.routeImageUrlLabel,
                         singleLine = true
                     )
                     RouteCoverImagePicker(
@@ -411,9 +418,9 @@ fun RouteEditorScreen(
                     )
                     Text(
                         if (imageUrl.startsWith("data:image/")) {
-                            "Imagen seleccionada. Se guardará en el almacenamiento de la aplicación."
+                            strings.selectedImageHelper
                         } else {
-                            "Esta imagen aparecerá en el listado y en la cabecera de la ruta."
+                            strings.routeImageHelper
                         },
                         color = InkMuted,
                         fontFamily = FontFamily.Serif,
@@ -427,13 +434,13 @@ fun RouteEditorScreen(
                     shape = RoundedCornerShape(16.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = PineContainer, contentColor = SurfaceCream)
                 ) {
-                    Text("Continuar para añadir paradas", fontFamily = FontFamily.Serif, fontWeight = FontWeight.Bold)
+                    Text(strings.continueToStops, fontFamily = FontFamily.Serif, fontWeight = FontWeight.Bold)
                 }
             } else {
                 EditorSection(
-                    badge = "Paradas y retos",
-                    title = "Paradas y retos (${stops.size})",
-                    description = "Cada parada tiene su ubicación y un enigma vinculado."
+                    badge = strings.stopsAndChallengesBadge,
+                    title = strings.stopsAndChallengesTitle(stops.size),
+                    description = strings.stopsAndChallengesDescription
                 ) {
                     stops.forEachIndexed { index, stop ->
                         Row(
@@ -461,7 +468,7 @@ fun RouteEditorScreen(
                                 )
                             }
                             IconButton(onClick = { editStop(index) }) {
-                                Icon(Icons.Default.Edit, contentDescription = "Editar parada", tint = PineContainer)
+                                Icon(Icons.Default.Edit, contentDescription = strings.editStop, tint = PineContainer)
                             }
                             IconButton(onClick = {
                                 val editing = editingStopIndex
@@ -469,7 +476,7 @@ fun RouteEditorScreen(
                                 else if (editing != null && editing > index) editingStopIndex = editing - 1
                                 stops.removeAt(index)
                             }) {
-                                Icon(Icons.Default.Delete, contentDescription = "Eliminar parada", tint = TerracottaGold)
+                                Icon(Icons.Default.Delete, contentDescription = strings.deleteStop, tint = TerracottaGold)
                             }
                         }
                     }
@@ -481,20 +488,20 @@ fun RouteEditorScreen(
                         language = language,
                         onMessage = { validationMessage = it },
                         onAddStop = ::addStop,
-                        addLabel = if (editingStopIndex != null) "Guardar cambios de la parada" else "Añadir parada"
+                        addLabel = if (editingStopIndex != null) strings.saveStopChanges else strings.addStop
                     )
                     if (editingStopIndex != null) {
-                        SecondaryButton(text = "Cancelar edición", onClick = ::cancelStopEdit)
+                        SecondaryButton(text = strings.cancelEdit, onClick = ::cancelStopEdit)
                     }
                 }
                 validationMessage?.let { ValidationBanner(it) }
                 SecondaryButton(
-                    text = "Volver a los datos de la ruta",
+                    text = strings.backToRouteDetails,
                     onClick = { currentStep = 1 },
                     enabled = !isSaving
                 )
                 SecondaryButton(
-                    text = "Guardar borrador",
+                    text = strings.saveDraft,
                     onClick = { save("borrador") },
                     enabled = !isSaving,
                     loading = isSaving && pendingStatus == "borrador"
@@ -514,7 +521,7 @@ fun RouteEditorScreen(
                         )
                         Spacer(Modifier.size(8.dp))
                     }
-                    Text("Enviar para verificación", fontFamily = FontFamily.Serif, fontWeight = FontWeight.Bold)
+                    Text(strings.submitForVerification, fontFamily = FontFamily.Serif, fontWeight = FontWeight.Bold)
                 }
             }
         }
@@ -523,8 +530,8 @@ fun RouteEditorScreen(
     if (showExitConfirmation) {
         AlertDialog(
             onDismissRequest = { if (!isSaving) showExitConfirmation = false },
-            title = { Text("Guardar cambios", fontFamily = FontFamily.Serif, fontWeight = FontWeight.Bold) },
-            text = { Text("Tienes datos en la ruta. ¿Quieres guardarla como borrador antes de salir?") },
+            title = { Text(strings.saveChanges, fontFamily = FontFamily.Serif, fontWeight = FontWeight.Bold) },
+            text = { Text(strings.unsavedRouteMessage) },
             confirmButton = {
                 TextButton(
                     enabled = !isSaving,
@@ -539,9 +546,9 @@ fun RouteEditorScreen(
                             strokeWidth = 2.dp
                         )
                         Spacer(Modifier.size(8.dp))
-                        Text("Guardando…", color = InkMuted, fontWeight = FontWeight.Bold)
+                        Text(strings.saving, color = InkMuted, fontWeight = FontWeight.Bold)
                     } else {
-                        Text("Guardar borrador", color = PineContainer, fontWeight = FontWeight.Bold)
+                        Text(strings.saveDraft, color = PineContainer, fontWeight = FontWeight.Bold)
                     }
                 }
             },
@@ -551,10 +558,10 @@ fun RouteEditorScreen(
                         showExitConfirmation = false
                         onBack()
                     }) {
-                        Text("Salir sin guardar", color = InkMuted)
+                        Text(strings.leaveWithoutSaving, color = InkMuted)
                     }
                     TextButton(enabled = !isSaving, onClick = { showExitConfirmation = false }) {
-                        Text("Seguir editando", color = PineContainer, fontWeight = FontWeight.Bold)
+                        Text(strings.keepEditing, color = PineContainer, fontWeight = FontWeight.Bold)
                     }
                 }
             }
@@ -706,6 +713,7 @@ internal fun SelectableChip(
 @Composable
 private fun DifficultyOption(
     option: Difficulty,
+    language: AppLanguage,
     selected: Boolean,
     onClick: () -> Unit
 ) {
@@ -723,14 +731,14 @@ private fun DifficultyOption(
     ) {
         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(
-                option.label,
+                difficultyLabel(option, language),
                 color = if (selected) SurfaceCream else InkDeep,
                 fontFamily = FontFamily.Serif,
                 fontWeight = FontWeight.Bold,
                 fontSize = 15.sp
             )
             Text(
-                option.detail,
+                difficultyDetail(option, language),
                 color = if (selected) SurfaceCream.copy(alpha = 0.75f) else InkMuted,
                 fontFamily = FontFamily.Serif,
                 fontSize = 12.sp

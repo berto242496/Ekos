@@ -20,6 +20,11 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ecosdolugar.data.formatRating
+import com.ecosdolugar.localization.AppLanguage
+import com.ecosdolugar.localization.appLanguageStrings
+import com.ecosdolugar.localization.categoryDisplayName
+import com.ecosdolugar.localization.difficultyLabel
+import com.ecosdolugar.localization.routeDetailStrings
 import com.ecosdolugar.model.Category
 import com.ecosdolugar.model.GuideAuthor
 import com.ecosdolugar.model.RouteItem
@@ -44,15 +49,17 @@ fun RouteDetailScreen(
     onOpenMap: () -> Unit,
     onStartRoute: (RouteItem) -> Unit,
     onOpenProfile: () -> Unit,
-    onOpenGuideProfile: (GuideAuthor) -> Unit = {}
+    onOpenGuideProfile: (GuideAuthor) -> Unit = {},
+    language: AppLanguage = AppLanguage.SPANISH
 ) {
     val shareText = rememberShareText()
+    val strings = routeDetailStrings(language)
     Scaffold(
         topBar = {
             TopAppBar(
                 title = {
                     Text(
-                        text = "ECOS DO LUGAR",
+                        text = appLanguageStrings(language).brandName,
                         style = MaterialTheme.typography.titleMedium.copy(
                             fontWeight = FontWeight.Bold,
                             color = PineDeep
@@ -61,7 +68,7 @@ fun RouteDetailScreen(
                 },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Volver")
+                        Icon(Icons.Default.ArrowBack, contentDescription = strings.back)
                     }
                 },
                 actions = {
@@ -114,7 +121,7 @@ fun RouteDetailScreen(
                         Icon(Icons.Default.Map, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(6.dp))
                         Text(
-                            "Ver mapa",
+                            strings.viewMap,
                             fontSize = 14.sp,
                             fontWeight = FontWeight.SemiBold,
                             maxLines = 1,
@@ -134,7 +141,7 @@ fun RouteDetailScreen(
                         )
                     ) {
                         Text(
-                            "Empezar ruta",
+                            strings.startRoute,
                             fontSize = 14.sp,
                             fontWeight = FontWeight.SemiBold,
                             maxLines = 1,
@@ -185,7 +192,7 @@ fun RouteDetailScreen(
                                 Box(contentAlignment = Alignment.Center) {
                                     Icon(
                                         imageVector = if (isSaved) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
-                                        contentDescription = "Guardar ruta",
+                                        contentDescription = strings.saveRoute,
                                         tint = if (isSaved) TerracottaGold else Color.White,
                                         modifier = Modifier.size(20.dp)
                                     )
@@ -200,7 +207,7 @@ fun RouteDetailScreen(
                                 Box(contentAlignment = Alignment.Center) {
                                     Icon(
                                         imageVector = Icons.Default.Share,
-                                        contentDescription = "Compartir ruta",
+                                        contentDescription = strings.shareRoute,
                                         tint = Color.White,
                                         modifier = Modifier.size(20.dp)
                                     )
@@ -221,7 +228,7 @@ fun RouteDetailScreen(
                                     color = PineDeep.copy(alpha = 0.85f)
                                 ) {
                                     Text(
-                                        text = category.displayName,
+                                        text = categoryDisplayName(category, language),
                                         color = Color.White,
                                         fontSize = 11.sp,
                                         fontWeight = FontWeight.SemiBold,
@@ -267,9 +274,9 @@ fun RouteDetailScreen(
                     Icon(Icons.Default.Star, contentDescription = null, tint = TerracottaGold, modifier = Modifier.size(18.dp))
                     Text(
                         text = if (route.reviewsCount > 0) {
-                            "${formatRating(route.rating)} · ${route.reviewsCount} valoraciones"
+                            "${formatRating(route.rating)} · ${route.reviewsCount} ${strings.ratingsWord}"
                         } else {
-                            "Sin valoraciones todavía"
+                            strings.noRatingsYet
                         },
                         fontSize = 14.sp,
                         fontWeight = FontWeight.SemiBold,
@@ -303,12 +310,12 @@ fun RouteDetailScreen(
                     ) {
                         MetricCard(
                             icon = Icons.Default.Explore,
-                            value = "${route.stopsCount} paradas",
+                            value = "${route.stopsCount} ${if (route.stopsCount == 1) strings.stopsSingular else strings.stopsPlural}",
                             modifier = Modifier.weight(1f)
                         )
                         MetricCard(
                             icon = Icons.Default.DirectionsWalk,
-                            value = route.difficulty.label,
+                            value = difficultyLabel(route.difficulty, language),
                             modifier = Modifier.weight(1f)
                         )
                     }
@@ -330,7 +337,7 @@ fun RouteDetailScreen(
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         Text(
-                            text = "GUÍA DE LA RUTA",
+                            text = strings.routeGuideLabel,
                             style = MaterialTheme.typography.labelSmall.copy(
                                 color = PineMoss,
                                 fontWeight = FontWeight.Bold,
@@ -357,7 +364,7 @@ fun RouteDetailScreen(
                                         Spacer(Modifier.width(6.dp))
                                         Icon(
                                             imageVector = Icons.Default.Verified,
-                                            contentDescription = "Guía verificado",
+                                            contentDescription = strings.verifiedGuide,
                                             tint = TerracottaGold,
                                             modifier = Modifier.size(16.dp)
                                         )
@@ -381,14 +388,14 @@ fun RouteDetailScreen(
                                         modifier = Modifier.size(14.dp)
                                     )
                                     Text(
-                                        text = if (route.guide.reviewsCount > 0) formatRating(route.guide.rating) else "Sin valoraciones",
+                                        text = if (route.guide.reviewsCount > 0) formatRating(route.guide.rating) else strings.noRatings,
                                         fontSize = 12.sp,
                                         fontWeight = FontWeight.Bold,
                                         color = OnSurfaceDark
                                     )
                                     if (route.guide.reviewsCount > 0) {
                                         Text(
-                                            text = "(${route.guide.reviewsCount} reseñas)",
+                                            text = "(${route.guide.reviewsCount} ${strings.guideReviewsWord})",
                                             fontSize = 12.sp,
                                             color = OnSurfaceVariant
                                         )

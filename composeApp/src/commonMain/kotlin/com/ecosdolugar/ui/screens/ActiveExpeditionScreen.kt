@@ -50,6 +50,9 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.ecosdolugar.localization.ActiveExpeditionStrings
+import com.ecosdolugar.localization.AppLanguage
+import com.ecosdolugar.localization.activeExpeditionStrings
 import com.ecosdolugar.model.RouteItem
 import com.ecosdolugar.model.RouteStop
 import com.ecosdolugar.model.StopAudioMode
@@ -78,18 +81,20 @@ fun ActiveExpeditionScreen(
     initialStopId: String? = null,
     onBack: () -> Unit,
     onSolveEnigma: (String, Int) -> Unit,
-    onSubmitReview: (routeRating: Int, guideRating: Int, comment: String) -> Unit
+    onSubmitReview: (routeRating: Int, guideRating: Int, comment: String) -> Unit,
+    language: AppLanguage = AppLanguage.SPANISH
 ) {
+    val strings = activeExpeditionStrings(language)
     val stop = route.stops.firstOrNull { it.id == initialStopId } ?: route.stops.firstOrNull()
     if (stop == null) {
         PlatformBackHandler(onBack = onBack)
         Scaffold(
             topBar = {
                 TopAppBar(
-                    title = { Text("Expedición", color = InkDeep) },
+                    title = { Text(strings.expeditionTitle, color = InkDeep) },
                     navigationIcon = {
                         IconButton(onClick = onBack) {
-                            Icon(Icons.Default.ArrowBack, contentDescription = "Volver", tint = InkDeep)
+                            Icon(Icons.Default.ArrowBack, contentDescription = strings.back, tint = InkDeep)
                         }
                     },
                     colors = TopAppBarDefaults.topAppBarColors(containerColor = SurfaceCream)
@@ -98,7 +103,7 @@ fun ActiveExpeditionScreen(
             containerColor = SurfaceCream
         ) { padding ->
             Box(Modifier.padding(padding).fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text("Esta ruta no tiene paradas.", color = InkMuted)
+                Text(strings.noStops, color = InkMuted)
             }
         }
         return
@@ -122,9 +127,9 @@ fun ActiveExpeditionScreen(
                 title = {
                     Text(
                         text = when (phase) {
-                            ExpeditionPhase.INFO -> "Parada ${stop.order} de ${route.stops.size}"
-                            ExpeditionPhase.TRIAL -> "Prueba"
-                            ExpeditionPhase.SUMMARY -> "Ruta finalizada"
+                            ExpeditionPhase.INFO -> "${strings.stopWord} ${stop.order} ${strings.ofWord} ${route.stops.size}"
+                            ExpeditionPhase.TRIAL -> strings.challengeTitle
+                            ExpeditionPhase.SUMMARY -> strings.routeFinishedTitle
                         },
                         color = InkDeep,
                         fontFamily = FontFamily.Serif,
@@ -133,7 +138,7 @@ fun ActiveExpeditionScreen(
                 },
                 navigationIcon = {
                     IconButton(onClick = goBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Volver", tint = InkDeep)
+                        Icon(Icons.Default.ArrowBack, contentDescription = strings.back, tint = InkDeep)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -155,7 +160,8 @@ fun ActiveExpeditionScreen(
                 ExpeditionPhase.INFO -> StopInfoContent(
                     stop = stop,
                     isCompleted = isCompleted,
-                    onStartTrial = { phase = ExpeditionPhase.TRIAL }
+                    onStartTrial = { phase = ExpeditionPhase.TRIAL },
+                    strings = strings
                 )
                 ExpeditionPhase.TRIAL -> StopTrialContent(
                     stop = stop,
@@ -163,14 +169,16 @@ fun ActiveExpeditionScreen(
                     isSolved = isCompleted,
                     onSolved = { attempts -> onSolveEnigma(stop.id, attempts) },
                     onFinish = { if (isRouteCompleted) phase = ExpeditionPhase.SUMMARY else onBack() },
-                    isRouteCompleted = isRouteCompleted
+                    isRouteCompleted = isRouteCompleted,
+                    language = language
                 )
                 ExpeditionPhase.SUMMARY -> RouteSummaryContent(
                     route = route,
                     completedStops = completedStops,
                     points = completedStops * POINTS_PER_STOP,
                     onSubmitReview = onSubmitReview,
-                    onDone = onBack
+                    onDone = onBack,
+                    strings = strings
                 )
             }
         }
@@ -183,7 +191,8 @@ private fun RouteSummaryContent(
     completedStops: Int,
     points: Int,
     onSubmitReview: (routeRating: Int, guideRating: Int, comment: String) -> Unit,
-    onDone: () -> Unit
+    onDone: () -> Unit,
+    strings: ActiveExpeditionStrings
 ) {
     var routeRating by remember(route.id) { mutableIntStateOf(0) }
     var guideRating by remember(route.id) { mutableIntStateOf(0) }
@@ -207,22 +216,22 @@ private fun RouteSummaryContent(
                 modifier = Modifier.fillMaxWidth().padding(18.dp),
                 horizontalArrangement = Arrangement.SpaceAround
             ) {
-                SummaryStat(label = "Paradas", value = "$completedStops/${route.stops.size}")
-                SummaryStat(label = "Puntos", value = points.toString())
+                SummaryStat(label = strings.statStops, value = "$completedStops/${route.stops.size}")
+                SummaryStat(label = strings.statPoints, value = points.toString())
             }
         }
 
         if (submitted) {
-            Text("¡Gracias por tu valoración!", color = PineContainer, fontWeight = FontWeight.SemiBold)
+            Text(strings.thanksForRating, color = PineContainer, fontWeight = FontWeight.SemiBold)
         } else {
-            Text("Deja tu valoración", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = InkDeep)
-            StarRatingRow(label = "La ruta", value = routeRating) { routeRating = it }
-            StarRatingRow(label = "El guía (${route.guide.name})", value = guideRating) { guideRating = it }
+            Text(strings.leaveRating, fontWeight = FontWeight.Bold, fontSize = 18.sp, color = InkDeep)
+            StarRatingRow(label = strings.routeRatingLabel, value = routeRating, strings = strings) { routeRating = it }
+            StarRatingRow(label = "${strings.guideRatingLabel} (${route.guide.name})", value = guideRating, strings = strings) { guideRating = it }
             OutlinedTextField(
                 value = comment,
                 onValueChange = { if (it.length <= 500) comment = it },
                 modifier = Modifier.fillMaxWidth(),
-                placeholder = { Text("Cuéntanos tu experiencia (opcional)") },
+                placeholder = { Text(strings.commentPlaceholder) },
                 minLines = 3,
                 shape = RoundedCornerShape(12.dp)
             )
@@ -236,7 +245,7 @@ private fun RouteSummaryContent(
                 shape = RoundedCornerShape(12.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = PineContainer, contentColor = SurfaceCream)
             ) {
-                Text("Enviar valoración", fontWeight = FontWeight.Bold)
+                Text(strings.submitRating, fontWeight = FontWeight.Bold)
             }
         }
 
@@ -245,7 +254,7 @@ private fun RouteSummaryContent(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(12.dp)
         ) {
-            Text("Volver al mapa", color = InkDeep, fontWeight = FontWeight.SemiBold)
+            Text(strings.backToMap, color = InkDeep, fontWeight = FontWeight.SemiBold)
         }
     }
 }
@@ -259,7 +268,7 @@ private fun SummaryStat(label: String, value: String) {
 }
 
 @Composable
-private fun StarRatingRow(label: String, value: Int, onChange: (Int) -> Unit) {
+private fun StarRatingRow(label: String, value: Int, strings: ActiveExpeditionStrings, onChange: (Int) -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Text(label, fontWeight = FontWeight.SemiBold, color = InkDeep)
         Row {
@@ -267,7 +276,7 @@ private fun StarRatingRow(label: String, value: Int, onChange: (Int) -> Unit) {
                 IconButton(onClick = { onChange(star) }) {
                     Icon(
                         imageVector = if (star <= value) Icons.Default.Star else Icons.Default.StarBorder,
-                        contentDescription = "$star estrellas",
+                        contentDescription = "$star ${if (star == 1) strings.starSingular else strings.starPlural}",
                         tint = TerracottaGold
                     )
                 }
@@ -280,7 +289,8 @@ private fun StarRatingRow(label: String, value: Int, onChange: (Int) -> Unit) {
 private fun StopInfoContent(
     stop: RouteStop,
     isCompleted: Boolean,
-    onStartTrial: () -> Unit
+    onStartTrial: () -> Unit,
+    strings: ActiveExpeditionStrings
 ) {
     val voice = rememberVoicePreviewer()
     val clipPlayer = rememberAudioClipPlayer()
@@ -337,7 +347,8 @@ private fun StopInfoContent(
         if (stop.audioMode == StopAudioMode.TTS) {
             NarrationToggleButton(
                 playing = narrating,
-                label = "Escuchar relato",
+                label = strings.listenStory,
+                stopLabel = strings.stopPlayback,
                 onClick = {
                     if (narrating) {
                         voice.stop()
@@ -353,7 +364,8 @@ private fun StopInfoContent(
         } else if (stop.audioMode == StopAudioMode.RECORDED && !recordedUrl.isNullOrBlank()) {
             NarrationToggleButton(
                 playing = playingRecording,
-                label = "Escuchar grabación",
+                label = strings.listenRecording,
+                stopLabel = strings.stopPlayback,
                 onClick = {
                     if (playingRecording) {
                         clipPlayer.stop()
@@ -396,7 +408,7 @@ private fun StopInfoContent(
             )
         ) {
             Text(
-                text = if (isCompleted) "Prueba completada" else "Ir a la prueba",
+                text = if (isCompleted) strings.challengeCompleted else strings.goToChallenge,
                 fontWeight = FontWeight.Bold
             )
         }
@@ -407,6 +419,7 @@ private fun StopInfoContent(
 private fun NarrationToggleButton(
     playing: Boolean,
     label: String,
+    stopLabel: String,
     onClick: () -> Unit
 ) {
     OutlinedButton(
@@ -422,7 +435,7 @@ private fun NarrationToggleButton(
         )
         Spacer(Modifier.width(8.dp))
         Text(
-            text = if (playing) "Detener" else label,
+            text = if (playing) stopLabel else label,
             fontWeight = FontWeight.SemiBold
         )
     }

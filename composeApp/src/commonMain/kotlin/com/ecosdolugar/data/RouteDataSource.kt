@@ -34,6 +34,8 @@ interface RouteDataSource {
 
     suspend fun loadTotalChallengeScore(accessToken: String): Int
 
+    suspend fun loadCompletedChallengesCount(): Int
+
     suspend fun saveDisplayName(userId: String, displayName: String, accessToken: String)
 
     suspend fun saveGuideProfile(

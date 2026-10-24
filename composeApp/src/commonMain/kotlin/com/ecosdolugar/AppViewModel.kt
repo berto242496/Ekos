@@ -55,7 +55,8 @@ data class AppState(
     val googleSignInError: String? = null,
     val guideSignInError: String? = null,
     val isSavingRoute: Boolean = false,
-    val triggeredStopIds: Set<String> = emptySet()
+    val triggeredStopIds: Set<String> = emptySet(),
+    val completedChallengesCount: Int = 0
 )
 
 /**
@@ -546,11 +547,13 @@ class AppViewModel(
                 }
             }.orEmpty()
             val enrichedRoutes = enrichRoutes(remoteRoutes, reviews, profiles)
+            val completedChallengesCount = orZeroOnFailure { routeDataSource.loadCompletedChallengesCount() }
             _state.update {
                 it.copy(
                     routes = enrichedRoutes,
                     routeReviews = reviews,
                     guideProfiles = profiles,
+                    completedChallengesCount = completedChallengesCount,
                     selectedRoute = enrichedRoutes.firstOrNull { route -> route.id == it.selectedRoute?.id }
                         ?: enrichedRoutes.firstOrNull()
                         ?: it.selectedRoute,
@@ -611,4 +614,13 @@ private suspend inline fun <T> orEmptyOnFailure(block: () -> List<T>): List<T> =
         throw error
     } catch (error: Exception) {
         emptyList()
+    }
+
+private suspend inline fun orZeroOnFailure(block: () -> Int): Int =
+    try {
+        block()
+    } catch (error: CancellationException) {
+        throw error
+    } catch (error: Exception) {
+        0
     }

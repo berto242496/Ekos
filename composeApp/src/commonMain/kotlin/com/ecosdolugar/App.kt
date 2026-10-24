@@ -157,6 +157,7 @@ fun App(viewModel: AppViewModel) {
                                 language = appLanguage.current,
                                 availableRoutesCount = state.routes.size,
                                 activeGuidesCount = state.routes.map { it.guide.id }.distinct().size,
+                                completedChallengesCount = state.completedChallengesCount,
                                 onOpenGuideMode = {
                                     viewModel.beginGoogleSignIn(NavigationScreen.GUIDE_DASHBOARD)
                                 }

@@ -235,6 +235,18 @@ class SupabaseRoutesRepository(
             }
         }
 
+    override suspend fun loadCompletedChallengesCount(): Int =
+        withContext(Dispatchers.IO) {
+            requireConfigured()
+            val response = request(
+                method = "POST",
+                path = "/rest/v1/rpc/get_completed_challenges_count",
+                body = "{}",
+                contentType = "application/json"
+            )
+            response.trim().toIntOrNull() ?: 0
+        }
+
     override suspend fun saveDisplayName(userId: String, displayName: String, accessToken: String) =
         withContext(Dispatchers.IO) {
             requireConfigured()

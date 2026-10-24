@@ -266,6 +266,7 @@ private class FakeData : RouteDataSource {
     var routes: List<RouteItem> = listOf(fixtureRoute("ruta-1"), fixtureRoute("ruta-2"))
     var savedIds: Set<String> = emptySet()
     var score = 0
+    var completedChallengesCount = 0
     var failReviews = false
     var failProfiles = false
     var failRoutes = false
@@ -299,6 +300,7 @@ private class FakeData : RouteDataSource {
 
     override suspend fun loadCompletedChallenges(accessToken: String): Set<String> = emptySet()
     override suspend fun loadTotalChallengeScore(accessToken: String) = score
+    override suspend fun loadCompletedChallengesCount() = completedChallengesCount
     override suspend fun saveDisplayName(userId: String, displayName: String, accessToken: String) {
         savedNames += displayName
     }

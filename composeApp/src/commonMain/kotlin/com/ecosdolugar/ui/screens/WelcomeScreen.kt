@@ -43,6 +43,7 @@ fun WelcomeScreen(
     language: AppLanguage,
     availableRoutesCount: Int,
     activeGuidesCount: Int,
+    completedChallengesCount: Int,
     onOpenGuideMode: () -> Unit
 ) {
     val strings = appLanguageStrings(language)
@@ -128,7 +129,8 @@ fun WelcomeScreen(
                 WelcomeMetrics(
                     strings = strings,
                     availableRoutesCount = availableRoutesCount,
-                    activeGuidesCount = activeGuidesCount
+                    activeGuidesCount = activeGuidesCount,
+                    completedChallengesCount = completedChallengesCount
                 )
                 Spacer(Modifier.height(20.dp))
                 GoogleSignInButton(strings, onClick = onSignInWithGoogle, isLoading = isSignInLoading)
@@ -222,7 +224,12 @@ private fun WelcomeHeader(
 }
 
 @Composable
-private fun WelcomeMetrics(strings: AppLanguageStrings, availableRoutesCount: Int, activeGuidesCount: Int) {
+private fun WelcomeMetrics(
+    strings: AppLanguageStrings,
+    availableRoutesCount: Int,
+    activeGuidesCount: Int,
+    completedChallengesCount: Int
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -232,9 +239,11 @@ private fun WelcomeMetrics(strings: AppLanguageStrings, availableRoutesCount: In
             .padding(vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        MetricColumn(strings.availableRoutesLabel, availableRoutesCount.toString(), Modifier.weight(1f).padding(start = 11.dp))
+        MetricColumn(strings.availableRoutesLabel, availableRoutesCount.toString(), Modifier.weight(1f).padding(start = 10.dp))
         Box(Modifier.width(1.dp).height(38.dp).background(Color.White.copy(alpha = 0.12f)))
-        MetricColumn(strings.activeGuidesLabel, activeGuidesCount.toString(), Modifier.weight(1f).padding(start = 11.dp))
+        MetricColumn(strings.activeGuidesLabel, activeGuidesCount.toString(), Modifier.weight(1f).padding(start = 10.dp))
+        Box(Modifier.width(1.dp).height(38.dp).background(Color.White.copy(alpha = 0.12f)))
+        MetricColumn(strings.completedChallengesLabel, completedChallengesCount.toString(), Modifier.weight(1f).padding(start = 10.dp))
     }
 }
 
@@ -245,7 +254,14 @@ private fun MetricColumn(
     modifier: Modifier = Modifier
 ) {
     Column(modifier = modifier) {
-        Text(label, color = SurfaceContainerHigh, fontSize = 9.sp, maxLines = 1)
+        Text(
+            label,
+            color = SurfaceContainerHigh,
+            fontSize = 9.sp,
+            lineHeight = 11.sp,
+            minLines = 2,
+            maxLines = 2
+        )
         Text(
             value,
             color = Color.White,

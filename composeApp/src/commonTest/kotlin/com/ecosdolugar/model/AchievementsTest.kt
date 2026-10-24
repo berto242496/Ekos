@@ -22,19 +22,24 @@ class AchievementsTest {
         mapPositionY = 0f
     )
 
-    private fun route(id: String, vararg stopIds: String) = RouteItem(
+    private fun route(
+        id: String,
+        vararg stopIds: String,
+        location: String = "",
+        categories: List<Category> = emptyList()
+    ) = RouteItem(
         id = id,
         title = "",
         subtitle = "",
         description = "",
-        location = "",
+        location = location,
         region = "",
         imageUrl = "",
         stopsCount = stopIds.size,
         duration = "",
         distance = "",
         difficulty = Difficulty.FACIL,
-        categories = emptyList(),
+        categories = categories,
         audioTag = "",
         tomoRef = "",
         overviewFeatures = emptyList(),
@@ -55,10 +60,44 @@ class AchievementsTest {
         assertFalse(userAchievementStatuses(profile, emptyList()).any { it.isUnlocked })
     }
 
+    private fun unlockedIds(profile: UserProfile, completed: List<RouteItem>) =
+        userAchievementStatuses(profile, completed).filter { it.isUnlocked }.map { it.id }
+
     @Test
-    fun solvingAnEnigmaUnlocksMenteAguda() {
-        val profile = UserProfile(solvedEnigmaIds = setOf("x"))
-        val unlocked = userAchievementStatuses(profile, emptyList()).filter { it.isUnlocked }.map { it.id }
-        assertEquals(listOf("mente-aguda"), unlocked)
+    fun completingRoutesUnlocksExplorerTiers() {
+        val one = listOf(route("a"))
+        assertEquals(listOf("primeros-pasos"), unlockedIds(UserProfile(), one))
+        val three = List(3) { route("r$it") }
+        assertTrue("explorador" in unlockedIds(UserProfile(), three))
+        assertFalse("gran-explorador" in unlockedIds(UserProfile(), three))
+        val ten = List(10) { route("r$it") }
+        assertTrue("gran-explorador" in unlockedIds(UserProfile(), ten))
+    }
+
+    @Test
+    fun discoveringTwentyStopsUnlocksStoryCollector() {
+        val nineteen = UserProfile(visitedStopIds = (1..10).map { "v$it" }.toSet(), solvedEnigmaIds = (1..9).map { "s$it" }.toSet())
+        assertFalse("coleccionista-historias" in unlockedIds(nineteen, emptyList()))
+        val twenty = nineteen.copy(solvedEnigmaIds = nineteen.solvedEnigmaIds + "s10")
+        assertTrue("coleccionista-historias" in unlockedIds(twenty, emptyList()))
+    }
+
+    @Test
+    fun categoryAchievementsRequireCompletedRouteOfThatCategory() {
+        val legends = listOf(route("l", location = "Tui", categories = listOf(Category.LEYENDAS)))
+        val unlocked = unlockedIds(UserProfile(), legends)
+        assertTrue("cazaleyendas" in unlocked)
+        assertFalse("guardian-historia" in unlocked)
+        assertFalse("espiritu-aventurero" in unlocked)
+        assertTrue("guardian-historia" in unlockedIds(UserProfile(), listOf(route("h", categories = listOf(Category.HISTORIA)))))
+        assertTrue("espiritu-aventurero" in unlockedIds(UserProfile(), listOf(route("n", categories = listOf(Category.NATURALEZA)))))
+    }
+
+    @Test
+    fun threeDifferentLocationsUnlockTirelessTraveler() {
+        val twoLocations = listOf(route("a", location = "Tui"), route("b", location = "Tui"), route("c", location = "Ourense"))
+        assertFalse("viajero-incansable" in unlockedIds(UserProfile(), twoLocations))
+        val threeLocations = twoLocations + route("d", location = "Valença")
+        assertTrue("viajero-incansable" in unlockedIds(UserProfile(), threeLocations))
     }
 }

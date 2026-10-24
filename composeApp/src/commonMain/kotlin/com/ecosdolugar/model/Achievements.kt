@@ -8,43 +8,72 @@ fun completedRoutesOf(profile: UserProfile, routes: List<RouteItem>): List<Route
         route.stops.isNotEmpty() && route.stops.all { it.id in profile.solvedEnigmaIds }
     }
 
-// Mirrors getUserAchievements in src/data/achievementsData.ts. Field notes do not exist on Android yet.
 fun userAchievementStatuses(
     profile: UserProfile,
     completedRoutes: List<RouteItem>,
     language: AppLanguage = AppLanguage.SPANISH
 ): List<UserAchievementStatus> {
     val strings = achievementStrings(language)
-    val isRaiaVisited = completedRoutes.any { it.id == "contrabando" } ||
-        profile.visitedStopIds.any { id -> listOf("cb", "tui", "valenca").any { id.contains(it) } }
+    val completedCount = completedRoutes.size
+    val discoveredStopsCount = (profile.visitedStopIds + profile.solvedEnigmaIds).size
+    val completedLocationsCount = completedRoutes.map { it.location.trim().lowercase() }.distinct().size
+    fun hasCompletedCategory(category: Category) = completedRoutes.any { category in it.categories }
     return listOf(
         UserAchievementStatus(
-            id = "primera-ruta",
-            title = strings.firstRouteTitle,
-            description = strings.firstRouteDescription,
-            icon = "🏁",
-            isUnlocked = completedRoutes.isNotEmpty()
+            id = "primeros-pasos",
+            title = strings.firstStepsTitle,
+            description = strings.firstStepsDescription,
+            icon = "🥾",
+            isUnlocked = completedCount >= 1
         ),
         UserAchievementStatus(
-            id = "visitante-raia",
-            title = strings.raiaVisitorTitle,
-            description = strings.raiaVisitorDescription,
-            icon = "🏰",
-            isUnlocked = isRaiaVisited
+            id = "explorador",
+            title = strings.explorerTitle,
+            description = strings.explorerDescription,
+            icon = "🧭",
+            isUnlocked = completedCount >= 3
         ),
         UserAchievementStatus(
-            id = "mente-aguda",
-            title = strings.sharpMindTitle,
-            description = strings.sharpMindDescription,
-            icon = "🔮",
-            isUnlocked = profile.solvedEnigmaIds.isNotEmpty()
+            id = "gran-explorador",
+            title = strings.greatExplorerTitle,
+            description = strings.greatExplorerDescription,
+            icon = "🏆",
+            isUnlocked = completedCount >= 10
         ),
         UserAchievementStatus(
-            id = "cronista-camino",
-            title = strings.chroniclerTitle,
-            description = strings.chroniclerDescription,
+            id = "coleccionista-historias",
+            title = strings.storyCollectorTitle,
+            description = strings.storyCollectorDescription,
             icon = "📖",
-            isUnlocked = false
+            isUnlocked = discoveredStopsCount >= 20
+        ),
+        UserAchievementStatus(
+            id = "cazaleyendas",
+            title = strings.legendHunterTitle,
+            description = strings.legendHunterDescription,
+            icon = "✨",
+            isUnlocked = hasCompletedCategory(Category.LEYENDAS)
+        ),
+        UserAchievementStatus(
+            id = "guardian-historia",
+            title = strings.historyGuardianTitle,
+            description = strings.historyGuardianDescription,
+            icon = "🏛️",
+            isUnlocked = hasCompletedCategory(Category.HISTORIA)
+        ),
+        UserAchievementStatus(
+            id = "espiritu-aventurero",
+            title = strings.adventurousSpiritTitle,
+            description = strings.adventurousSpiritDescription,
+            icon = "🌿",
+            isUnlocked = hasCompletedCategory(Category.NATURALEZA)
+        ),
+        UserAchievementStatus(
+            id = "viajero-incansable",
+            title = strings.tirelessTravelerTitle,
+            description = strings.tirelessTravelerDescription,
+            icon = "🌍",
+            isUnlocked = completedLocationsCount >= 3
         )
     )
 }

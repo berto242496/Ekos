@@ -1,46 +1,78 @@
 package com.ecosdolugar.localization
 
 data class AchievementStrings(
-    val firstRouteTitle: String,
-    val firstRouteDescription: String,
-    val raiaVisitorTitle: String,
-    val raiaVisitorDescription: String,
-    val sharpMindTitle: String,
-    val sharpMindDescription: String,
-    val chroniclerTitle: String,
-    val chroniclerDescription: String
+    val firstStepsTitle: String,
+    val firstStepsDescription: String,
+    val explorerTitle: String,
+    val explorerDescription: String,
+    val greatExplorerTitle: String,
+    val greatExplorerDescription: String,
+    val storyCollectorTitle: String,
+    val storyCollectorDescription: String,
+    val legendHunterTitle: String,
+    val legendHunterDescription: String,
+    val historyGuardianTitle: String,
+    val historyGuardianDescription: String,
+    val adventurousSpiritTitle: String,
+    val adventurousSpiritDescription: String,
+    val tirelessTravelerTitle: String,
+    val tirelessTravelerDescription: String
 )
 
 fun achievementStrings(language: AppLanguage): AchievementStrings =
     when (language) {
         AppLanguage.SPANISH -> AchievementStrings(
-            firstRouteTitle = "Primera ruta completada",
-            firstRouteDescription = "Completa al menos una expedición o ruta en la app.",
-            raiaVisitorTitle = "Visitante incansable de la Raia",
-            raiaVisitorDescription = "Explora o completa la ruta del Contrabando en la frontera.",
-            sharpMindTitle = "Mente Aguda",
-            sharpMindDescription = "Resuelve con éxito tu primer enigma mitológico.",
-            chroniclerTitle = "Cronista del Camino",
-            chroniclerDescription = "Escribe tu primera anotación en el cuaderno de campo."
+            firstStepsTitle = "Primeros pasos",
+            firstStepsDescription = "Completar la primera ruta",
+            explorerTitle = "Explorador",
+            explorerDescription = "Completar 3 rutas",
+            greatExplorerTitle = "Gran explorador",
+            greatExplorerDescription = "Completar 10 rutas",
+            storyCollectorTitle = "Coleccionista de historias",
+            storyCollectorDescription = "Descubrir 20 paradas",
+            legendHunterTitle = "Cazaleyendas",
+            legendHunterDescription = "Completar una ruta de leyendas",
+            historyGuardianTitle = "Guardián de la historia",
+            historyGuardianDescription = "Completar una ruta histórica",
+            adventurousSpiritTitle = "Espíritu aventurero",
+            adventurousSpiritDescription = "Completar una ruta de naturaleza",
+            tirelessTravelerTitle = "Viajero incansable",
+            tirelessTravelerDescription = "Completar rutas en 3 localidades diferentes"
         )
         AppLanguage.GALICIAN -> AchievementStrings(
-            firstRouteTitle = "Primeira ruta completada",
-            firstRouteDescription = "Completa polo menos unha expedición ou ruta na app.",
-            raiaVisitorTitle = "Visitante incansable da Raia",
-            raiaVisitorDescription = "Explora ou completa a ruta do Contrabando na fronteira.",
-            sharpMindTitle = "Mente Aguda",
-            sharpMindDescription = "Resolve con éxito o teu primeiro enigma mitolóxico.",
-            chroniclerTitle = "Cronista do Camiño",
-            chroniclerDescription = "Escribe a túa primeira anotación no caderno de campo."
+            firstStepsTitle = "Primeiros pasos",
+            firstStepsDescription = "Completar a primeira ruta",
+            explorerTitle = "Explorador",
+            explorerDescription = "Completar 3 rutas",
+            greatExplorerTitle = "Gran explorador",
+            greatExplorerDescription = "Completar 10 rutas",
+            storyCollectorTitle = "Coleccionista de historias",
+            storyCollectorDescription = "Descubrir 20 paradas",
+            legendHunterTitle = "Cazalendas",
+            legendHunterDescription = "Completar unha ruta de lendas",
+            historyGuardianTitle = "Gardián da historia",
+            historyGuardianDescription = "Completar unha ruta histórica",
+            adventurousSpiritTitle = "Espírito aventureiro",
+            adventurousSpiritDescription = "Completar unha ruta de natureza",
+            tirelessTravelerTitle = "Viaxeiro incansable",
+            tirelessTravelerDescription = "Completar rutas en 3 localidades diferentes"
         )
         AppLanguage.ENGLISH -> AchievementStrings(
-            firstRouteTitle = "First route completed",
-            firstRouteDescription = "Complete at least one expedition or route in the app.",
-            raiaVisitorTitle = "Tireless visitor of the Raia",
-            raiaVisitorDescription = "Explore or complete the Contraband route on the border.",
-            sharpMindTitle = "Sharp Mind",
-            sharpMindDescription = "Successfully solve your first mythological enigma.",
-            chroniclerTitle = "Chronicler of the Way",
-            chroniclerDescription = "Write your first note in the field notebook."
+            firstStepsTitle = "First steps",
+            firstStepsDescription = "Complete your first route",
+            explorerTitle = "Explorer",
+            explorerDescription = "Complete 3 routes",
+            greatExplorerTitle = "Great explorer",
+            greatExplorerDescription = "Complete 10 routes",
+            storyCollectorTitle = "Story collector",
+            storyCollectorDescription = "Discover 20 stops",
+            legendHunterTitle = "Legend hunter",
+            legendHunterDescription = "Complete a legends route",
+            historyGuardianTitle = "Guardian of history",
+            historyGuardianDescription = "Complete a historical route",
+            adventurousSpiritTitle = "Adventurous spirit",
+            adventurousSpiritDescription = "Complete a nature route",
+            tirelessTravelerTitle = "Tireless traveler",
+            tirelessTravelerDescription = "Complete routes in 3 different locations"
         )
     }

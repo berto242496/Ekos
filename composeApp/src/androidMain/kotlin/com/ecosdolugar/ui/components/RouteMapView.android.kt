@@ -495,7 +495,6 @@ private fun routeMapHtml(): String = """
             });
           });
           const bounds = L.latLngBounds(points);
-          if (userMarker && fit) bounds.extend(userMarker.getLatLng());
           if (fit && bounds.isValid() && !hasUserMovedMap) {
             settingUserLocation = true;
             map.fitBounds(bounds, { padding: [36, 36], maxZoom: 16 });
@@ -525,14 +524,10 @@ private fun routeMapHtml(): String = """
           } else {
             userMarker.setLatLng(position);
           }
-          if (!hasUserMovedMap) {
-            if (activeRouteId) {
-              redrawSelectedRoute(true);
-            } else {
-              settingUserLocation = true;
-              map.setView(position, 14);
-              settingUserLocation = false;
-            }
+          if (!hasUserMovedMap && !activeRouteId) {
+            settingUserLocation = true;
+            map.setView(position, 14);
+            settingUserLocation = false;
           }
         };
         window.setMapHeight = function(height) {

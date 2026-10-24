@@ -75,7 +75,7 @@ export default function App() {
   });
   const [catalogRoutes, setCatalogRoutes] = useState<RouteItem[]>([]);
 
-  const [selectedRoute, setSelectedRoute] = useState<RouteItem>(() => allRoutes[0] || ROUTES[0]);
+  const [selectedRoute, setSelectedRoute] = useState<RouteItem | null>(() => allRoutes[0] ?? null);
   const [pendingChallengeStopId, setPendingChallengeStopId] = useState<string | null>(null);
   const [isMapModalOpen, setIsMapModalOpen] = useState(false);
   const [isKmpModalOpen, setIsKmpModalOpen] = useState(false);
@@ -384,7 +384,7 @@ export default function App() {
 
   // Handler to mark enigma solved
   const handleSolveEnigma = (stopId: string, attempts = 1) => {
-    const stop = selectedRoute.stops.find(item => item.id === stopId);
+    const stop = selectedRoute?.stops.find(item => item.id === stopId);
     if (stop?.challengeId && user.isGoogleAuthenticated) {
       saveChallengeProgress(stop.challengeId, attempts, 100, true).catch(error => {
         setRouteStorageError(error instanceof Error ? error.message : 'No se pudo guardar el progreso del reto.');
@@ -411,6 +411,7 @@ export default function App() {
 
   // Handler from active expedition to add quick note
   const handleExpeditionAddNote = (stop: RouteStop) => {
+    if (!selectedRoute) return;
     const defaultContent = `Anotación en ${stop.title}: `;
     const content = prompt('Escribe una nota para tu cuaderno de campo:', defaultContent);
     if (content && content.trim()) {
@@ -560,12 +561,12 @@ export default function App() {
       return updated;
     });
 
-    setSelectedRoute(prev => ({
+    setSelectedRoute(prev => (prev ? {
       ...prev,
       startedCount: (prev.startedCount || 0) + 1,
       viewsCount: (prev.viewsCount || 0) + 1,
       revenue: (prev.revenue || 0) + purchaseRecord.pricePaid,
-    }));
+    } : prev));
   };
 
   return (
@@ -591,6 +592,8 @@ export default function App() {
         {/* 1. Welcome Screen */}
         {currentScreen === 'welcome' && (
           <WelcomeScreen
+            routesCount={allRoutes.length}
+            guidesCount={new Set(allRoutes.map(route => route.guide?.id).filter(Boolean)).size}
             onSignInWithGoogle={handleSignInWithGoogle}
             onOpenGuideMode={() => {
               setIsGuideSignInLoading(true);
@@ -719,7 +722,7 @@ export default function App() {
       )}
 
       {/* 4. Visitor Screen: Detail View */}
-      {currentScreen === 'detail' && (
+      {currentScreen === 'detail' && selectedRoute && (
         <RouteDetail
           route={selectedRoute}
           user={user}
@@ -741,7 +744,7 @@ export default function App() {
       {currentScreen === 'expedition-map' && (
         <InteractiveMap
           routes={allRoutes}
-          selectedRouteId={selectedRoute.id}
+          selectedRouteId={selectedRoute?.id}
           characterId={user.characterId}
           expeditionMode
           solvedStopIds={user.solvedEnigmaIds}
@@ -756,7 +759,7 @@ export default function App() {
         />
       )}
 
-      {currentScreen === 'expedition' && (
+      {currentScreen === 'expedition' && selectedRoute && (
         <ActiveExpedition
           route={selectedRoute}
           user={user}
@@ -800,7 +803,7 @@ export default function App() {
           {activeTab === 'mapa' && (
             <InteractiveMap
               routes={allRoutes}
-              selectedRouteId={selectedRoute.id}
+              selectedRouteId={selectedRoute?.id}
               characterId={user.characterId}
               onSelectRoute={handleSelectRoute}
               onStartRoute={handleStartRoute}
@@ -885,7 +888,7 @@ export default function App() {
             <div className="w-12 h-1.5 rounded-full bg-[#c3c8c1] mx-auto mt-2.5 mb-1" />
             <InteractiveMap
               routes={allRoutes}
-              selectedRouteId={selectedRoute.id}
+              selectedRouteId={selectedRoute?.id}
               characterId={user.characterId}
               isModal={true}
               onClose={() => setIsMapModalOpen(false)}

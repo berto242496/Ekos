@@ -155,7 +155,8 @@ fun App(viewModel: AppViewModel) {
                                 signInError = state.googleSignInError,
                                 guideSignInError = state.guideSignInError,
                                 language = appLanguage.current,
-                                routes = state.routes,
+                                availableRoutesCount = state.routes.size,
+                                activeGuidesCount = state.routes.map { it.guide.id }.distinct().size,
                                 onOpenGuideMode = {
                                     viewModel.beginGoogleSignIn(NavigationScreen.GUIDE_DASHBOARD)
                                 }
@@ -216,17 +217,19 @@ fun App(viewModel: AppViewModel) {
                             )
                         }
                         NavigationScreen.DETAIL -> {
-                            RouteDetailScreen(
-                                route = state.selectedRoute,
-                                language = appLanguage.current,
-                                isSaved = state.selectedRoute.id in userProfile.savedRouteIds,
-                                onBack = { viewModel.navigateTo(NavigationScreen.CATALOG) },
-                                onToggleSaved = viewModel::toggleSavedRoute,
-                                onOpenMap = viewModel::openMapForSelectedRoute,
-                                onStartRoute = viewModel::startExpedition,
-                                onOpenProfile = { viewModel.navigateTo(NavigationScreen.JOURNAL) },
-                                onOpenGuideProfile = viewModel::openGuideProfile
-                            )
+                            state.selectedRoute?.let { route ->
+                                RouteDetailScreen(
+                                    route = route,
+                                    language = appLanguage.current,
+                                    isSaved = route.id in userProfile.savedRouteIds,
+                                    onBack = { viewModel.navigateTo(NavigationScreen.CATALOG) },
+                                    onToggleSaved = viewModel::toggleSavedRoute,
+                                    onOpenMap = viewModel::openMapForSelectedRoute,
+                                    onStartRoute = viewModel::startExpedition,
+                                    onOpenProfile = { viewModel.navigateTo(NavigationScreen.JOURNAL) },
+                                    onOpenGuideProfile = viewModel::openGuideProfile
+                                )
+                            }
                         }
                         NavigationScreen.GUIDE_PROFILE -> {
                             state.selectedGuide?.let { guide ->
@@ -241,15 +244,17 @@ fun App(viewModel: AppViewModel) {
                             }
                         }
                         NavigationScreen.EXPEDITION -> {
-                            ActiveExpeditionScreen(
-                                route = state.selectedRoute,
-                                userProfile = userProfile,
-                                initialStopId = state.activeExpeditionStopId,
-                                language = appLanguage.current,
-                                onBack = viewModel::backToExpeditionMap,
-                                onSolveEnigma = viewModel::solveEnigma,
-                                onSubmitReview = viewModel::submitReview
-                            )
+                            state.selectedRoute?.let { route ->
+                                ActiveExpeditionScreen(
+                                    route = route,
+                                    userProfile = userProfile,
+                                    initialStopId = state.activeExpeditionStopId,
+                                    language = appLanguage.current,
+                                    onBack = viewModel::backToExpeditionMap,
+                                    onSolveEnigma = viewModel::solveEnigma,
+                                    onSubmitReview = viewModel::submitReview
+                                )
+                            }
                         }
                         NavigationScreen.MAP -> {
                             InteractiveMapScreen(

@@ -285,7 +285,7 @@ private fun createRouteMap(
         },
         "AndroidMap"
     )
-    loadDataWithBaseURL("https://www.openstreetmap.org/", routeMapHtml(), "text/html", "UTF-8", null)
+    loadDataWithBaseURL("file:///android_asset/", routeMapHtml(), "text/html", "UTF-8", null)
 }
 
 private class RouteMapWebView(context: Context) : WebView(context) {
@@ -399,21 +399,6 @@ private fun routeMapHtml(): String = """
       <style>
         html, body { width: 100%; height: 100%; min-height: 100vh; margin: 0; }
         #map { position: absolute; inset: 0; width: 100vw; height: 100vh; background: #dde8e2; }
-        .route-pin {
-          display: flex; align-items: center; justify-content: center;
-          width: 22px; height: 22px; border: 2px solid white; border-radius: 50%;
-          background: #17452f; color: white; font: 700 10px sans-serif;
-          box-shadow: 0 2px 6px #0006;
-        }
-        .route-pin.completed { background: #3f8a4f; }
-        .route-pin.selected { width: 26px; height: 26px; background: #d49b45; color: #17291e; }
-        .route-start {
-          display: flex; align-items: center; justify-content: center;
-          width: 24px; height: 24px; border: 2px solid white; border-radius: 50%;
-          background: #17452f; color: white; font: 700 10px sans-serif;
-          box-shadow: 0 2px 6px #0006;
-        }
-        .user-location { border: 3px solid white; border-radius: 50%; background: #2878d0; box-shadow: 0 1px 8px #0008; }
         .leaflet-popup-content { font: 14px sans-serif; }
         .leaflet-control-attribution { max-width: 80%; font-size: 9px; line-height: 1.25; }
       </style>
@@ -461,21 +446,22 @@ private fun routeMapHtml(): String = """
         map.on('dragstart', () => { hasUserMovedMap = true; });
         map.on('zoomstart', () => { if (!settingUserLocation) hasUserMovedMap = true; });
 
-        function startIcon() {
-          return L.divIcon({
-            className: '',
-            html: '<span class="route-start">⚑</span>',
-            iconSize: [26, 26],
-            iconAnchor: [13, 13]
+        function mapIcon(name, size) {
+          return L.icon({
+            iconUrl: 'map/map_' + name + '.png',
+            iconSize: [size, size],
+            iconAnchor: [size / 2, size / 2]
           });
         }
-        function stopIcon(stop) {
-          return L.divIcon({
-            className: '',
-            html: '<span class="route-pin' + (stop.id === selectedStopId ? ' selected' : '') + (stop.completed ? ' completed' : '') + '">' + (stop.completed ? '✓' : stop.order) + '</span>',
-            iconSize: [24, 24],
-            iconAnchor: [12, 12]
-          });
+        function startIcon() {
+          return mapIcon('inicio', 32);
+        }
+        function stopIcon(stop, index, total) {
+          let name = 'parada';
+          if (stop.completed) name = 'completada';
+          else if (index === 0) name = 'inicio';
+          else if (index === total - 1) name = 'final';
+          return mapIcon(name, stop.id === selectedStopId ? 48 : 40);
         }
         function redrawVisibleStarts() {
           routeStartLayer.clearLayers();
@@ -497,8 +483,8 @@ private fun routeMapHtml(): String = """
           const route = allRoutes.find(item => item.id === activeRouteId);
           if (!route || route.stops.length === 0) return;
           const points = route.stops.map(stop => [stop.lat, stop.lng]);
-          route.stops.forEach(stop => {
-            const marker = L.marker([stop.lat, stop.lng], { icon: stopIcon(stop) }).addTo(selectedRouteLayer);
+          route.stops.forEach((stop, index) => {
+            const marker = L.marker([stop.lat, stop.lng], { icon: stopIcon(stop, index, route.stops.length) }).addTo(selectedRouteLayer);
             const label = document.createElement('div');
             label.textContent = stop.title;
             marker.bindPopup(label);
@@ -534,9 +520,7 @@ private fun routeMapHtml(): String = """
         window.setUserLocation = function(latitude, longitude) {
           const position = [latitude, longitude];
           if (!userMarker) {
-            userMarker = L.circleMarker(position, {
-              radius: 9, color: '#fff', weight: 3, fillColor: '#2878d0', fillOpacity: 1
-            }).addTo(map);
+            userMarker = L.marker(position, { icon: mapIcon('ubicacion_actual', 32) }).addTo(map);
             userMarker.bindPopup('Tu ubicación');
           } else {
             userMarker.setLatLng(position);

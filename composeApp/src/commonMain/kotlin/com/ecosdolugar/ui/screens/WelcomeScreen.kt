@@ -24,12 +24,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.ecosdolugar.model.RouteItem
+import com.ecosdolugar.localization.AppLanguage
 import ecosdolugar.composeapp.generated.resources.Res
 import ecosdolugar.composeapp.generated.resources.hero_forest
 import ecosdolugar.composeapp.generated.resources.google_g_logo
 import org.jetbrains.compose.resources.painterResource
-import com.ecosdolugar.localization.AppLanguage
 import com.ecosdolugar.localization.AppLanguageStrings
 import com.ecosdolugar.localization.appLanguageStrings
 import com.ecosdolugar.ui.theme.*
@@ -42,11 +41,11 @@ fun WelcomeScreen(
     signInError: String?,
     guideSignInError: String?,
     language: AppLanguage,
-    routes: List<RouteItem>,
+    availableRoutesCount: Int,
+    activeGuidesCount: Int,
     onOpenGuideMode: () -> Unit
 ) {
     val strings = appLanguageStrings(language)
-    val publishedRoutes = routes.filter { it.status == "publicada" }
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -128,8 +127,8 @@ fun WelcomeScreen(
                 Spacer(Modifier.height(20.dp))
                 WelcomeMetrics(
                     strings = strings,
-                    provincesCount = publishedRoutes.map { it.region }.filter { it.isNotBlank() }.distinct().size,
-                    routesCount = publishedRoutes.size
+                    availableRoutesCount = availableRoutesCount,
+                    activeGuidesCount = activeGuidesCount
                 )
                 Spacer(Modifier.height(20.dp))
                 GoogleSignInButton(strings, onClick = onSignInWithGoogle, isLoading = isSignInLoading)
@@ -223,7 +222,7 @@ private fun WelcomeHeader(
 }
 
 @Composable
-private fun WelcomeMetrics(strings: AppLanguageStrings, provincesCount: Int, routesCount: Int) {
+private fun WelcomeMetrics(strings: AppLanguageStrings, availableRoutesCount: Int, activeGuidesCount: Int) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -233,16 +232,9 @@ private fun WelcomeMetrics(strings: AppLanguageStrings, provincesCount: Int, rou
             .padding(vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        MetricColumn(strings.provinces, provincesCount.toString(), Modifier.weight(1f).padding(start = 11.dp))
+        MetricColumn(strings.availableRoutesLabel, availableRoutesCount.toString(), Modifier.weight(1f).padding(start = 11.dp))
         Box(Modifier.width(1.dp).height(38.dp).background(Color.White.copy(alpha = 0.12f)))
-        MetricColumn(strings.mythicalRoutes, routesCount.toString(), Modifier.weight(1f).padding(start = 11.dp))
-        Box(Modifier.width(1.dp).height(38.dp).background(Color.White.copy(alpha = 0.12f)))
-        MetricColumn(
-            strings.geography,
-            strings.allGalicia,
-            Modifier.weight(1.18f).padding(start = 11.dp),
-            isGeographyValue = true
-        )
+        MetricColumn(strings.activeGuidesLabel, activeGuidesCount.toString(), Modifier.weight(1f).padding(start = 11.dp))
     }
 }
 
@@ -250,16 +242,15 @@ private fun WelcomeMetrics(strings: AppLanguageStrings, provincesCount: Int, rou
 private fun MetricColumn(
     label: String,
     value: String,
-    modifier: Modifier = Modifier,
-    isGeographyValue: Boolean = false
+    modifier: Modifier = Modifier
 ) {
     Column(modifier = modifier) {
         Text(label, color = SurfaceContainerHigh, fontSize = 9.sp, maxLines = 1)
         Text(
             value,
-            color = if (isGeographyValue) TerracottaFixedDim else Color.White,
+            color = Color.White,
             fontFamily = FontFamily.Serif,
-            fontSize = if (isGeographyValue) 15.sp else 18.sp,
+            fontSize = 18.sp,
             fontWeight = FontWeight.SemiBold,
             maxLines = 1
         )

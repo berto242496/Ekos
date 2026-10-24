@@ -1,4 +1,4 @@
-export type Category = 'historia' | 'leyendas' | 'familias' | 'patrimonio' | 'naturaleza';
+export type Category = 'historia' | 'leyendas' | 'naturaleza' | 'gastronomia' | 'arte' | 'tradiciones';
 
 export type AppLanguage = 'es' | 'gl' | 'en' | 'pt';
 
@@ -183,7 +183,7 @@ export interface CharacterItem {
   cardGradient: string; // Tailwind gradient classes
   glowColor: string;
   stats: CharacterStat[];
-  avatarEmoji: string;
+  avatarImage: string; // public path to the character portrait
   iconName: string;
 }
 

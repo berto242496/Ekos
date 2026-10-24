@@ -3,7 +3,9 @@ package com.ecosdolugar
 import com.ecosdolugar.auth.GoogleAuthResult
 import com.ecosdolugar.auth.GoogleAuthService
 import com.ecosdolugar.data.RouteDataSource
-import com.ecosdolugar.data.RoutesRepository
+import com.ecosdolugar.model.Category
+import com.ecosdolugar.model.Difficulty
+import com.ecosdolugar.model.GuideAuthor
 import com.ecosdolugar.model.GuideProfileInfo
 import com.ecosdolugar.model.RouteItem
 import com.ecosdolugar.model.RouteReview
@@ -208,7 +210,37 @@ class AppViewModelTest {
         assertEquals(NavigationScreen.DETAIL, vm.state.value.screen)
         assertFalse(vm.state.value.mapIsExpedition)
     }
+
+    @Test
+    fun appWorksWithoutAnyRoutes() {
+        auth.restoreResult = GoogleAuthResult.NoStoredSession
+        data.routes = emptyList()
+        val vm = viewModel()
+        assertEquals(NavigationScreen.WELCOME, vm.state.value.screen)
+        assertTrue(vm.state.value.routes.isEmpty())
+        assertNull(vm.state.value.selectedRoute)
+    }
 }
+
+private fun fixtureRoute(id: String) = RouteItem(
+    id = id,
+    title = "Ruta $id",
+    subtitle = "",
+    description = "",
+    location = "",
+    region = "",
+    imageUrl = "",
+    stopsCount = 0,
+    duration = "",
+    distance = "",
+    difficulty = Difficulty.FACIL,
+    categories = listOf(Category.HISTORIA),
+    audioTag = "",
+    tomoRef = "",
+    guide = GuideAuthor(id = "guide-1", name = "Guía", title = "", bio = ""),
+    overviewFeatures = emptyList(),
+    stops = emptyList()
+)
 
 private class FakeAuth : GoogleAuthService {
     var restoreResult: GoogleAuthResult = GoogleAuthResult.NoStoredSession
@@ -231,7 +263,7 @@ private class FakeAuth : GoogleAuthService {
 }
 
 private class FakeData : RouteDataSource {
-    val routes: List<RouteItem> = RoutesRepository.routes
+    var routes: List<RouteItem> = listOf(fixtureRoute("ruta-1"), fixtureRoute("ruta-2"))
     var savedIds: Set<String> = emptySet()
     var score = 0
     var failReviews = false

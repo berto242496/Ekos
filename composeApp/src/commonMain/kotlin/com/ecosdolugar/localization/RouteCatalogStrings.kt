@@ -6,15 +6,12 @@ data class RouteCatalogStrings(
     val routesTitle: String,
     val guideButton: String,
     val profile: String,
-    val regionCoverage: String,
+    val topLabel: String,
     val savedRoutes: String,
     val showAllRoutes: String,
     val filterSaved: String,
     val heading: String,
-    val experienceSingular: String,
-    val experiencePlural: String,
-    val catalogSuffix: String,
-    val countOf: String,
+    val routesAvailable: (count: Int) -> String,
     val clearFilters: String,
     val activeGift: String,
     val changeCharacter: String,
@@ -44,19 +41,16 @@ fun routeCatalogStrings(language: AppLanguage): RouteCatalogStrings =
             routesTitle = "Rutas",
             guideButton = "Guía",
             profile = "Perfil",
-            regionCoverage = "TODA GALICIA · LAS 4 PROVINCIAS",
+            topLabel = "Rutas creadas por guías locales",
             savedRoutes = "Rutas guardadas",
             showAllRoutes = "Ver todas las rutas",
             filterSaved = "Filtrar guardadas",
-            heading = "Elige tu ruta mágica",
-            experienceSingular = "experiencia",
-            experiencePlural = "experiencias",
-            catalogSuffix = "en catálogo",
-            countOf = "de",
+            heading = "Descubre tu próxima ruta.",
+            routesAvailable = { count -> if (count == 1) "1 ruta disponible." else "$count rutas disponibles." },
             clearFilters = "Limpiar filtros",
             activeGift = "Don activo:",
             changeCharacter = "Cambiar",
-            searchPlaceholder = "Buscar por título, pueblo, zona o guía...",
+            searchPlaceholder = "Buscar rutas, lugares o guías...",
             clearSearch = "Limpiar",
             resetFilters = "Limpiar filtros",
             featured = "DESTACADA",
@@ -79,19 +73,16 @@ fun routeCatalogStrings(language: AppLanguage): RouteCatalogStrings =
             routesTitle = "Rutas",
             guideButton = "Guía",
             profile = "Perfil",
-            regionCoverage = "TODA GALICIA · AS 4 PROVINCIAS",
+            topLabel = "Rutas creadas por guías locales",
             savedRoutes = "Rutas gardadas",
             showAllRoutes = "Ver todas as rutas",
             filterSaved = "Filtrar gardadas",
-            heading = "Elixe a túa ruta máxica",
-            experienceSingular = "experiencia",
-            experiencePlural = "experiencias",
-            catalogSuffix = "no catálogo",
-            countOf = "de",
+            heading = "Descubre a túa próxima ruta.",
+            routesAvailable = { count -> if (count == 1) "1 ruta dispoñible." else "$count rutas dispoñibles." },
             clearFilters = "Limpar filtros",
             activeGift = "Don activo:",
             changeCharacter = "Cambiar",
-            searchPlaceholder = "Buscar por título, vila, zona ou guía...",
+            searchPlaceholder = "Buscar rutas, lugares ou guías...",
             clearSearch = "Limpar",
             resetFilters = "Limpar filtros",
             featured = "DESTACADA",
@@ -114,19 +105,16 @@ fun routeCatalogStrings(language: AppLanguage): RouteCatalogStrings =
             routesTitle = "Routes",
             guideButton = "Guide",
             profile = "Profile",
-            regionCoverage = "ALL GALICIA · ALL 4 PROVINCES",
+            topLabel = "Routes created by local guides",
             savedRoutes = "Saved routes",
             showAllRoutes = "Show all routes",
             filterSaved = "Show saved routes",
-            heading = "Choose your magical route",
-            experienceSingular = "experience",
-            experiencePlural = "experiences",
-            catalogSuffix = "in the catalogue",
-            countOf = "of",
+            heading = "Discover your next route.",
+            routesAvailable = { count -> if (count == 1) "1 route available." else "$count routes available." },
             clearFilters = "Clear filters",
             activeGift = "Active gift:",
             changeCharacter = "Change",
-            searchPlaceholder = "Search by title, town, area or guide...",
+            searchPlaceholder = "Search routes, places or guides...",
             clearSearch = "Clear",
             resetFilters = "Clear filters",
             featured = "FEATURED",
@@ -153,24 +141,27 @@ fun categoryDisplayName(category: Category, language: AppLanguage): String =
             Category.ALL -> "Todas"
             Category.HISTORIA -> "Historia"
             Category.LEYENDAS -> "Leyendas"
-            Category.FAMILIAS -> "Familias"
-            Category.PATRIMONIO -> "Patrimonio"
             Category.NATURALEZA -> "Naturaleza"
+            Category.GASTRONOMIA -> "Gastronomía"
+            Category.ARTE -> "Arte"
+            Category.TRADICIONES -> "Tradiciones"
         }
         AppLanguage.GALICIAN -> when (category) {
             Category.ALL -> "Todas"
             Category.HISTORIA -> "Historia"
             Category.LEYENDAS -> "Lendas"
-            Category.FAMILIAS -> "Familias"
-            Category.PATRIMONIO -> "Patrimonio"
             Category.NATURALEZA -> "Natureza"
+            Category.GASTRONOMIA -> "Gastronomía"
+            Category.ARTE -> "Arte"
+            Category.TRADICIONES -> "Tradicións"
         }
         AppLanguage.ENGLISH -> when (category) {
             Category.ALL -> "All"
             Category.HISTORIA -> "History"
             Category.LEYENDAS -> "Legends"
-            Category.FAMILIAS -> "Families"
-            Category.PATRIMONIO -> "Heritage"
             Category.NATURALEZA -> "Nature"
+            Category.GASTRONOMIA -> "Gastronomy"
+            Category.ARTE -> "Art"
+            Category.TRADICIONES -> "Traditions"
         }
     }

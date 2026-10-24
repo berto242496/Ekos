@@ -62,9 +62,9 @@ fun characterSelectionStrings(language: AppLanguage, characterId: String): Chara
                 "Pequeño ser mágico y travieso de la mitología gallega, famoso por sus trastadas y por hacer de las suyas en las casas. Le gusta enredar, esconder cosas y sorprender a quien se cruza con él.",
                 "Allí donde otros solo ven un camino, él ve una oportunidad para hacer de las suyas. Cada rincón que descubras puede guardar una pequeña sorpresa esperándote."
             ),
-            "moura" to CharacterCopy(
-                "Figura legendaria de gran belleza y misterio, vinculada a castros, fuentes, peñascos y tesoros escondidos. En las leyendas gallegas, suele guardar encantamientos y secretos ancestrales.",
-                "Guarda tesoros antiguos y conoce el valor de cada paso bajo el hechizo de su mirada. Si completas el camino hasta el final, quizá recibas una recompensa digna de una leyenda."
+            "nubeiro" to CharacterCopy(
+                "Figura legendaria de la tradición gallega, señor de las nubes y las tormentas. Se dice que recorre los cielos provocando truenos, rayos y lluvia, envuelto en nieblas y vientos misteriosos.",
+                "Recorre los cielos entre truenos y relámpagos, y sabe que todo viaje tiene su destino. Si sigues su rastro hasta el final, quizás las nubes se abran para ti y revelen un regalo digno de los dioses del cielo."
             ),
             "urco" to CharacterCopy(
                 "Criatura legendaria, representada habitualmente como un enorme perro negro con cuernos que aparece entre la niebla. Está especialmente ligado a las leyendas marineras y a la tradición popular de Pontevedra.",
@@ -80,9 +80,9 @@ fun characterSelectionStrings(language: AppLanguage, characterId: String): Chara
                 "Pequeno ser máxico e traveso da mitoloxía galega, famoso polas súas trasnadas e por facer das súas nas casas. Gústalle enredar, agochar cousas e sorprender a quen se cruza con el.",
                 "Alí onde outros só ven un camiño, el ve unha oportunidade para facer das súas. Cada recuncho que descubras pode gardar unha pequena sorpresa agardando por ti."
             ),
-            "moura" to CharacterCopy(
-                "Figura lendaria de gran beleza e misterio, vinculada a castros, fontes, penedos e tesouros agochados. Nas lendas galegas, adoita gardar encantamentos e segredos ancestrais.",
-                "Garda tesouros antigos e coñece o valor de cada paso dado baixo o feitizo da súa mirada. Se completas o camiño ata o final, quizais recibas unha recompensa digna dunha lenda."
+            "nubeiro" to CharacterCopy(
+                "Figura lendaria da tradición galega, señor das nubes e das tormentas. Dise que percorre os ceos provocando treboadas, raios e choiva, envolto en néboas e ventos misteriosos.",
+                "Percorre os ceos entre tronos e lóstregos, e sabe que toda viaxe ten o seu destino. Se segues o seu ronsel ata o final, quizais as nubes se abran para ti e revelen un agasallo digno dos deuses do ceo."
             ),
             "urco" to CharacterCopy(
                 "Criatura lendaria, representada habitualmente como un enorme can negro con cornos que aparece entre a néboa. Está especialmente ligado ás lendas mariñeiras e á tradición popular de Pontevedra.",
@@ -98,9 +98,9 @@ fun characterSelectionStrings(language: AppLanguage, characterId: String): Chara
                 "A small, mischievous magical being from Galician mythology, famous for his pranks and antics around the home. He loves to meddle, hide things and surprise anyone he meets.",
                 "Where others see only a path, he sees a chance to cause a little mischief. Every corner you discover may hold a small surprise waiting for you."
             ),
-            "moura" to CharacterCopy(
-                "A legendary figure of great beauty and mystery, connected to hillforts, springs, rocky outcrops and hidden treasures. In Galician legends, she often guards enchantments and ancestral secrets.",
-                "She guards ancient treasures and knows the value of every step taken beneath the spell of her gaze. If you complete the journey, you may receive a reward worthy of a legend."
+            "nubeiro" to CharacterCopy(
+                "A legendary figure of Galician tradition, lord of the clouds and storms. He is said to roam the skies bringing thunder, lightning and rain, wrapped in mists and mysterious winds.",
+                "He travels the skies between thunder and lightning, and knows that every journey has its destination. If you follow his trail to the end, the clouds may open for you and reveal a gift worthy of the gods of the sky."
             ),
             "urco" to CharacterCopy(
                 "A legendary creature, usually depicted as a huge black dog with horns emerging from the mist. He is especially associated with seafaring legends and the folk tradition of Pontevedra.",

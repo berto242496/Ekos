@@ -71,17 +71,17 @@ fun difficultyLabel(difficulty: Difficulty, language: AppLanguage): String =
     when (language) {
         AppLanguage.SPANISH -> when (difficulty) {
             Difficulty.FACIL -> "Fácil"
-            Difficulty.MEDIA -> "Media"
-            Difficulty.EXIGENTE -> "Exigente"
+            Difficulty.MEDIA -> "Moderada"
+            Difficulty.EXIGENTE -> "Difícil"
         }
         AppLanguage.GALICIAN -> when (difficulty) {
             Difficulty.FACIL -> "Fácil"
-            Difficulty.MEDIA -> "Media"
-            Difficulty.EXIGENTE -> "Esixente"
+            Difficulty.MEDIA -> "Moderada"
+            Difficulty.EXIGENTE -> "Difícil"
         }
         AppLanguage.ENGLISH -> when (difficulty) {
             Difficulty.FACIL -> "Easy"
-            Difficulty.MEDIA -> "Medium"
-            Difficulty.EXIGENTE -> "Demanding"
+            Difficulty.MEDIA -> "Moderate"
+            Difficulty.EXIGENTE -> "Hard"
         }
     }

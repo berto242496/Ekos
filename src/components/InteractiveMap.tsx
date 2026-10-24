@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { RouteItem, RouteStop } from '../types';
 import { getCharacterById } from '../data/charactersData';
+import { CharacterAvatar } from './CharacterAvatar';
 import { useI18n } from '../services/i18n';
 import {
   Layers,
@@ -34,6 +35,15 @@ type LocationErrorKey =
   | 'map_location_unsupported'
   | 'map_location_denied'
   | 'map_location_error';
+
+const USER_MARKER_SRC = '/assets/map/Ecos_mapa_Ubicacion_actual.png';
+
+function getStopMarkerSrc(index: number, total: number, completed: boolean): string {
+  if (completed) return '/assets/map/Ecos_mapa_Completada.png';
+  if (index === 0) return '/assets/map/Ecos_mapa_Inicio.png';
+  if (index === total - 1) return '/assets/map/Ecos_mapa_Final.png';
+  return '/assets/map/Ecos_mapa_Parada.png';
+}
 
 export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   routes,
@@ -323,7 +333,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
             className="h-8 px-2.5 rounded-full bg-[#1b3022]/10 border border-[#1b3022]/20 flex items-center gap-1.5"
             title={t('map_companion').replace('{name}', activeChar.name)}
           >
-            <span className="text-base leading-none">{activeChar.avatarEmoji}</span>
+            <CharacterAvatar character={activeChar} className="h-6 w-6" />
             <span className="font-serif text-[12px] font-semibold text-[#1b3022] hidden sm:inline">
               {activeChar.name}
             </span>
@@ -479,6 +489,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
         {visibleStops.map(({ stop, route }) => {
           const isSelected = selectedStop?.stop.id === stop.id;
           const point = toMapPosition(stop.coordinates.lat, stop.coordinates.lng);
+          const stopIndex = route.stops.indexOf(stop);
           return (
             <button
               key={`${route.id}-${stop.id}`}
@@ -486,12 +497,9 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
               style={{
                 left: point.x,
                 top: point.y,
-                backgroundColor: getRouteColor(route.id),
               }}
-              className={`absolute -translate-x-1/2 -translate-y-1/2 flex items-center justify-center rounded-full border-2 border-white text-white shadow-md transition-transform z-20 cursor-pointer ${
-                isSelected
-                  ? 'w-10 h-10 ring-4 ring-[#faba71]/70 scale-110'
-                  : 'w-8 h-8 hover:scale-110'
+              className={`absolute -translate-x-1/2 -translate-y-full z-20 cursor-pointer transition-transform drop-shadow-md ${
+                isSelected ? 'scale-110' : 'hover:scale-110'
               }`}
               title={`${route.title}: ${stop.title}`}
               aria-label={t('map_stop_aria')
@@ -499,20 +507,27 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
                 .replace('{order}', String(stop.order))
                 .replace('{title}', stop.title)}
             >
-              <span className="font-serif text-[12px] font-bold">{stop.order}</span>
+              <img
+                src={getStopMarkerSrc(stopIndex, route.stops.length, solvedStopIds.includes(stop.id))}
+                alt=""
+                draggable={false}
+                className={isSelected ? 'h-12 w-12' : 'h-10 w-10'}
+              />
             </button>
           );
         })}
 
         {expeditionMode && userLocation && (
-          <div
-            className="absolute z-20 h-5 w-5 -translate-x-1/2 -translate-y-1/2 rounded-full border-[3px] border-white bg-blue-600 shadow-lg"
+          <img
+            src={USER_MARKER_SRC}
+            alt={t('map_user_marker')}
+            draggable={false}
+            className="absolute z-20 h-10 w-10 -translate-x-1/2 -translate-y-1/2 pointer-events-none drop-shadow-md"
             style={{
               left: toMapPosition(userLocation.lat, userLocation.lng).x,
               top: toMapPosition(userLocation.lat, userLocation.lng).y,
             }}
             title={t('map_user_marker_title').replace('{m}', String(Math.round(userLocation.accuracy)))}
-            aria-label={t('map_user_marker')}
           />
         )}
 

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { RouteItem, FieldNote, UserProfile } from '../types';
 import { getCharacterById } from '../data/charactersData';
+import { CharacterAvatar } from './CharacterAvatar';
 import {
   BookOpen,
   Bookmark,
@@ -166,7 +167,7 @@ export const FieldJournal: React.FC<FieldJournalProps> = ({
                 className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/15 border border-[#faba71]/40 transition-all cursor-pointer"
                 title="Cambiar personaje"
               >
-                <span className="text-xl leading-none">{activeChar.avatarEmoji}</span>
+                <CharacterAvatar character={activeChar} className="h-6 w-6" />
                 <div className="text-left hidden sm:block">
                   <p className="text-[11px] font-serif font-bold text-white leading-tight">
                     {activeChar.name}

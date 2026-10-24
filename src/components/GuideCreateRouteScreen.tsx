@@ -192,7 +192,7 @@ const TEMPLATE_PRESETS: RouteTemplatePreset[] = [
           generalHint: 'Comienza por la letra M y termina con la A.',
           characterClues: {
             meiga: 'El caldero hierve: la piedra guarda la energía de la antigua Moura.',
-            moura: '¡Yo misma grabé ese nombre en la caliza hace dos mil inviernos!',
+            nubeiro: 'Entre truenos ese nombre quedó escrito en la piedra hace dos mil inviernos.',
           },
           solutionExplanation: 'La Moura es el símbolo del encanto eterno y de las piedras vivas gallegas.',
           magicalReward: 'Runa de Granito y Agua Salada desbloqueada.',
@@ -312,7 +312,7 @@ const TEMPLATE_PRESETS: RouteTemplatePreset[] = [
     location: 'Fragas do Eume / Bosque Atlántico',
     description:
       'Un juego de exploración en la naturaleza más exuberante de Galicia, descubriendo árboles centenarios, puentes colgantes y seres mitológicos traviesos.',
-    category: 'familias',
+    category: 'naturaleza',
     duration: '1h 15 min',
     difficulty: 'Fácil',
     price: '0,99 €',
@@ -757,7 +757,7 @@ export const GuideCreateRouteScreen: React.FC<GuideCreateRouteScreenProps> = ({
         correctRuneOrder: selectedRuneIds,
         generalHint: runePuzzleHint.trim() || 'Sigue la energía de los antiguos petroglifos.',
         characterClues: {
-          moura: 'La Moura recuerda el orden exacto de los glifos.',
+          nubeiro: 'El Nubeiro recuerda el orden exacto de los glifos.',
         },
         solutionExplanation: 'Los glifos de piedra se han armonizado.',
         magicalReward: 'Runa Sagrada del Granito.',
@@ -1169,9 +1169,10 @@ export const GuideCreateRouteScreen: React.FC<GuideCreateRouteScreenProps> = ({
                 >
                   <option value="leyendas">{t('filter_legends')}</option>
                   <option value="historia">{t('filter_history')}</option>
-                  <option value="familias">{t('filter_families')}</option>
-                  <option value="patrimonio">{t('filter_heritage')}</option>
                   <option value="naturaleza">{t('filter_nature')}</option>
+                  <option value="gastronomia">{t('filter_gastronomy')}</option>
+                  <option value="arte">{t('filter_art')}</option>
+                  <option value="tradiciones">{t('filter_traditions')}</option>
                 </select>
               </div>
 
@@ -1200,10 +1201,17 @@ export const GuideCreateRouteScreen: React.FC<GuideCreateRouteScreenProps> = ({
                   onChange={(e) => setDifficulty(e.target.value as any)}
                   className="w-full px-3 py-2.5 rounded-xl border border-[#1b3022]/20 bg-white font-serif text-xs outline-none"
                 >
-                  <option value="Fácil">{t('difficulty_easy')} (Paseo accesible)</option>
-                  <option value="Media">{t('difficulty_medium')} (Camino tradicional)</option>
-                  <option value="Exigente">{t('difficulty_hard')} (Costa o desnivel)</option>
+                  <option value="Fácil">🟢 {t('difficulty_easy')}</option>
+                  <option value="Media">🟡 {t('difficulty_medium')}</option>
+                  <option value="Exigente">🔴 {t('difficulty_hard')}</option>
                 </select>
+                <p className="mt-1.5 text-[11px] font-serif text-[#47654e] leading-snug">
+                  {difficulty === 'Fácil'
+                    ? t('difficulty_easy_desc')
+                    : difficulty === 'Media'
+                      ? t('difficulty_medium_desc')
+                      : t('difficulty_hard_desc')}
+                </p>
               </div>
             </div>
 

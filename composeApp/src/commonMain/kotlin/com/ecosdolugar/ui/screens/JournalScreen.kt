@@ -17,6 +17,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import com.ecosdolugar.ui.components.CharacterAvatarImage
+import org.jetbrains.compose.resources.DrawableResource
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -125,7 +127,7 @@ fun JournalScreen(
             item {
                 PassportCard(
                     userProfile = userProfile,
-                    characterEmoji = character.avatarEmoji,
+                    characterImage = character.avatarImage,
                     characterName = "${character.name} (${character.galicianTitle})",
                     accentColor = charColor,
                     completedCount = completedRoutes.size,
@@ -276,7 +278,7 @@ fun JournalScreen(
 @Composable
 private fun PassportCard(
     userProfile: UserProfile,
-    characterEmoji: String,
+    characterImage: DrawableResource,
     characterName: String,
     accentColor: Color,
     completedCount: Int,
@@ -304,7 +306,7 @@ private fun PassportCard(
                         .border(2.dp, accentColor, CircleShape),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(characterEmoji, fontSize = 28.sp)
+                    CharacterAvatarImage(characterImage, Modifier.padding(3.dp))
                 }
                 Column(modifier = Modifier.weight(1f)) {
                     Text(

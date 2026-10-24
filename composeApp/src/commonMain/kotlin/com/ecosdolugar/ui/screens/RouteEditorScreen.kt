@@ -731,8 +731,7 @@ private fun DifficultyOption(
     ) {
         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(
-                difficultyLabel(option, language),
-                color = if (selected) SurfaceCream else InkDeep,
+                "${difficultyEmoji(option)} ${difficultyLabel(option, language)}",
                 fontFamily = FontFamily.Serif,
                 fontWeight = FontWeight.Bold,
                 fontSize = 15.sp
@@ -748,6 +747,12 @@ private fun DifficultyOption(
             Icon(Icons.Default.Check, contentDescription = null, tint = TerracottaGold)
         }
     }
+}
+
+private fun difficultyEmoji(option: Difficulty): String = when (option) {
+    Difficulty.FACIL -> "🟢"
+    Difficulty.MEDIA -> "🟡"
+    Difficulty.EXIGENTE -> "🔴"
 }
 
 @Composable

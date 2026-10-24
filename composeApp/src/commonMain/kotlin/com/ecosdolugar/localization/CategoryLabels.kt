@@ -9,43 +9,46 @@ fun categoryLabel(category: Category, language: AppLanguage): String =
             Category.ALL -> "Todas"
             Category.HISTORIA -> "Historia"
             Category.LEYENDAS -> "Leyendas"
-            Category.FAMILIAS -> "Familias"
-            Category.PATRIMONIO -> "Patrimonio"
             Category.NATURALEZA -> "Naturaleza"
+            Category.GASTRONOMIA -> "Gastronomía"
+            Category.ARTE -> "Arte"
+            Category.TRADICIONES -> "Tradiciones"
         }
         AppLanguage.GALICIAN -> when (category) {
             Category.ALL -> "Todas"
             Category.HISTORIA -> "Historia"
             Category.LEYENDAS -> "Lendas"
-            Category.FAMILIAS -> "Familias"
-            Category.PATRIMONIO -> "Patrimonio"
             Category.NATURALEZA -> "Natureza"
+            Category.GASTRONOMIA -> "Gastronomía"
+            Category.ARTE -> "Arte"
+            Category.TRADICIONES -> "Tradicións"
         }
         AppLanguage.ENGLISH -> when (category) {
             Category.ALL -> "All"
             Category.HISTORIA -> "History"
             Category.LEYENDAS -> "Legends"
-            Category.FAMILIAS -> "Families"
-            Category.PATRIMONIO -> "Heritage"
             Category.NATURALEZA -> "Nature"
+            Category.GASTRONOMIA -> "Gastronomy"
+            Category.ARTE -> "Art"
+            Category.TRADICIONES -> "Traditions"
         }
     }
 
 fun difficultyDetail(difficulty: Difficulty, language: AppLanguage): String =
     when (language) {
         AppLanguage.SPANISH -> when (difficulty) {
-            Difficulty.FACIL -> "Paseo accesible"
-            Difficulty.MEDIA -> "Camino tradicional"
-            Difficulty.EXIGENTE -> "Costa o desnivel"
+            Difficulty.FACIL -> "Recorrido corto, terreno sencillo y poco esfuerzo físico."
+            Difficulty.MEDIA -> "Recorrido con algunas pendientes o tramos irregulares."
+            Difficulty.EXIGENTE -> "Recorrido largo, con desniveles o terreno exigente."
         }
         AppLanguage.GALICIAN -> when (difficulty) {
-            Difficulty.FACIL -> "Paseo accesible"
-            Difficulty.MEDIA -> "Camiño tradicional"
-            Difficulty.EXIGENTE -> "Costa ou desnivel"
+            Difficulty.FACIL -> "Percorrido curto, terreo sinxelo e pouco esforzo físico."
+            Difficulty.MEDIA -> "Percorrido con algunhas pendentes ou tramos irregulares."
+            Difficulty.EXIGENTE -> "Percorrido longo, con desniveis ou terreo esixente."
         }
         AppLanguage.ENGLISH -> when (difficulty) {
-            Difficulty.FACIL -> "Accessible walk"
-            Difficulty.MEDIA -> "Traditional path"
-            Difficulty.EXIGENTE -> "Coastal or steep terrain"
+            Difficulty.FACIL -> "Short route, easy terrain and little physical effort."
+            Difficulty.MEDIA -> "Route with some slopes or uneven sections."
+            Difficulty.EXIGENTE -> "Long route, with steep changes in elevation or demanding terrain."
         }
     }

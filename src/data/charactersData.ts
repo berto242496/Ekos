@@ -18,7 +18,7 @@ export const CHARACTERS: CharacterItem[] = [
     cardGradient: 'from-[#2b1238] via-[#1a0f27] to-[#090b14]',
     glowColor: 'rgba(192, 132, 252, 0.25)',
     stats: [],
-    avatarEmoji: '🔮',
+    avatarImage: '/assets/characters/meiga.jpeg',
     iconName: 'Sparkles',
   },
   {
@@ -38,28 +38,28 @@ export const CHARACTERS: CharacterItem[] = [
     cardGradient: 'from-[#3a1d0d] via-[#24130b] to-[#0b0f14]',
     glowColor: 'rgba(249, 115, 22, 0.25)',
     stats: [],
-    avatarEmoji: '👺',
+    avatarImage: '/assets/characters/trasno.jpeg',
     iconName: 'Footprints',
   },
   {
-    id: 'moura',
-    name: 'Moura',
-    galicianTitle: 'A Moura',
-    archetype: 'Guardiana de leyendas',
-    badge: 'Memoria de los castros',
-    summary: 'Figura legendaria vinculada a castros, fuentes, peñascos y tesoros escondidos.',
-    lore: 'Figura legendaria de gran belleza y misterio, vinculada a castros, fuentes, peñascos y tesoros escondidos. En las leyendas gallegas, suele guardar encantamientos y secretos ancestrales.',
-    abilityName: 'Tesoros y leyendas antiguas',
-    abilityDescription: 'Guarda tesoros antiguos y conoce el valor de cada paso bajo el hechizo de su mirada. Si completas el camino hasta el final, quizá recibas una recompensa digna de una leyenda.',
-    quote: '«Las piedras guardan el tesoro de quien sabe escuchar la tierra.»',
-    sacredItem: 'Tesoros de los castros',
-    element: 'Piedra y encantamientos',
-    accentColor: '#fbbf24',
-    cardGradient: 'from-[#382a0d] via-[#241b0b] to-[#09140f]',
-    glowColor: 'rgba(251, 191, 36, 0.25)',
+    id: 'nubeiro',
+    name: 'Nubeiro',
+    galicianTitle: 'O Nubeiro',
+    archetype: 'Señor de las nubes y las tormentas',
+    badge: 'Señor de las tormentas',
+    summary: 'Figura legendaria de la tradición gallega, señor de las nubes y las tormentas.',
+    lore: 'Figura legendaria de la tradición gallega, señor de las nubes y las tormentas. Se dice que recorre los cielos provocando truenos, rayos y lluvia, envuelto en nieblas y vientos misteriosos.',
+    abilityName: 'Viaje entre truenos y relámpagos',
+    abilityDescription: 'Recorre los cielos entre truenos y relámpagos, y sabe que todo viaje tiene su destino. Si sigues su rastro hasta el final, quizás las nubes se abran para ti y revelen un regalo digno de los dioses del cielo.',
+    quote: '«Quien sigue el rastro de las nubes llega siempre a su destino.»',
+    sacredItem: 'Relámpago y niebla',
+    element: 'Cielo y tormenta',
+    accentColor: '#60a5fa',
+    cardGradient: 'from-[#0d1f38] via-[#0b1626] to-[#080d18]',
+    glowColor: 'rgba(96, 165, 250, 0.25)',
     stats: [],
-    avatarEmoji: '👑',
-    iconName: 'Shield',
+    avatarImage: '/assets/characters/nubeiro.jpeg',
+    iconName: 'CloudLightning',
   },
   {
     id: 'urco',
@@ -78,18 +78,15 @@ export const CHARACTERS: CharacterItem[] = [
     cardGradient: 'from-[#122e1a] via-[#0d2214] to-[#08170c]',
     glowColor: 'rgba(74, 222, 128, 0.25)',
     stats: [],
-    avatarEmoji: '🐺',
+    avatarImage: '/assets/characters/urco.jpeg',
     iconName: 'Compass',
   },
 ];
 
 export const DEFAULT_CHARACTER = CHARACTERS[0];
 
-const LEGACY_CHARACTER_IDS = new Set(['lavandeira', 'lobishome', 'caminante', 'contrabandista']);
-
 export function getCharacterById(id: string): CharacterItem {
-  const canonicalId = LEGACY_CHARACTER_IDS.has(id) ? 'urco' : id;
-  return CHARACTERS.find(character => character.id === canonicalId) || DEFAULT_CHARACTER;
+  return CHARACTERS.find(character => character.id === id) || DEFAULT_CHARACTER;
 }
 
 export interface CharacterAffinity {
@@ -108,11 +105,11 @@ export function getCharacterRouteAffinity(characterId: string, routeId: string):
       bonusDescription: '+50% de percepción de hierbas y pistas ocultas en robledales y claustros.',
     };
   }
-  if (id === 'moura' && (routeId === 'baixo-mino' || routeId === 'rias-baixas' || routeId === 'contrabando' || routeId === 'leyendas-mino')) {
+  if (id === 'nubeiro' && (routeId === 'costa-da-morte' || routeId === 'serra-do-courel')) {
     return {
       hasAffinity: true,
-      badgeLabel: '👑 Sintonía telúrica de la Moura',
-      bonusDescription: 'Desvela tesoros de oro y grabados rúnicos de los castros milenarios.',
+      badgeLabel: '⛈️ Sintonía de tormenta del Nubeiro',
+      bonusDescription: 'Sus nubes revelan rutas ocultas y señales del cielo en costas y montañas abiertas.',
     };
   }
   if (id === 'urco' && (routeId === 'serra-do-courel' || routeId === 'fragas-do-eume')) {
@@ -143,8 +140,8 @@ export function getCharacterCompanionAdvice(characterId: string, stopTitle: stri
       return `«Siento un aroma a hierba de San Juan y agua fresca cerca de ${stopTitle}. Abre los ojos del alma y usa mi don si el enigma te parece oscuro.»`;
     case 'trasno':
       return `«¡Caray! En esta parada de ${stopTitle} hay un sendero secreto... Si te atascas con la prueba, ¡déjame trastear y lo descifro en un abrir y cerrar de ojos!»`;
-    case 'moura':
-      return `«Las piedras de ${stopTitle} guardan el peso de tres mil años. Escucha el silencio de la tierra y recuerda el valor del trisquel y del oro telúrico.»`;
+    case 'nubeiro':
+      return `«Oigo un trueno lejano sobre ${stopTitle}. Sigue mi rastro y las nubes podrían abrirse para ti.»`;
     case 'urco':
       return `«Entre a néboa de ${stopTitle}, o meu instinto percibe verdades que pasan desapercibidas.»`;
     default:

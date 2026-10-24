@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { RouteItem, RouteStop, UserProfile } from '../types';
+import { CharacterAvatar } from './CharacterAvatar';
 import { soundEngine } from '../services/soundEngine';
 import {
   getCharacterById,
@@ -190,7 +191,7 @@ export const ActiveExpedition: React.FC<ActiveExpeditionProps> = ({
             className="w-10 h-10 rounded-full bg-[#1b3022] flex items-center justify-center text-xl shadow-xs border border-white/40 cursor-pointer"
             title={`Compañero Activo: ${character.name}`}
           >
-            {character.avatarEmoji}
+            <CharacterAvatar character={character} className="h-8 w-8" />
           </div>
         </div>
       </header>
@@ -401,7 +402,7 @@ export const ActiveExpedition: React.FC<ActiveExpeditionProps> = ({
           <div className="flex items-start justify-between gap-3">
             <div className="flex items-center gap-3">
               <div className="w-12 h-12 rounded-2xl bg-white/10 flex items-center justify-center text-2xl border border-white/20 shrink-0 shadow-inner">
-                {character.avatarEmoji}
+                              <CharacterAvatar character={character} className="h-9 w-9" />
               </div>
               <div className="flex flex-col min-w-0">
                 <div className="flex items-center gap-2">

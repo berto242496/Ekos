@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { StopTrial } from '../types';
 import { getCharacterById } from '../data/charactersData';
+import { CharacterAvatar } from './CharacterAvatar';
 import { soundEngine } from '../services/soundEngine';
 import {
   Sparkles,
@@ -93,18 +94,18 @@ export const TrialCard: React.FC<TrialCardProps> = ({
         setTypedLetters([trial.cipherWord[0].toUpperCase()]);
         setDonMessage('🔮 ¡La Meiga iluminó la primera letra con su caldero!');
       }
-    } else if (characterId === 'moura') {
-      // 2. MOURA: Orden Ancestral de los Petroglifos
+    } else if (getCharacterById(characterId).id === 'nubeiro') {
+      // 2. NUBEIRO: Orden Ancestral de los Petroglifos
       if (trial?.type === 'puzle_runico' && trial.correctRuneOrder) {
         setSelectedRunes(trial.correctRuneOrder.slice(0, Math.min(3, Math.max(2, trial.correctRuneOrder.length - 1))));
-        setDonMessage('👑 ¡La Moura ordenó los glifos milenarios sobre el granito de los castros!');
+        setDonMessage('⛈️ ¡El Nubeiro ordenó los glifos milenarios sobre la piedra de los castros!');
       } else if (trial?.type === 'acertijo') {
         setHighlightedCorrectOption(true);
-        setDonMessage('👑 ¡La Moura recordó la inscripción milenaria de piedra!');
+        setDonMessage('⛈️ ¡El Nubeiro recordó la inscripción milenaria de piedra!');
       } else if (trial?.type === 'cifrado_magico' && trial.cipherWord) {
         const firstTwo = trial.cipherWord.slice(0, 2).toUpperCase().split('');
         setTypedLetters(firstTwo);
-        setDonMessage('👑 ¡La Moura grabó las primeras runas de piedra en el código!');
+        setDonMessage('⛈️ ¡El Nubeiro grabó las primeras runas de piedra en el código!');
       }
     } else if (characterId === 'trasno') {
       // 3. TRASNO: Atajo Pillo de Cifrados
@@ -341,7 +342,7 @@ export const TrialCard: React.FC<TrialCardProps> = ({
         {donMessage && (
           <div className="p-3 rounded-xl bg-[#1b3022] text-[#f7f2ea] text-xs font-sans flex items-center justify-between gap-2 shadow-sm animate-in fade-in slide-in-from-top-1">
             <div className="flex items-center gap-2">
-              <span className="text-base">{char.avatarEmoji}</span>
+              <CharacterAvatar character={char} className="h-6 w-6" />
               <span className="font-medium leading-snug">{donMessage}</span>
             </div>
             <button
@@ -598,7 +599,7 @@ export const TrialCard: React.FC<TrialCardProps> = ({
           <div className="mt-1">
             {showCharacterClue ? (
               <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-start gap-2.5">
-                <span className="text-xl shrink-0 leading-none mt-0.5">{char.avatarEmoji}</span>
+                <CharacterAvatar character={char} className="mt-0.5 h-6 w-6" />
                 <div className="flex flex-col min-w-0">
                   <div className="flex items-center gap-1.5">
                     <span className="font-serif text-[12px] font-bold text-amber-950">
@@ -624,7 +625,7 @@ export const TrialCard: React.FC<TrialCardProps> = ({
                 className="w-full py-2 px-3 rounded-xl bg-amber-500/10 hover:bg-amber-500/15 border border-amber-500/25 flex items-center justify-between text-left cursor-pointer transition-all active:scale-[0.99]"
               >
                 <div className="flex items-center gap-2">
-                  <span className="text-base">{char.avatarEmoji}</span>
+                  <CharacterAvatar character={char} className="h-6 w-6" />
                   <span className="font-sans text-[12px] font-medium text-amber-950">
                     Preguntar secreto oculto a {char.name}
                   </span>

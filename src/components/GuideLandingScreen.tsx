@@ -1,5 +1,6 @@
 import React from 'react';
-import { Compass, Sparkles, MapPin, Coins, Users, ArrowRight, BookOpen, ShieldCheck, ChevronLeft } from 'lucide-react';
+import { ChevronLeft, Compass, Sparkles, Coins, Users, ArrowRight, BookOpen, ShieldCheck } from 'lucide-react';
+import { useI18n } from '../services/i18n';
 
 interface GuideLandingScreenProps {
   onStartCreateRoute: () => void;
@@ -12,26 +13,27 @@ export const GuideLandingScreen: React.FC<GuideLandingScreenProps> = ({
   onGoToDashboard,
   onBackToVisitor,
 }) => {
+  const { t } = useI18n();
   const benefits = [
     {
       icon: Compass,
-      title: 'Crea rutas propias',
-      desc: 'Diseña itinerarios a tu ritmo, destacando los rincones, historias y leyendas que solo los locales conocen.',
+      title: t('guide_landing_block_1_title'),
+      desc: t('guide_landing_block_1_desc'),
     },
     {
       icon: BookOpen,
-      title: 'Publica experiencias culturales',
-      desc: 'Enriquece cada parada con relatos orales, misterios históricos, pistas secretas y retos participativos.',
+      title: t('guide_landing_block_2_title'),
+      desc: t('guide_landing_block_2_desc'),
     },
     {
       icon: Users,
-      title: 'Llega a más visitantes',
-      desc: 'Conecta con viajeros y amantes del patrimonio que buscan descubrir el territorio de forma inmersiva y respetuosa.',
+      title: t('guide_landing_block_3_title'),
+      desc: t('guide_landing_block_3_desc'),
     },
     {
       icon: Coins,
-      title: 'Monetiza tu conocimiento',
-      desc: 'Fija el precio de tus rutas con micropagos accesibles (0,99 € – 4,99 €) u ofrécelas gratis con total libertad.',
+      title: t('guide_landing_block_4_title'),
+      desc: t('guide_landing_block_4_desc'),
     },
   ];
 
@@ -64,15 +66,15 @@ export const GuideLandingScreen: React.FC<GuideLandingScreenProps> = ({
         <div className="text-center max-w-2xl mx-auto mb-12">
           <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#c48b47]/15 border border-[#c48b47]/30 text-[#8c5717] text-xs font-semibold uppercase tracking-widest mb-6">
             <Sparkles className="w-3.5 h-3.5" />
-            Espacio para Guías y Divulgadores
+            {t('guide_landing_eyebrow')}
           </div>
 
           <h1 className="text-3xl sm:text-5xl font-serif font-medium tracking-tight text-[#0f2416] leading-tight mb-5">
-            Crea y monetiza tus propias rutas
+            {t('guide_landing_title')}
           </h1>
 
           <p className="text-lg sm:text-xl text-[#334b39] font-serif leading-relaxed">
-            Convierte tu conocimiento local en experiencias digitales para visitantes.
+            {t('guide_landing_description')}
           </p>
         </div>
 
@@ -120,7 +122,7 @@ export const GuideLandingScreen: React.FC<GuideLandingScreenProps> = ({
                 onClick={onStartCreateRoute}
                 className="w-full sm:w-auto inline-flex items-center justify-center gap-2.5 px-8 py-3.5 rounded-xl bg-[#c48b47] hover:bg-[#d59850] text-[#0f2416] font-semibold text-base shadow-md transition-all active:scale-[0.98]"
               >
-                <span>Crear mi primera ruta</span>
+                <span>{t('guide_landing_cta')}</span>
                 <ArrowRight className="w-4 h-4" />
               </button>
 

@@ -70,8 +70,8 @@ fun guideDashboardStrings(language: AppLanguage): GuideDashboardStrings =
             difficulty = { difficulty ->
                 when (difficulty) {
                     Difficulty.FACIL -> "Fácil"
-                    Difficulty.MEDIA -> "Media"
-                    Difficulty.EXIGENTE -> "Exigente"
+                    Difficulty.MEDIA -> "Moderada"
+                    Difficulty.EXIGENTE -> "Difícil"
                 }
             }
         )
@@ -108,8 +108,8 @@ fun guideDashboardStrings(language: AppLanguage): GuideDashboardStrings =
             difficulty = { difficulty ->
                 when (difficulty) {
                     Difficulty.FACIL -> "Fácil"
-                    Difficulty.MEDIA -> "Media"
-                    Difficulty.EXIGENTE -> "Esixente"
+                    Difficulty.MEDIA -> "Moderada"
+                    Difficulty.EXIGENTE -> "Difícil"
                 }
             }
         )
@@ -146,8 +146,8 @@ fun guideDashboardStrings(language: AppLanguage): GuideDashboardStrings =
             difficulty = { difficulty ->
                 when (difficulty) {
                     Difficulty.FACIL -> "Easy"
-                    Difficulty.MEDIA -> "Medium"
-                    Difficulty.EXIGENTE -> "Demanding"
+                    Difficulty.MEDIA -> "Moderate"
+                    Difficulty.EXIGENTE -> "Hard"
                 }
             }
         )

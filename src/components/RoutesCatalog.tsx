@@ -3,6 +3,7 @@ import { RouteItem, Category, UserProfile, GuideAuthor } from '../types';
 import { APP_LOGO_URL } from '../data/routesData';
 import { MOCK_GUIDES } from '../data/guidesData';
 import { getCharacterById, getCharacterRouteAffinity } from '../data/charactersData';
+import { CharacterAvatar } from './CharacterAvatar';
 import { soundEngine } from '../services/soundEngine';
 import { useI18n } from '../services/i18n';
 import { LanguageSelector } from './LanguageSelector';
@@ -48,17 +49,19 @@ const CATEGORIES: { id: Category | 'all'; label: string }[] = [
   { id: 'all', label: 'filter_all' },
   { id: 'historia', label: 'filter_history' },
   { id: 'leyendas', label: 'filter_legends' },
-  { id: 'familias', label: 'filter_families' },
-  { id: 'patrimonio', label: 'filter_heritage' },
   { id: 'naturaleza', label: 'filter_nature' },
+  { id: 'gastronomia', label: 'filter_gastronomy' },
+  { id: 'arte', label: 'filter_art' },
+  { id: 'tradiciones', label: 'filter_traditions' },
 ];
 
 const CATEGORY_TRANSLATION_KEYS: Record<string, string> = {
   historia: 'filter_history',
   leyendas: 'filter_legends',
-  familias: 'filter_families',
-  patrimonio: 'filter_heritage',
   naturaleza: 'filter_nature',
+  gastronomia: 'filter_gastronomy',
+  arte: 'filter_art',
+  tradiciones: 'filter_traditions',
 };
 
 const DIFFICULTY_TRANSLATION_KEYS: Record<string, string> = {
@@ -388,7 +391,7 @@ export const RoutesCatalog: React.FC<RoutesCatalogProps> = ({
                 className="h-8 px-2.5 rounded-full bg-[#1b3022]/10 hover:bg-[#1b3022]/15 active:scale-95 flex items-center gap-1.5 transition-all cursor-pointer border border-[#1b3022]/15"
                 title={t('catalog_character_title').replace('{name}', activeChar.name)}
               >
-                <span className="text-base leading-none">{activeChar.avatarEmoji}</span>
+                <CharacterAvatar character={activeChar} className="h-6 w-6" />
                 <span className="font-serif text-xs font-semibold text-[#1b3022] hidden xs:inline">
                   {activeChar.name}
                 </span>
@@ -424,7 +427,7 @@ export const RoutesCatalog: React.FC<RoutesCatalogProps> = ({
           <div className="flex items-center gap-1.5">
             <Navigation className="w-4 h-4 text-[#47654e]" />
             <span className="font-sans text-[11px] uppercase tracking-wider text-[#47654e] font-semibold">
-              {t('catalog_region_scope')}
+              {t('catalog_top_text')}
             </span>
           </div>
 
@@ -449,9 +452,7 @@ export const RoutesCatalog: React.FC<RoutesCatalogProps> = ({
           </h2>
           <div className="flex items-center justify-between gap-2 mt-1">
             <p className="font-serif text-[15px] text-[#434843] italic">
-              {filteredRoutes.length} {t(filteredRoutes.length === 1 ? 'catalog_experience_one' : 'catalog_experience_many')} {filteredRoutes.length !== routes.length
-                ? `(${t('catalog_count_of')} ${routes.length})`
-                : t('catalog_in_catalog')}
+              {t(routes.length === 1 ? 'catalog_available_one' : 'catalog_available_many').replace('{count}', String(routes.length))}
             </p>
             {activeFiltersCount > 0 && (
               <button
@@ -1055,7 +1056,7 @@ export const RoutesCatalog: React.FC<RoutesCatalogProps> = ({
                     {/* Character Affinity Highlight */}
                     {affinity.hasAffinity && (
                       <div className="flex items-center gap-2 p-2 rounded-xl bg-amber-50 border border-amber-300/80 text-amber-950 text-xs font-sans">
-                        <span className="text-base leading-none shrink-0">{activeChar.avatarEmoji}</span>
+                        <CharacterAvatar character={activeChar} className="h-6 w-6 shrink-0" />
                         <div className="flex flex-col min-w-0">
                           <span className="font-bold text-[11px] text-amber-900 leading-tight">
                             {affinity.badgeLabel}

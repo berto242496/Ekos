@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { UserProfile } from '../types';
 import { CHARACTERS, getCharacterById } from '../data/charactersData';
+import { CharacterAvatar } from './CharacterAvatar';
 import { LanguageSelector } from './LanguageSelector';
 import { useI18n } from '../services/i18n';
 import { ArrowLeft, Check, CheckCircle2, Sparkles } from 'lucide-react';
@@ -54,8 +55,8 @@ export const CharacterSelectionScreen: React.FC<CharacterSelectionScreenProps> =
 
           <div className="flex items-center gap-2">
             <LanguageSelector variant="compact" />
-            <div className="w-10 h-10 rounded-full bg-[#132e1e] border border-[#faba71]/30 flex items-center justify-center text-xl shadow-inner">
-              {activeChar.avatarEmoji}
+            <div className="w-10 h-10 rounded-full bg-[#132e1e] border border-[#faba71]/30             flex items-center justify-center shadow-inner">
+                          <CharacterAvatar character={activeChar} className="h-10 w-10" />
             </div>
           </div>
         </div>
@@ -99,7 +100,7 @@ export const CharacterSelectionScreen: React.FC<CharacterSelectionScreenProps> =
                       backgroundColor: isSelected ? `${char.accentColor}30` : 'rgba(0,0,0,0.3)',
                     }}
                   >
-                    {char.avatarEmoji}
+<CharacterAvatar character={char} className="h-12 w-12" />
                   </div>
                   <span className="font-serif text-xs font-bold text-white truncate w-full">
                     {char.name}
@@ -118,7 +119,7 @@ export const CharacterSelectionScreen: React.FC<CharacterSelectionScreenProps> =
           }}
         >
           <div className="absolute -right-8 -bottom-8 opacity-10 pointer-events-none text-9xl">
-            {activeChar.avatarEmoji}
+                      <CharacterAvatar character={activeChar} className="h-40 w-40" />
           </div>
 
           <div className="relative z-10 flex flex-col gap-4">
@@ -130,7 +131,7 @@ export const CharacterSelectionScreen: React.FC<CharacterSelectionScreenProps> =
                   borderColor: `${activeChar.accentColor}80`,
                 }}
               >
-                {activeChar.avatarEmoji}
+                <CharacterAvatar character={activeChar} className="h-14 w-14" />
               </div>
               <h2 className="font-serif text-2xl font-bold text-white tracking-tight">
                 {activeChar.name}

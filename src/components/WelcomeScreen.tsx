@@ -8,12 +8,16 @@ interface WelcomeScreenProps {
   onSignInWithGoogle: () => void;
   onOpenGuideMode?: () => void;
   isGuideSignInLoading?: boolean;
+  routesCount: number;
+  guidesCount: number;
 }
 
 export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
   onSignInWithGoogle,
   onOpenGuideMode,
   isGuideSignInLoading = false,
+  routesCount,
+  guidesCount,
 }) => {
   const { t } = useI18n();
   return (
@@ -55,14 +59,14 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
 
         <div className="flex flex-col items-center bg-white/10 backdrop-blur-md px-5 py-2.5 rounded-full border border-white/10 shadow-sm">
           <img
-            alt="Ecos del Lugar Logo"
+            alt={t('welcome_brand')}
             className="h-6 w-auto object-contain brightness-0 invert opacity-95"
             src={APP_LOGO_URL}
           />
           <div className="flex items-center gap-1.5 mt-0.5">
             <span className="w-1 h-1 rounded-full bg-[#faba71]" />
             <span className="font-sans text-[10px] uppercase text-[#ebe8e1] tracking-widest font-medium">
-              Rutas & Patrimonio de Toda Galicia
+              {t('welcome_header_subtitle')}
             </span>
             <span className="w-1 h-1 rounded-full bg-[#faba71]" />
           </div>
@@ -96,28 +100,24 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
 
         {/* Poetic Headline */}
         <h1 className="font-serif text-[34px] text-white italic leading-tight tracking-tight mb-3">
-          Haz visitable <br />
-          <span className="not-italic font-semibold text-[#fcf9f2]">lo invisible</span>
+          {t('welcome_title_1')} <br />
+          <span className="not-italic font-semibold text-[#fcf9f2]">{t('welcome_title_2')}</span>
         </h1>
 
         {/* Editorial Excerpt */}
         <p className="font-sans text-[15px] text-[#ebe8e1] leading-relaxed mb-6 max-w-sm">
-          Descubre la historia, mitología y tesoros ocultos de toda Galicia a través de rutas digitales interactivas y relatos sonoros.
+          {t('welcome_description')}
         </p>
 
-        {/* Tactical Micro-Metrics of All Galicia */}
-        <div className="grid grid-cols-3 gap-2 p-3 rounded-xl bg-white/10 backdrop-blur-sm border border-white/5 mb-6">
+        {/* Live Metrics from the app's route catalog */}
+        <div className="grid grid-cols-2 gap-2 p-3 rounded-xl bg-white/10 backdrop-blur-sm border border-white/5 mb-6">
           <div className="flex flex-col">
-            <span className="font-sans text-[11px] uppercase tracking-wider text-[#e5e2db]">Provincias</span>
-            <span className="font-serif text-[20px] text-white font-semibold">4</span>
+            <span className="font-sans text-[11px] uppercase tracking-wider text-[#e5e2db]">{t('welcome_stat_routes')}</span>
+            <span className="font-serif text-[20px] text-white font-semibold">{routesCount}</span>
           </div>
-          <div className="flex flex-col border-x border-white/10 px-2">
-            <span className="font-sans text-[11px] uppercase tracking-wider text-[#e5e2db]">Rutas Míticas</span>
-            <span className="font-serif text-[20px] text-white font-semibold">7</span>
-          </div>
-          <div className="flex flex-col pl-1">
-            <span className="font-sans text-[11px] uppercase tracking-wider text-[#e5e2db]">Geografía</span>
-            <span className="font-serif text-[18px] text-[#faba71] font-semibold">Toda Galicia</span>
+          <div className="flex flex-col border-l border-white/10 pl-3">
+            <span className="font-sans text-[11px] uppercase tracking-wider text-[#e5e2db]">{t('welcome_stat_guides')}</span>
+            <span className="font-serif text-[20px] text-white font-semibold">{guidesCount}</span>
           </div>
         </div>
 
@@ -151,7 +151,7 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
             </svg>
             <div className="flex flex-col items-start leading-tight">
               <span className="font-sans text-[15px] font-semibold text-[#1f1f1f]">
-                Entra con Google
+                {t('welcome_visitor_button')}
               </span>
             </div>
           </button>
@@ -160,7 +160,7 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
           <div className="relative flex py-1.5 items-center">
             <div className="flex-grow border-t border-white/15" />
             <span className="flex-shrink mx-3 text-[11px] uppercase tracking-wider text-[#ffddba]/70 font-serif">
-              ¿Eres guía local?
+              {t('welcome_guide_separator')}
             </span>
             <div className="flex-grow border-t border-white/15" />
           </div>
@@ -176,7 +176,7 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
             {isGuideSignInLoading
               ? <LoaderCircle className="w-4 h-4 animate-spin text-[#faba71]" />
               : <Compass className="w-4 h-4 text-[#faba71]" />}
-            <span>{isGuideSignInLoading ? 'Conectando con Google…' : 'Soy guía · Crea tus rutas con Google'}</span>
+            <span>{isGuideSignInLoading ? t('welcome_connecting') : t('welcome_guide_button')}</span>
           </button>
         </div>
 
@@ -184,7 +184,7 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
         <div className="mt-4 text-center">
           <p className="font-sans text-[11px] text-[#c3c8c1]/70 font-light flex items-center justify-center gap-1.5">
             <MapPin className="w-3 h-3 text-[#faba71]" />
-            <span>A Coruña · Lugo · Ourense · Pontevedra — Arquivo Vivo</span>
+            <span>{t('welcome_footer')}</span>
           </p>
         </div>
       </main>

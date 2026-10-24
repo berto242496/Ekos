@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { RouteItem, UserProfile, GuideAuthor, UserPurchaseRecord } from '../types';
 import { APP_LOGO_URL } from '../data/routesData';
 import { getCharacterById, getCharacterRouteAffinity } from '../data/charactersData';
+import { CharacterAvatar } from './CharacterAvatar';
 import { UserCheckoutModal } from './UserCheckoutModal';
 import { LanguageSelector } from './LanguageSelector';
 import { useI18n } from '../services/i18n';
@@ -383,7 +384,7 @@ export const RouteDetail: React.FC<RouteDetailProps> = ({
           <div className="p-4 rounded-2xl bg-gradient-to-r from-[#1b3022] to-[#091b10] text-white border border-[#2b4c37] shadow-sm flex flex-col gap-2.5">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2.5">
-                <span className="text-2xl leading-none">{activeChar.avatarEmoji}</span>
+                <CharacterAvatar character={activeChar} className="h-8 w-8" />
                 <div>
                   <span className="text-[10px] uppercase font-bold text-[#ffddba] tracking-wider block">
                     Compañeiro Activo
@@ -573,7 +574,7 @@ export const RouteDetail: React.FC<RouteDetailProps> = ({
               <span className="font-serif text-sm font-semibold tracking-wide truncate">
                 Empezar con {activeChar.name.split(' ')[0]}
               </span>
-              <span className="text-sm shrink-0">{activeChar.avatarEmoji}</span>
+              <CharacterAvatar character={activeChar} className="h-5 w-5" />
               <ArrowRight className="w-3.5 h-3.5 text-[#ffddba] shrink-0" />
             </button>
           ) : (

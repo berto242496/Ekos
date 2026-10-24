@@ -58,6 +58,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
+import com.ecosdolugar.ui.components.CharacterAvatarImage
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -246,7 +247,7 @@ private fun TrialCompletedContent(
                 .border(2.dp, accent, CircleShape),
             contentAlignment = Alignment.Center
         ) {
-            Text(character.avatarEmoji, fontSize = 56.sp)
+            CharacterAvatarImage(character.avatarImage, Modifier.padding(4.dp))
         }
         Surface(
             shape = RoundedCornerShape(18.dp),

@@ -17,6 +17,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import com.ecosdolugar.ui.components.CharacterAvatarImage
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontStyle
@@ -157,7 +158,7 @@ fun RoutesCatalogScreen(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(4.dp)
                             ) {
-                                Text(activeCharacter.avatarEmoji, fontSize = 14.sp)
+                                CharacterAvatarImage(activeCharacter.avatarImage, Modifier.size(20.dp))
                                 Text(activeCharacter.name, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = PineDeep)
                             }
                         }
@@ -201,7 +202,7 @@ fun RoutesCatalogScreen(
                     ) {
                         Icon(Icons.Default.NearMe, contentDescription = null, tint = PineMoss, modifier = Modifier.size(15.dp))
                         Text(
-                            text = strings.regionCoverage,
+                            text = strings.topLabel,
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Bold,
                             color = PineMoss,
@@ -243,8 +244,7 @@ fun RoutesCatalogScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "${filteredRoutes.size} ${if (filteredRoutes.size == 1) strings.experienceSingular else strings.experiencePlural} " +
-                                if (filteredRoutes.size == routes.size) strings.catalogSuffix else "${strings.countOf} ${routes.size}",
+                            text = strings.routesAvailable(filteredRoutes.size),
                             style = MaterialTheme.typography.bodyMedium.copy(
                                 color = OnSurfaceVariant,
                                 fontStyle = FontStyle.Italic

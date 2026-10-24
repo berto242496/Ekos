@@ -4,9 +4,10 @@ enum class Category(val displayName: String) {
     ALL("Todas"),
     HISTORIA("Historia"),
     LEYENDAS("Leyendas"),
-    FAMILIAS("Familias"),
-    PATRIMONIO("Patrimonio"),
-    NATURALEZA("Naturaleza")
+    NATURALEZA("Naturaleza"),
+    GASTRONOMIA("Gastronomía"),
+    ARTE("Arte"),
+    TRADICIONES("Tradiciones")
 }
 
 enum class Difficulty(val label: String, val detail: String) {

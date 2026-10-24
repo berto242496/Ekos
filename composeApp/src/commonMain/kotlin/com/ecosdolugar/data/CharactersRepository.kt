@@ -1,5 +1,10 @@
 package com.ecosdolugar.data
 
+import ecosdolugar.composeapp.generated.resources.Res
+import ecosdolugar.composeapp.generated.resources.character_meiga
+import ecosdolugar.composeapp.generated.resources.character_nubeiro
+import ecosdolugar.composeapp.generated.resources.character_trasno
+import ecosdolugar.composeapp.generated.resources.character_urco
 import com.ecosdolugar.model.CharacterItem
 
 object CharactersRepository {
@@ -19,7 +24,7 @@ object CharactersRepository {
             element = "Natureza e maxia",
             accentColorHex = 0xFFC084FCL,
             stats = emptyList(),
-            avatarEmoji = "🔮"
+            avatarImage = Res.drawable.character_meiga
         ),
         CharacterItem(
             id = "trasno",
@@ -36,24 +41,24 @@ object CharactersRepository {
             element = "Vento e corredoiras",
             accentColorHex = 0xFFF97316L,
             stats = emptyList(),
-            avatarEmoji = "👺"
+            avatarImage = Res.drawable.character_trasno
         ),
         CharacterItem(
-            id = "moura",
-            name = "Moura",
-            galicianTitle = "A Moura",
-            archetype = "Gardiá de lendas",
-            badge = "Memoria dos castros",
-            summary = "Figura lendaria vinculada a castros, fontes, penedos e tesouros agochados.",
-            lore = "Figura lendaria de gran beleza e misterio, vinculada a castros, fontes, penedos e tesouros agochados. Nas lendas galegas, adoita gardar encantamentos e segredos ancestrais.",
-            abilityName = "Tesouros e lendas antigas",
-            abilityDescription = "Garda tesouros antigos e coñece o valor de cada paso dado baixo o feitizo da súa mirada. Se completas o camiño ata o final, quizais recibas unha recompensa digna dunha lenda.",
-            quote = "«As pedras gardan o tesouro de quen sabe escoitar a terra.»",
-            sacredItem = "Tesouros dos castros",
-            element = "Pedra e encantamentos",
-            accentColorHex = 0xFFFBBF24L,
+            id = "nubeiro",
+            name = "Nubeiro",
+            galicianTitle = "O Nubeiro",
+            archetype = "Señor das nubes e das tormentas",
+            badge = "Señor das tormentas",
+            summary = "Figura lendaria da tradición galega, señor das nubes e das tormentas.",
+            lore = "Figura lendaria da tradición galega, señor das nubes e das tormentas. Dise que percorre os ceos provocando treboadas, raios e choiva, envolto en néboas e ventos misteriosos.",
+            abilityName = "Viaxe entre troons e lóstregos",
+            abilityDescription = "Percorre os ceos entre tronos e lóstregos, e sabe que toda viaxe ten o seu destino. Se segues o seu ronsel ata o final, quizais as nubes se abran para ti e revelen un agasallo digno dos deuses do ceo.",
+            quote = "«Quen segue o rastro das nubes chega sempre ao seu destino.»",
+            sacredItem = "Lóstrego e néboa",
+            element = "Ceo e tormenta",
+            accentColorHex = 0xFF60A5FAL,
             stats = emptyList(),
-            avatarEmoji = "👑"
+            avatarImage = Res.drawable.character_nubeiro
         ),
         CharacterItem(
             id = "urco",
@@ -70,15 +75,11 @@ object CharactersRepository {
             element = "Mar e misterio",
             accentColorHex = 0xFF4ADE80L,
             stats = emptyList(),
-            avatarEmoji = "🐺"
+            avatarImage = Res.drawable.character_urco
         )
     )
 
     fun getById(id: String): CharacterItem {
-        val canonicalId = when (id) {
-            "lavandeira", "lobishome", "caminante", "contrabandista" -> "urco"
-            else -> id
-        }
-        return characters.find { it.id == canonicalId } ?: characters.first()
+        return characters.find { it.id == id } ?: characters.first()
     }
 }

@@ -5,7 +5,6 @@ import androidx.lifecycle.viewModelScope
 import com.ecosdolugar.auth.GoogleAuthResult
 import com.ecosdolugar.auth.GoogleAuthService
 import com.ecosdolugar.data.RouteDataSource
-import com.ecosdolugar.data.RoutesRepository
 import com.ecosdolugar.data.enrichRoutes
 import com.ecosdolugar.data.withRouteTitles
 import com.ecosdolugar.localization.AppLanguage
@@ -39,7 +38,7 @@ data class AppState(
     val routes: List<RouteItem> = emptyList(),
     val routeReviews: List<RouteReview> = emptyList(),
     val guideProfiles: List<GuideProfileInfo> = emptyList(),
-    val selectedRoute: RouteItem = RoutesRepository.routes.first(),
+    val selectedRoute: RouteItem? = null,
     val selectedGuide: GuideAuthor? = null,
     val mapRouteToFocus: String? = null,
     val mapReturnScreen: NavigationScreen = NavigationScreen.CATALOG,
@@ -115,7 +114,7 @@ class AppViewModel(
 
     fun openMapForSelectedRoute() = _state.update {
         it.copy(
-            mapRouteToFocus = it.selectedRoute.id,
+            mapRouteToFocus = it.selectedRoute?.id,
             mapReturnScreen = NavigationScreen.DETAIL,
             mapIsExpedition = false,
             screen = NavigationScreen.MAP
@@ -135,7 +134,7 @@ class AppViewModel(
 
     fun backToExpeditionMap() = _state.update {
         it.copy(
-            mapRouteToFocus = it.selectedRoute.id,
+            mapRouteToFocus = it.selectedRoute?.id,
             mapReturnScreen = NavigationScreen.DETAIL,
             mapIsExpedition = true,
             screen = NavigationScreen.MAP
@@ -429,7 +428,7 @@ class AppViewModel(
                 )
             )
         }
-        val challengeId = current.selectedRoute.stops.firstOrNull { it.id == stopId }?.challengeId
+        val challengeId = current.selectedRoute?.stops?.firstOrNull { it.id == stopId }?.challengeId
         val session = current.session()
         if (challengeId != null && session != null) {
             launchReportingErrors(strings.syncChallengeFailed) {
@@ -448,7 +447,7 @@ class AppViewModel(
     fun submitReview(routeRating: Int, guideRating: Int, comment: String) {
         val current = _state.value
         val session = current.session() ?: return
-        val route = current.selectedRoute
+        val route = current.selectedRoute ?: return
         launchReportingErrors(strings.saveReviewFailed) {
             routeDataSource.saveRouteReview(
                 userId = session.userId,
@@ -552,7 +551,7 @@ class AppViewModel(
                     routes = enrichedRoutes,
                     routeReviews = reviews,
                     guideProfiles = profiles,
-                    selectedRoute = enrichedRoutes.firstOrNull { route -> route.id == it.selectedRoute.id }
+                    selectedRoute = enrichedRoutes.firstOrNull { route -> route.id == it.selectedRoute?.id }
                         ?: enrichedRoutes.firstOrNull()
                         ?: it.selectedRoute,
                     userProfile = it.userProfile.copy(

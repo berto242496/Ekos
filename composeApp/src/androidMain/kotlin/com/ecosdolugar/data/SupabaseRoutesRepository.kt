@@ -702,9 +702,10 @@ private fun JSONArray?.toCategories(): List<Category> {
         when (optString(index).lowercase()) {
             "historia" -> Category.HISTORIA
             "leyendas" -> Category.LEYENDAS
-            "familias" -> Category.FAMILIAS
-            "patrimonio" -> Category.PATRIMONIO
             "naturaleza" -> Category.NATURALEZA
+            "gastronomía", "gastronomia" -> Category.GASTRONOMIA
+            "arte" -> Category.ARTE
+            "tradiciones", "tradicións" -> Category.TRADICIONES
             else -> null
         }
     }

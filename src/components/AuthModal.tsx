@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { UserProfile, RouteItem } from '../types';
 import { APP_LOGO_URL } from '../data/routesData';
 import { getCharacterById } from '../data/charactersData';
+import { CharacterAvatar } from './CharacterAvatar';
 import { getUserAchievements } from '../data/achievementsData';
 import {
   X,
@@ -195,7 +196,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             {/* Active Character */}
             <div className="p-3 rounded-2xl bg-[#0e2718] text-[#f7f2ea] border border-[#2b5239] flex items-center justify-between">
               <div className="flex items-center gap-2.5">
-                <span className="text-2xl">{activeChar.avatarEmoji}</span>
+                <CharacterAvatar character={activeChar} className="h-8 w-8" />
                 <div>
                   <p className="text-[10px] text-[#faba71] uppercase tracking-wide">Personaje</p>
                   <p className="font-serif font-bold text-sm text-white">{activeChar.name}</p>

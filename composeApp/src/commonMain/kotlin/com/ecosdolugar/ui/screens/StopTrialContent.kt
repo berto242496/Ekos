@@ -40,6 +40,9 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Help
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
@@ -100,9 +103,21 @@ internal fun StopTrialContent(
     var attempts by remember(stop.id) { mutableIntStateOf(0) }
     var feedback by remember(stop.id) { mutableStateOf<String?>(null) }
     var showHint by remember(stop.id) { mutableStateOf(false) }
-    val hint = trial?.generalHint?.takeIf { it.isNotBlank() } ?: stop.enigma.hint
-    val title = trial?.title?.takeIf { it.isNotBlank() } ?: strings.untitledTrial
-    val question = trial?.question?.takeIf { it.isNotBlank() } ?: stop.enigma.question
+    var showHintDialog by remember(stop.id) { mutableStateOf(false) }
+    val hintText = trial?.generalHint?.takeIf { it.isNotBlank() } ?: stop.enigma.hint
+    // En el puzle la pista es la imagen completa, no un texto.
+    val puzzleImageUrl = trial?.imageUrl?.takeIf { it.isNotBlank() } ?: stop.imageUrl
+    val hasHint = if (type == TrialType.PUZLE_IMAGEN) puzzleImageUrl.isNotBlank() else hintText.isNotBlank()
+    // Los textos fijos se traducen al idioma del visitante; el nombre de la parada y las frases del guía no.
+    val title = stop.title.takeIf { it.isNotBlank() }
+        ?: trial?.title?.takeIf { it.isNotBlank() }
+        ?: strings.untitledTrial
+    val question = when (type) {
+        TrialType.PUZLE_IMAGEN -> strings.puzzleQuestion
+        TrialType.ORDENAR_PALABRA -> strings.wordQuestion
+        TrialType.COMPLETAR_FRASE -> strings.phraseQuestion
+        else -> trial?.question?.takeIf { it.isNotBlank() } ?: stop.enigma.question
+    }
 
     val onAnswer: (Boolean) -> Unit = { correct ->
         attempts += 1
@@ -120,59 +135,107 @@ internal fun StopTrialContent(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        Text(
-            text = title,
-            fontFamily = FontFamily.Serif,
-            fontWeight = FontWeight.Bold,
-            fontSize = 22.sp,
-            color = InkDeep
-        )
-        Text(text = question, fontSize = 15.sp, lineHeight = 22.sp, color = InkDeep)
+        if (hasHint) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                IconButton(
+                    onClick = { if (!showHint) showHintDialog = true },
+                    enabled = !showHint
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Help,
+                        contentDescription = strings.hintIconDescription,
+                        tint = if (showHint) InkMuted else PineContainer
+                    )
+                }
+            }
+        }
 
-        when (type) {
-            TrialType.PUZLE_IMAGEN -> {
-                val imageUrl = trial?.imageUrl?.takeIf { it.isNotBlank() } ?: stop.imageUrl
-                if (imageUrl.isBlank()) {
-                    MissingDataNotice(strings.noImageConfigured)
-                } else {
-                    PuzzleTrial(
-                        stopId = stop.id,
-                        imageUrl = imageUrl,
-                        gridSize = trial?.puzzleGridSize ?: 3,
-                        strings = strings,
-                        onAnswer = onAnswer
-                    )
+        if (showHintDialog) {
+            AlertDialog(
+                onDismissRequest = { showHintDialog = false },
+                title = { Text(strings.hintDialogTitle, fontWeight = FontWeight.Bold) },
+                text = { Text(strings.hintDialogMessage) },
+                confirmButton = {
+                    TextButton(onClick = {
+                        showHint = true
+                        showHintDialog = false
+                    }) {
+                        Text(strings.useHint, color = PineContainer, fontWeight = FontWeight.SemiBold)
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showHintDialog = false }) {
+                        Text(strings.cancel, color = InkMuted)
+                    }
                 }
-            }
-            TrialType.ORDENAR_PALABRA -> {
-                val answer = trial?.cipherWord?.takeIf { it.isNotBlank() } ?: stop.enigma.answer
-                val letters = remember(stop.id) {
-                    trial?.scrambledLetters?.takeIf { it.isNotEmpty() } ?: scrambleLetters(answer)
-                }
-                WordTrial(stopId = stop.id, letters = letters, answer = answer, strings = strings, onAnswer = onAnswer)
-            }
-            TrialType.COMPLETAR_FRASE -> {
-                val sentence = trial?.sentence?.takeIf { it.isNotBlank() } ?: stop.enigma.question
-                val missing = trial?.missingWord?.takeIf { it.isNotBlank() } ?: stop.enigma.answer
-                SentenceTrial(stopId = stop.id, sentence = sentence, missingWord = missing, strings = strings, onAnswer = onAnswer)
-            }
-            else -> {
-                val options = trial?.options.orEmpty()
-                if (options.isNotEmpty()) {
-                    OptionsTrial(
-                        stopId = stop.id,
-                        options = options,
-                        correctIndex = trial?.correctOptionIndex ?: 0,
-                        onAnswer = onAnswer
-                    )
-                } else {
-                    TextAnswerTrial(
-                        stopId = stop.id,
-                        expected = stop.enigma.answer,
-                        label = strings.yourAnswer,
-                        strings = strings,
-                        onAnswer = onAnswer
-                    )
+            )
+        }
+
+        Surface(
+            shape = RoundedCornerShape(18.dp),
+            color = Color.White,
+            border = BorderStroke(1.dp, FieldBorder),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(
+                modifier = Modifier.padding(18.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                Text(
+                    text = title,
+                    fontFamily = FontFamily.Serif,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 22.sp,
+                    color = InkDeep
+                )
+                Text(text = question, fontSize = 15.sp, lineHeight = 22.sp, color = InkDeep)
+
+                when (type) {
+                    TrialType.PUZLE_IMAGEN -> {
+                        val imageUrl = trial?.imageUrl?.takeIf { it.isNotBlank() } ?: stop.imageUrl
+                        if (imageUrl.isBlank()) {
+                            MissingDataNotice(strings.noImageConfigured)
+                        } else {
+                            PuzzleTrial(
+                                stopId = stop.id,
+                                imageUrl = imageUrl,
+                                gridSize = trial?.puzzleGridSize ?: 3,
+                                strings = strings,
+                                onAnswer = onAnswer
+                            )
+                        }
+                    }
+                    TrialType.ORDENAR_PALABRA -> {
+                        val answer = trial?.cipherWord?.takeIf { it.isNotBlank() } ?: stop.enigma.answer
+                        val letters = remember(stop.id) {
+                            trial?.scrambledLetters?.takeIf { it.isNotEmpty() } ?: scrambleLetters(answer)
+                        }
+                        WordTrial(stopId = stop.id, letters = letters, answer = answer, strings = strings, onAnswer = onAnswer)
+                    }
+                    TrialType.COMPLETAR_FRASE -> {
+                        val sentence = trial?.sentence?.takeIf { it.isNotBlank() } ?: stop.enigma.question
+                        val missing = trial?.missingWord?.takeIf { it.isNotBlank() } ?: stop.enigma.answer
+                        SentenceTrial(stopId = stop.id, sentence = sentence, missingWord = missing, strings = strings, onAnswer = onAnswer)
+                    }
+                    else -> {
+                        val options = trial?.options.orEmpty()
+                        if (options.isNotEmpty()) {
+                            OptionsTrial(
+                                stopId = stop.id,
+                                options = options,
+                                correctIndex = trial?.correctOptionIndex ?: 0,
+                                onAnswer = onAnswer
+                            )
+                        } else {
+                            TextAnswerTrial(
+                                stopId = stop.id,
+                                expected = stop.enigma.answer,
+                                label = strings.yourAnswer,
+                                strings = strings,
+                                onAnswer = onAnswer
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -193,18 +256,23 @@ internal fun StopTrialContent(
             }
         }
 
-        if (hint.isNotBlank()) {
-            TextButton(onClick = { showHint = !showHint }) {
-                Text(if (showHint) strings.hideHint else strings.showHint, color = PineContainer, fontWeight = FontWeight.SemiBold)
-            }
-            if (showHint) {
+        if (hasHint && showHint) {
+            if (type == TrialType.PUZLE_IMAGEN) {
+                RouteCoverImage(
+                    url = puzzleImageUrl,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .aspectRatio(1f)
+                        .clip(RoundedCornerShape(18.dp))
+                )
+            } else {
                 Surface(
                     shape = RoundedCornerShape(12.dp),
                     color = Color.White,
                     border = BorderStroke(1.dp, FieldBorder),
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text(hint, color = InkDeep, fontSize = 13.sp, modifier = Modifier.padding(12.dp))
+                    Text(hintText, color = InkDeep, fontSize = 13.sp, modifier = Modifier.padding(12.dp))
                 }
             }
         }
@@ -239,7 +307,28 @@ private fun TrialCompletedContent(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(20.dp)
     ) {
-        Spacer(Modifier.height(8.dp))
+        Text(
+            text = strings.completedTitle,
+            fontFamily = FontFamily.Serif,
+            fontWeight = FontWeight.Bold,
+            fontSize = 26.sp,
+            color = InkDeep,
+            textAlign = TextAlign.Center
+        )
+        Surface(
+            shape = RoundedCornerShape(50),
+            color = PineContainer.copy(alpha = 0.08f),
+            border = BorderStroke(1.dp, FieldBorder)
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Icon(Icons.Default.CheckCircle, contentDescription = null, tint = PineContainer, modifier = Modifier.size(18.dp))
+                Text(strings.challengeCompleted, color = PineContainer, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+            }
+        }
         Box(
             modifier = Modifier
                 .size(120.dp)
@@ -252,17 +341,17 @@ private fun TrialCompletedContent(
         Surface(
             shape = RoundedCornerShape(18.dp),
             color = Color.White,
-            border = BorderStroke(1.dp, FieldBorder)
+            border = BorderStroke(1.dp, FieldBorder),
+            modifier = Modifier.fillMaxWidth()
         ) {
-            Column(modifier = Modifier.padding(18.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            Column(
+                modifier = Modifier.padding(18.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
                 Text(character.name.uppercase(), fontSize = 11.sp, fontWeight = FontWeight.Bold, color = InkMuted)
                 Spacer(Modifier.height(6.dp))
                 Text(message, fontSize = 16.sp, color = InkDeep, textAlign = TextAlign.Center, lineHeight = 22.sp)
             }
-        }
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            Icon(Icons.Default.CheckCircle, contentDescription = null, tint = PineContainer, modifier = Modifier.size(18.dp))
-            Text(strings.challengeCompleted, color = PineContainer, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
         }
         Button(
             onClick = onFinish,

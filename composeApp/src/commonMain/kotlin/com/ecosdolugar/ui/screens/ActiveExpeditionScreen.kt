@@ -127,8 +127,7 @@ fun ActiveExpeditionScreen(
                 title = {
                     Text(
                         text = when (phase) {
-                            ExpeditionPhase.INFO -> "${strings.stopWord} ${stop.order} ${strings.ofWord} ${route.stops.size}"
-                            ExpeditionPhase.TRIAL -> strings.challengeTitle
+                            ExpeditionPhase.INFO, ExpeditionPhase.TRIAL -> "${strings.stopWord} ${stop.order} ${strings.ofWord} ${route.stops.size}"
                             ExpeditionPhase.SUMMARY -> strings.routeFinishedTitle
                         },
                         color = InkDeep,

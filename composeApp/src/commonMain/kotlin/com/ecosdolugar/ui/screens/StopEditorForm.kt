@@ -321,12 +321,6 @@ internal fun StopEditorForm(
                     )
                 }
             }
-            RouteEditorTextField(
-                value = form.hint,
-                onValueChange = { form.hint = it },
-                label = strings.optionalHintLabel,
-                singleLine = true
-            )
         }
         TrialType.ORDENAR_PALABRA -> {
             HelperText(strings.wordHelper)

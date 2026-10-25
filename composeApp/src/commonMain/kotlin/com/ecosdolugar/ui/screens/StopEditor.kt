@@ -242,7 +242,7 @@ internal fun StopDraft.toRouteStop(index: Int, routeId: String, strings: StopEdi
             question = strings.puzzleQuestion,
             imageUrl = puzzleImageUrl,
             puzzleGridSize = puzzleGridSize,
-            generalHint = hint,
+            generalHint = "",
             solutionExplanation = strings.puzzleSolutionNote,
             magicalReward = strings.magicalReward
         )
@@ -286,7 +286,7 @@ internal fun StopDraft.toRouteStop(index: Int, routeId: String, strings: StopEdi
         historicalNote = "",
         enigma = FieldEnigma(
             question = if (trialType == TrialType.ACERTIJO) question else trial.question,
-            hint = hint,
+            hint = if (trialType == TrialType.PUZLE_IMAGEN) "" else hint,
             answer = answerText
         ),
         trial = trial,

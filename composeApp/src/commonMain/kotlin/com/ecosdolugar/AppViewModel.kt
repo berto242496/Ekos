@@ -16,6 +16,10 @@ import com.ecosdolugar.model.RouteItem
 import com.ecosdolugar.model.RouteReview
 import com.ecosdolugar.model.RouteStop
 import com.ecosdolugar.model.UserProfile
+import com.ecosdolugar.model.routeCompletionPoints
+import com.ecosdolugar.model.stopArrivalPoints
+import com.ecosdolugar.model.trialPoints
+import com.ecosdolugar.model.withStopScore
 import com.ecosdolugar.util.ProfanityFilter
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
@@ -30,7 +34,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
-internal const val CHALLENGE_SCORE = 100
 private const val MAX_DISPLAY_NAME_LENGTH = 60
 
 data class AppState(
@@ -56,8 +59,19 @@ data class AppState(
     val guideSignInError: String? = null,
     val isSavingRoute: Boolean = false,
     val triggeredStopIds: Set<String> = emptySet(),
-    val completedChallengesCount: Int = 0
+    val completedChallengesCount: Int = 0,
+    val pointsGain: PointsGain? = null,
+    val routeBonusGain: PointsGain? = null
 )
+
+/** Points just earned. [serial] changes on every gain so the UI can re-show the feedback. */
+data class PointsGain(val points: Int, val serial: Int)
+
+private fun AppState.withPointsGain(gained: Int): AppState =
+    if (gained > 0) copy(pointsGain = PointsGain(gained, (pointsGain?.serial ?: 0) + 1)) else this
+
+private fun AppState.withRouteBonusGain(points: Int): AppState =
+    if (points > 0) copy(routeBonusGain = PointsGain(points, (routeBonusGain?.serial ?: 0) + 1)) else this
 
 /**
  * Single source of truth for session, data and navigation. All state changes go through
@@ -144,13 +158,37 @@ class AppViewModel(
 
     fun closeMap() = _state.update { it.copy(mapIsExpedition = false, screen = it.mapReturnScreen) }
 
-    fun onStopReached(stop: RouteStop) = _state.update {
-        it.copy(
-            activeExpeditionStopId = stop.id,
-            triggeredStopIds = it.triggeredStopIds + stop.id,
-            userProfile = it.userProfile.copy(visitedStopIds = it.userProfile.visitedStopIds + stop.id),
-            screen = NavigationScreen.EXPEDITION
-        )
+    fun consumePointsGain() = _state.update { it.copy(pointsGain = null) }
+
+    fun consumeRouteBonusGain() = _state.update { it.copy(routeBonusGain = null) }
+
+    fun onStopReached(stop: RouteStop) {
+        val current = _state.value
+        val isFirstArrival = stop.id !in current.userProfile.stopScores
+        val arrivalPoints = stopArrivalPoints(current.userProfile.characterId)
+        _state.update { state ->
+            val profile = state.userProfile.copy(visitedStopIds = state.userProfile.visitedStopIds + stop.id)
+                .let { p -> if (isFirstArrival) p.withStopScore(stop.id, arrivalPoints) else p }
+            state.copy(
+                activeExpeditionStopId = stop.id,
+                triggeredStopIds = state.triggeredStopIds + stop.id,
+                userProfile = profile,
+                screen = NavigationScreen.EXPEDITION
+            ).withPointsGain(profile.totalScore - state.userProfile.totalScore)
+        }
+        val session = current.session()
+        if (isFirstArrival && stop.challengeId != null && session != null) {
+            launchReportingErrors(strings.syncChallengeFailed) {
+                routeDataSource.saveChallengeProgress(
+                    userId = session.userId,
+                    challengeId = stop.challengeId,
+                    attempts = 0,
+                    score = arrivalPoints,
+                    completed = false,
+                    accessToken = session.token
+                )
+            }
+        }
     }
 
     // endregion
@@ -418,18 +456,27 @@ class AppViewModel(
         }
     }
 
-    fun solveEnigma(stopId: String, attempts: Int) {
+    fun solveEnigma(stopId: String, attempts: Int, hintsUsed: Int = 0) {
         val current = _state.value
-        val isNewlySolved = stopId !in current.userProfile.solvedEnigmaIds
-        _state.update {
-            it.copy(
-                userProfile = it.userProfile.copy(
-                    solvedEnigmaIds = it.userProfile.solvedEnigmaIds + stopId,
-                    totalScore = it.userProfile.totalScore + if (isNewlySolved) CHALLENGE_SCORE else 0
-                )
-            )
+        val profile = current.userProfile
+        if (stopId in profile.solvedEnigmaIds) return
+        val route = current.selectedRoute
+        val solvedAfter = profile.solvedEnigmaIds + stopId
+        val routeCompleted = route != null && route.stops.isNotEmpty() && route.stops.all { it.id in solvedAfter }
+        val arrivalPoints = profile.stopScores[stopId] ?: stopArrivalPoints(profile.characterId)
+        val routeBonus = if (routeCompleted) routeCompletionPoints(profile.characterId) else 0
+        val stopTotal = arrivalPoints +
+            trialPoints(profile.characterId, failedAttempts = (attempts - 1).coerceAtLeast(0), hintsUsed = hintsUsed) +
+            routeBonus
+        _state.update { state ->
+            val updated = state.userProfile.copy(solvedEnigmaIds = state.userProfile.solvedEnigmaIds + stopId)
+                .withStopScore(stopId, stopTotal)
+            val gained = updated.totalScore - state.userProfile.totalScore
+            state.copy(userProfile = updated)
+                .withPointsGain(gained - routeBonus)
+                .withRouteBonusGain(routeBonus)
         }
-        val challengeId = current.selectedRoute?.stops?.firstOrNull { it.id == stopId }?.challengeId
+        val challengeId = route?.stops?.firstOrNull { it.id == stopId }?.challengeId
         val session = current.session()
         if (challengeId != null && session != null) {
             launchReportingErrors(strings.syncChallengeFailed) {
@@ -437,7 +484,7 @@ class AppViewModel(
                     userId = session.userId,
                     challengeId = challengeId,
                     attempts = attempts,
-                    score = CHALLENGE_SCORE,
+                    score = stopTotal,
                     completed = true,
                     accessToken = session.token
                 )
@@ -529,7 +576,11 @@ class AppViewModel(
                 null
             }
             val completedChallengeIds = token?.let { routeDataSource.loadCompletedChallenges(it) }.orEmpty()
-            val totalScore = token?.let { routeDataSource.loadTotalChallengeScore(it) } ?: 0
+            val challengeScores = token?.let { routeDataSource.loadChallengeScores(it) }.orEmpty()
+            val remoteStopScores = remoteRoutes
+                .flatMap { it.stops }
+                .mapNotNull { stop -> stop.challengeId?.let { challengeScores[it] }?.let { stop.id to it } }
+                .toMap()
             val completedStopIds = remoteRoutes
                 .flatMap { it.stops }
                 .filter { it.challengeId in completedChallengeIds }
@@ -560,8 +611,8 @@ class AppViewModel(
                     userProfile = it.userProfile.copy(
                         solvedEnigmaIds = it.userProfile.solvedEnigmaIds + completedStopIds,
                         savedRouteIds = savedRouteIds ?: it.userProfile.savedRouteIds,
-                        totalScore = totalScore
-                    )
+                        stopScores = it.userProfile.stopScores + remoteStopScores
+                    ).let { profile -> profile.copy(totalScore = profile.stopScores.values.sum()) }
                 )
             }
         } catch (error: CancellationException) {

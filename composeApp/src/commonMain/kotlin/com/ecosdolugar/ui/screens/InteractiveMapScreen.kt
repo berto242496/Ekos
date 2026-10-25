@@ -14,6 +14,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material3.*
@@ -51,6 +52,7 @@ fun InteractiveMapScreen(
     expeditionMode: Boolean = false,
     solvedStopIds: Set<String> = emptySet(),
     triggeredStopIds: Set<String> = emptySet(),
+    totalScore: Int = 0,
     onBack: () -> Unit,
     onSelectRoute: (RouteItem) -> Unit,
     onStopReached: ((RouteStop) -> Unit)? = null,
@@ -174,6 +176,30 @@ fun InteractiveMapScreen(
                     contentDescription = strings.back,
                     tint = Color.White
                 )
+            }
+
+            Surface(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .statusBarsPadding()
+                    .padding(12.dp),
+                shape = RoundedCornerShape(14.dp),
+                color = PineContainer.copy(alpha = 0.92f),
+                shadowElevation = 6.dp
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Icon(Icons.Default.Star, contentDescription = null, tint = TerracottaGold, modifier = Modifier.size(18.dp))
+                    Text(
+                        totalScore.toString(),
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 15.sp
+                    )
+                }
             }
 
             AnimatedVisibility(

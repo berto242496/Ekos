@@ -187,7 +187,9 @@ data class UserProfile(
     val savedRouteIds: Set<String> = emptySet(),
     val visitedStopIds: Set<String> = emptySet(),
     val solvedEnigmaIds: Set<String> = emptySet(),
-    val totalScore: Int = 0
+    val totalScore: Int = 0,
+    /** Puntuación acumulada por parada (llegada + prueba + bonificación de ruta en la última parada). */
+    val stopScores: Map<String, Int> = emptyMap()
 )
 
 data class UserAchievementStatus(

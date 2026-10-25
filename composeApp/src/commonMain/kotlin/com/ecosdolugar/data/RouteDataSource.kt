@@ -32,7 +32,7 @@ interface RouteDataSource {
 
     suspend fun loadCompletedChallenges(accessToken: String): Set<String>
 
-    suspend fun loadTotalChallengeScore(accessToken: String): Int
+    suspend fun loadChallengeScores(accessToken: String): Map<String, Int>
 
     suspend fun loadCompletedChallengesCount(): Int
 

@@ -87,7 +87,7 @@ internal fun StopTrialContent(
     stop: RouteStop,
     characterId: String,
     isSolved: Boolean,
-    onSolved: (attempts: Int) -> Unit,
+    onSolved: (attempts: Int, hintsUsed: Int) -> Unit,
     onFinish: () -> Unit,
     isRouteCompleted: Boolean = false,
     language: AppLanguage = AppLanguage.SPANISH
@@ -122,7 +122,7 @@ internal fun StopTrialContent(
     val onAnswer: (Boolean) -> Unit = { correct ->
         attempts += 1
         if (correct) {
-            onSolved(attempts)
+            onSolved(attempts, if (showHint) 1 else 0)
         } else {
             feedback = strings.notCorrectYet
         }

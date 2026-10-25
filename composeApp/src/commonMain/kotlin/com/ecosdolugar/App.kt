@@ -22,6 +22,7 @@ import com.ecosdolugar.localization.appLanguageStrings
 import com.ecosdolugar.localization.appShellStrings
 import com.ecosdolugar.localization.rememberAppLanguageController
 import com.ecosdolugar.model.GuideAuthor
+import com.ecosdolugar.model.routeScore
 import com.ecosdolugar.platform.PlatformBackHandler
 import com.ecosdolugar.ui.screens.*
 import com.ecosdolugar.ui.theme.EcosDoLugarTheme
@@ -250,6 +251,10 @@ fun App(viewModel: AppViewModel) {
                                     route = route,
                                     userProfile = userProfile,
                                     initialStopId = state.activeExpeditionStopId,
+                                    pointsGain = state.pointsGain,
+                                    onPointsGainShown = viewModel::consumePointsGain,
+                                    routeBonusGain = state.routeBonusGain,
+                                    onRouteBonusShown = viewModel::consumeRouteBonusGain,
                                     language = appLanguage.current,
                                     onBack = viewModel::backToExpeditionMap,
                                     onSolveEnigma = viewModel::solveEnigma,
@@ -265,6 +270,7 @@ fun App(viewModel: AppViewModel) {
                                 expeditionMode = state.mapIsExpedition,
                                 solvedStopIds = userProfile.solvedEnigmaIds,
                                 triggeredStopIds = state.triggeredStopIds,
+                                totalScore = state.selectedRoute?.let { userProfile.routeScore(it) } ?: 0,
                                 onBack = viewModel::closeMap,
                                 onSelectRoute = viewModel::openRoute,
                                 onStopReached = viewModel::onStopReached

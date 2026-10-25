@@ -147,7 +147,7 @@ class SupabaseRoutesRepository(
         require(accessToken.isNotBlank()) { "Inicia sesión para sincronizar el progreso del reto." }
         require(userId.isNotBlank()) { "Vuelve a iniciar sesión para sincronizar el progreso del reto." }
         require(attempts >= 0) { "El número de intentos no puede ser negativo." }
-        require(score in 0..100) { "La puntuación debe estar entre 0 y 100." }
+        require(score >= 0) { "La puntuación no puede ser negativa." }
         val progress = JSONObject()
             .put("user_id", userId)
             .put("challenge_id", challengeId)
@@ -220,18 +220,19 @@ class SupabaseRoutesRepository(
             }
         }
 
-    override suspend fun loadTotalChallengeScore(accessToken: String): Int =
+    override suspend fun loadChallengeScores(accessToken: String): Map<String, Int> =
         withContext(Dispatchers.IO) {
             requireConfigured()
             require(accessToken.isNotBlank()) { "Inicia sesión para cargar tu puntuación." }
             val response = request(
                 method = "GET",
-                path = "/rest/v1/user_challenge_progress?select=score&status=eq.completado",
+                path = "/rest/v1/user_challenge_progress?select=challenge_id,score",
                 accessToken = accessToken
             )
             val rows = JSONArray(response)
-            (0 until rows.length()).sumOf { index ->
-                rows.getJSONObject(index).optInt("score", 0)
+            (0 until rows.length()).associate { index ->
+                val row = rows.getJSONObject(index)
+                row.getString("challenge_id") to row.optInt("score", 0)
             }
         }
 

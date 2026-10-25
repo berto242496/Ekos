@@ -9,6 +9,8 @@ import com.ecosdolugar.model.GuideAuthor
 import com.ecosdolugar.model.GuideProfileInfo
 import com.ecosdolugar.model.RouteItem
 import com.ecosdolugar.model.RouteReview
+import com.ecosdolugar.model.RouteStop
+import com.ecosdolugar.model.FieldEnigma
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
@@ -68,11 +70,13 @@ class AppViewModelTest {
     fun restoredCompleteSessionGoesToCatalogWithRemoteProgress() {
         auth.restoreResult = session()
         data.savedIds = setOf("route-x")
-        data.score = 300
+        data.routes = listOf(fixtureRoute("ruta-1").copy(stops = listOf(stopWithChallenge("stop-1", "challenge-1"))))
+        data.challengeScores = mapOf("challenge-1" to 300)
         val state = viewModel().state.value
         assertEquals(NavigationScreen.CATALOG, state.screen)
         assertEquals("token", state.accessToken)
         assertEquals(setOf("route-x"), state.userProfile.savedRouteIds)
+        assertEquals(300, state.userProfile.stopScores["stop-1"])
         assertEquals(300, state.userProfile.totalScore)
     }
 
@@ -154,7 +158,42 @@ class AppViewModelTest {
         val vm = viewModel()
         vm.solveEnigma("stop-1", 1)
         vm.solveEnigma("stop-1", 2)
-        assertEquals(CHALLENGE_SCORE, vm.state.value.userProfile.totalScore)
+        // Llegada (Meiga: 50) + prueba resuelta a la primera (100), sin repetir puntos.
+        assertEquals(150, vm.state.value.userProfile.totalScore)
+    }
+
+    @Test
+    fun solvingPublishesPointsGainOnce() {
+        auth.restoreResult = GoogleAuthResult.NoStoredSession
+        val vm = viewModel()
+        vm.solveEnigma("stop-1", 1)
+        // Llegada (50) + prueba resuelta a la primera (100).
+        assertEquals(PointsGain(150, 1), vm.state.value.pointsGain)
+    }
+
+    @Test
+    fun consumePointsGainClearsIt() {
+        auth.restoreResult = GoogleAuthResult.NoStoredSession
+        val vm = viewModel()
+        vm.solveEnigma("stop-1", 1)
+        assertEquals(PointsGain(150, 1), vm.state.value.pointsGain)
+        vm.consumePointsGain()
+        assertEquals(null, vm.state.value.pointsGain)
+    }
+
+
+    @Test
+    fun completingRoutePublishesRouteBonusSeparately() {
+        auth.restoreResult = GoogleAuthResult.NoStoredSession
+        val route = fixtureRoute("ruta-1").copy(stops = listOf(stopWithChallenge("stop-1", "challenge-1")))
+        val vm = viewModel()
+        vm.startExpedition(route)
+        vm.solveEnigma("stop-1", 1)
+        val bonus = com.ecosdolugar.model.routeCompletionPoints(vm.state.value.userProfile.characterId)
+        assertEquals(PointsGain(bonus, 1), vm.state.value.routeBonusGain)
+        assertEquals(PointsGain(150, 1), vm.state.value.pointsGain)
+        vm.consumeRouteBonusGain()
+        assertEquals(null, vm.state.value.routeBonusGain)
     }
 
     @Test
@@ -222,6 +261,23 @@ class AppViewModelTest {
     }
 }
 
+private fun stopWithChallenge(id: String, challengeId: String) = RouteStop(
+    id = id,
+    order = 1,
+    title = "",
+    subtitle = "",
+    locationName = "",
+    story = "",
+    historicalNote = "",
+    enigma = FieldEnigma(question = "", hint = "", answer = ""),
+    audioDuration = "",
+    latitude = 0.0,
+    longitude = 0.0,
+    mapPositionX = 0f,
+    mapPositionY = 0f,
+    challengeId = challengeId
+)
+
 private fun fixtureRoute(id: String) = RouteItem(
     id = id,
     title = "Ruta $id",
@@ -265,7 +321,7 @@ private class FakeAuth : GoogleAuthService {
 private class FakeData : RouteDataSource {
     var routes: List<RouteItem> = listOf(fixtureRoute("ruta-1"), fixtureRoute("ruta-2"))
     var savedIds: Set<String> = emptySet()
-    var score = 0
+    var challengeScores: Map<String, Int> = emptyMap()
     var completedChallengesCount = 0
     var failReviews = false
     var failProfiles = false
@@ -299,7 +355,7 @@ private class FakeData : RouteDataSource {
     ) = Unit
 
     override suspend fun loadCompletedChallenges(accessToken: String): Set<String> = emptySet()
-    override suspend fun loadTotalChallengeScore(accessToken: String) = score
+    override suspend fun loadChallengeScores(accessToken: String): Map<String, Int> = challengeScores
     override suspend fun loadCompletedChallengesCount() = completedChallengesCount
     override suspend fun saveDisplayName(userId: String, displayName: String, accessToken: String) {
         savedNames += displayName

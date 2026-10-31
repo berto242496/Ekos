@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.ecosdolugar.auth.GoogleAuthResult
 import com.ecosdolugar.auth.GoogleAuthService
 import com.ecosdolugar.data.RouteDataSource
+import com.ecosdolugar.data.enrichGuide
 import com.ecosdolugar.data.enrichRoutes
 import com.ecosdolugar.data.withRouteTitles
 import com.ecosdolugar.localization.AppLanguage
@@ -61,7 +62,11 @@ data class AppState(
     val triggeredStopIds: Set<String> = emptySet(),
     val completedChallengesCount: Int = 0,
     val pointsGain: PointsGain? = null,
-    val routeBonusGain: PointsGain? = null
+    val routeBonusGain: PointsGain? = null,
+    /** Ruta que se iniciará en cuanto el guía elija personaje. */
+    val pendingRouteStart: RouteItem? = null,
+    /** Pantalla a la que volver tras elegir personaje (salvo que haya una ruta pendiente). */
+    val characterReturnScreen: NavigationScreen = NavigationScreen.CATALOG
 )
 
 /** Points just earned. [serial] changes on every gain so the UI can re-show the feedback. */
@@ -136,15 +141,42 @@ class AppViewModel(
         )
     }
 
-    fun startExpedition(route: RouteItem) = _state.update {
+    fun startExpedition(route: RouteItem) {
+        if (_state.value.userProfile.isGuideAccount && _state.value.userProfile.characterId == null) {
+            _state.update {
+                it.copy(
+                    selectedRoute = route,
+                    pendingRouteStart = route,
+                    characterReturnScreen = NavigationScreen.DETAIL,
+                    screen = NavigationScreen.CHARACTER_SELECTION
+                )
+            }
+            return
+        }
+        _state.update {
+            it.copy(
+                selectedRoute = route,
+                pendingRouteStart = null,
+                activeExpeditionStopId = null,
+                mapRouteToFocus = route.id,
+                mapReturnScreen = NavigationScreen.DETAIL,
+                mapIsExpedition = true,
+                screen = NavigationScreen.MAP
+            )
+        }
+    }
+
+    fun openCharacterSelection(returnScreen: NavigationScreen) = _state.update {
         it.copy(
-            selectedRoute = route,
-            activeExpeditionStopId = null,
-            mapRouteToFocus = route.id,
-            mapReturnScreen = NavigationScreen.DETAIL,
-            mapIsExpedition = true,
-            screen = NavigationScreen.MAP
+            pendingRouteStart = null,
+            characterReturnScreen = returnScreen,
+            screen = NavigationScreen.CHARACTER_SELECTION
         )
+    }
+
+    fun cancelCharacterSelection() = _state.update {
+        val target = it.pendingRouteStart?.let { NavigationScreen.DETAIL } ?: it.characterReturnScreen
+        it.copy(pendingRouteStart = null, screen = target)
     }
 
     fun backToExpeditionMap() = _state.update {
@@ -165,7 +197,7 @@ class AppViewModel(
     fun onStopReached(stop: RouteStop) {
         val current = _state.value
         val isFirstArrival = stop.id !in current.userProfile.stopScores
-        val arrivalPoints = stopArrivalPoints(current.userProfile.characterId)
+        val arrivalPoints = stopArrivalPoints(current.userProfile.effectiveCharacterId)
         _state.update { state ->
             val profile = state.userProfile.copy(visitedStopIds = state.userProfile.visitedStopIds + stop.id)
                 .let { p -> if (isFirstArrival) p.withStopScore(stop.id, arrivalPoints) else p }
@@ -238,8 +270,12 @@ class AppViewModel(
                     }
                 }
                 val screen = when {
-                    isGuideDestination ->
-                        if (result.profileComplete) NavigationScreen.GUIDE_DASHBOARD else NavigationScreen.GUIDE_WELCOME
+                    isGuideDestination -> when {
+                        result.isGuideAccount && result.profileComplete -> NavigationScreen.GUIDE_DASHBOARD
+                        else -> NavigationScreen.GUIDE_WELCOME
+                    }
+                    // A guide account entering as a traveler is onboarded again from the name step.
+                    result.isGuideAccount -> NavigationScreen.DISPLAY_NAME
                     result.profileComplete -> NavigationScreen.CATALOG
                     result.displayNameSet -> NavigationScreen.CHARACTER_SELECTION
                     else -> NavigationScreen.DISPLAY_NAME
@@ -250,7 +286,7 @@ class AppViewModel(
                         userProfile = it.userProfile.signedIn(
                             result,
                             name = result.displayName.ifBlank { result.email },
-                            isGuideAccount = isGuideDestination || result.isGuideAccount
+                            isGuideAccount = isGuideDestination
                         ),
                         displayNameDraft = result.displayName.ifBlank { result.email.substringBefore('@') },
                         displayNameError = null,
@@ -281,7 +317,8 @@ class AppViewModel(
             when (result) {
                 is GoogleAuthResult.Success -> {
                     val screen = when {
-                        result.isGuideAccount && !result.profileComplete -> NavigationScreen.GUIDE_WELCOME
+                        result.isGuideAccount && result.profileComplete -> NavigationScreen.GUIDE_DASHBOARD
+                        result.isGuideAccount -> NavigationScreen.GUIDE_WELCOME
                         result.profileComplete -> NavigationScreen.CATALOG
                         result.displayNameSet -> NavigationScreen.CHARACTER_SELECTION
                         else -> NavigationScreen.DISPLAY_NAME
@@ -402,10 +439,18 @@ class AppViewModel(
         viewModelScope.launch {
             _state.update { it.copy(isSavingDisplayName = true, displayNameError = null) }
             try {
-                routeDataSource.saveGuideProfile(session.userId, name, bio, photoDataUrl, session.token)
+                val savedAvatarUrl = routeDataSource.saveGuideProfile(
+                    session.userId, name, bio, photoDataUrl, session.token
+                )
                 googleAuthService.completeGuideProfile(name)
+                val savedProfile = GuideProfileInfo(
+                    userId = session.userId,
+                    displayName = name.trim(),
+                    bio = bio.trim(),
+                    avatarUrl = savedAvatarUrl
+                )
                 _state.update {
-                    it.copy(
+                    it.withGuideProfile(savedProfile).copy(
                         userProfile = it.userProfile.copy(name = name),
                         screen = NavigationScreen.GUIDE_DASHBOARD
                     )
@@ -426,13 +471,19 @@ class AppViewModel(
 
     fun confirmCharacter(characterId: String) {
         launchReportingErrors(strings.saveCharacterFailed) {
+            val session = _state.value.session() ?: error(strings.googleSessionExpired)
+            routeDataSource.saveCharacter(session.userId, characterId, session.token)
             googleAuthService.saveProfile(_state.value.userProfile.name, characterId)
+            val pendingRoute = _state.value.pendingRouteStart
+            val returnScreen = _state.value.characterReturnScreen
             _state.update {
                 it.copy(
                     userProfile = it.userProfile.copy(characterId = characterId),
-                    screen = NavigationScreen.CATALOG
+                    characterReturnScreen = NavigationScreen.CATALOG,
+                    screen = returnScreen
                 )
             }
+            pendingRoute?.let(::startExpedition)
         }
     }
 
@@ -463,10 +514,10 @@ class AppViewModel(
         val route = current.selectedRoute
         val solvedAfter = profile.solvedEnigmaIds + stopId
         val routeCompleted = route != null && route.stops.isNotEmpty() && route.stops.all { it.id in solvedAfter }
-        val arrivalPoints = profile.stopScores[stopId] ?: stopArrivalPoints(profile.characterId)
-        val routeBonus = if (routeCompleted) routeCompletionPoints(profile.characterId) else 0
+        val arrivalPoints = profile.stopScores[stopId] ?: stopArrivalPoints(profile.effectiveCharacterId)
+        val routeBonus = if (routeCompleted) routeCompletionPoints(profile.effectiveCharacterId) else 0
         val stopTotal = arrivalPoints +
-            trialPoints(profile.characterId, failedAttempts = (attempts - 1).coerceAtLeast(0), hintsUsed = hintsUsed) +
+            trialPoints(profile.effectiveCharacterId, failedAttempts = (attempts - 1).coerceAtLeast(0), hintsUsed = hintsUsed) +
             routeBonus
         _state.update { state ->
             val updated = state.userProfile.copy(solvedEnigmaIds = state.userProfile.solvedEnigmaIds + stopId)
@@ -641,6 +692,19 @@ class AppViewModel(
 
 private class Session(val userId: String, val token: String)
 
+/** Aplica el perfil de guía recién guardado a las rutas y guías ya cargados en memoria. */
+private fun AppState.withGuideProfile(profile: GuideProfileInfo): AppState {
+    val updatedProfiles = guideProfiles.filterNot { it.userId == profile.userId } + profile
+    fun GuideAuthor.refreshed(): GuideAuthor =
+        if (id == profile.userId) enrichGuide(this, routeReviews, updatedProfiles) else this
+    return copy(
+        guideProfiles = updatedProfiles,
+        routes = routes.map { route -> route.copy(guide = route.guide.refreshed()) },
+        selectedRoute = selectedRoute?.let { route -> route.copy(guide = route.guide.refreshed()) },
+        selectedGuide = selectedGuide?.refreshed()
+    )
+}
+
 private fun AppState.session(): Session? {
     val token = accessToken?.takeIf { it.isNotBlank() }
     val userId = userProfile.googleId?.takeIf { it.isNotBlank() }
@@ -654,7 +718,8 @@ private fun UserProfile.signedIn(result: GoogleAuthResult.Success, name: String,
     isGoogleAuthenticated = true,
     isGuideAccount = isGuideAccount,
     googleId = result.googleId,
-    characterId = result.characterId ?: characterId
+    characterId = result.characterId ?: characterId,
+    photoUrl = result.photoUrl ?: photoUrl
 )
 
 /** Optional data: a failed load yields an empty list, but cancellation must still propagate. */

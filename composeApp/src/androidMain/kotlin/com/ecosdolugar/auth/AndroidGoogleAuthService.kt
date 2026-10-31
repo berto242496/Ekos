@@ -82,14 +82,13 @@ class AndroidGoogleAuthService(
             // A session saved by a previous install or key may be unreadable; sign-in must still work.
             val storedProfile = runCatching { readStoredSession() }.getOrNull()
                 ?.takeIf { it.optString("user_id") == session.userId }
-            val displayName = storedProfile?.optString("display_name")
-                ?.takeIf(String::isNotBlank)
+            val account = loadAccount(session.userId, session.accessToken, storedProfile)
+            val displayName = account.displayName
                 ?: session.displayName.ifBlank { googleCredential.displayName.orEmpty() }
-            val characterId = storedProfile?.optString("character_id")?.takeIf(String::isNotBlank)
-            val displayNameSet = storedProfile?.optBoolean("display_name_set") == true
-            val profileComplete = storedProfile?.optBoolean("profile_complete") == true
-            val isGuideAccount = storedProfile?.optBoolean("is_guide_account") == true
-            persistSession(session, displayName, characterId, displayNameSet, profileComplete, isGuideAccount)
+            persistSession(
+                session, displayName, account.characterId, account.displayNameSet,
+                account.profileComplete, account.isGuide, photoUrl = googleCredential.profilePictureUri?.toString()
+            )
             GoogleAuthResult.Success(
                 googleId = session.userId,
                 email = session.email,
@@ -98,10 +97,10 @@ class AndroidGoogleAuthService(
                 idToken = googleCredential.idToken,
                 accessToken = session.accessToken,
                 refreshToken = session.refreshToken,
-                characterId = characterId,
-                displayNameSet = displayNameSet,
-                profileComplete = profileComplete,
-                isGuideAccount = isGuideAccount
+                characterId = account.characterId,
+                displayNameSet = account.displayNameSet,
+                profileComplete = account.profileComplete,
+                isGuideAccount = account.isGuide
             )
         } catch (_: GetCredentialCancellationException) {
             GoogleAuthResult.Cancelled
@@ -136,25 +135,25 @@ class AndroidGoogleAuthService(
 
         return try {
             val session = routesRepository.refreshAuthSession(stored.getString("refresh_token"))
-            val displayName = stored.optString("display_name").ifBlank { session.displayName }
-            val characterId = stored.optString("character_id").takeIf(String::isNotBlank)
-            val isGuideAccount = stored.optBoolean("is_guide_account")
-            val displayNameSet = stored.optBoolean("display_name_set")
-            val profileComplete = stored.optBoolean("profile_complete") &&
-                (characterId != null || isGuideAccount)
-            persistSession(session, displayName, characterId, displayNameSet, profileComplete, isGuideAccount)
+            val account = loadAccount(session.userId, session.accessToken, stored)
+            val displayName = account.displayName ?: session.displayName
+            val photoUrl = stored.storedPhotoUrl()
+            persistSession(
+                session, displayName, account.characterId, account.displayNameSet,
+                account.profileComplete, account.isGuide, photoUrl = photoUrl
+            )
             GoogleAuthResult.Success(
                 googleId = session.userId,
                 email = session.email,
                 displayName = displayName,
-                photoUrl = null,
+                photoUrl = photoUrl,
                 idToken = "",
                 accessToken = session.accessToken,
                 refreshToken = session.refreshToken,
-                characterId = characterId,
-                displayNameSet = displayNameSet,
-                profileComplete = profileComplete,
-                isGuideAccount = isGuideAccount
+                characterId = account.characterId,
+                displayNameSet = account.displayNameSet,
+                profileComplete = account.profileComplete,
+                isGuideAccount = account.isGuide
             )
         } catch (error: CancellationException) {
             throw error
@@ -165,10 +164,10 @@ class AndroidGoogleAuthService(
         }
     }
 
-    override suspend fun saveProfile(displayName: String, characterId: String) = updateStoredSession {
+    override suspend fun saveProfile(displayName: String, characterId: String?) = updateStoredSession {
         put("display_name", displayName.trim())
         put("display_name_set", true)
-        put("character_id", characterId)
+        put("character_id", characterId ?: JSONObject.NULL)
         put("profile_complete", true)
     }
 
@@ -218,13 +217,49 @@ class AndroidGoogleAuthService(
         }
     }
 
+    private suspend fun loadAccount(userId: String, accessToken: String, local: JSONObject?): AccountState {
+        val remote = try {
+            routesRepository.loadAccountProfile(userId, accessToken)
+        } catch (error: CancellationException) {
+            throw error
+        } catch (_: Exception) {
+            // Offline or server error: fall back to the device cache so the user is not stuck.
+            return localAccount(local)
+        }
+        return AccountState(
+            displayName = remote?.displayName,
+            characterId = remote?.characterId,
+            isGuide = remote?.isGuide == true
+        )
+    }
+
+    private fun localAccount(local: JSONObject?): AccountState {
+        val profileComplete = local?.optBoolean("profile_complete") == true
+        return AccountState(
+            displayName = local?.optString("display_name")?.takeIf(String::isNotBlank),
+            characterId = local?.let { if (it.isNull("character_id")) null else it.optString("character_id").takeIf(String::isNotBlank) },
+            isGuide = profileComplete && local?.optBoolean("is_guide_account") == true
+        )
+    }
+
+    private class AccountState(
+        val displayName: String?,
+        val characterId: String?,
+        val isGuide: Boolean
+    ) {
+        val displayNameSet: Boolean get() = displayName != null
+        // A guide profile is complete once saved (is_guide); a traveler needs a character.
+        val profileComplete: Boolean get() = isGuide || characterId != null
+    }
+
     private fun persistSession(
         session: SupabaseAuthSession,
         displayName: String,
         characterId: String?,
         displayNameSet: Boolean,
         profileComplete: Boolean,
-        isGuideAccount: Boolean = false
+        isGuideAccount: Boolean = false,
+        photoUrl: String? = null
     ) {
         writeStoredSession(
             JSONObject()
@@ -237,8 +272,12 @@ class AndroidGoogleAuthService(
                 .put("character_id", characterId ?: JSONObject.NULL)
                 .put("profile_complete", profileComplete)
                 .put("is_guide_account", isGuideAccount)
+                .put("photo_url", photoUrl ?: JSONObject.NULL)
         )
     }
+
+    private fun JSONObject.storedPhotoUrl(): String? =
+        takeUnless { isNull("photo_url") }?.optString("photo_url")?.takeIf(String::isNotBlank)
 
     private fun readStoredSession(): JSONObject? {
         val encrypted = preferences.getString(sessionStorageKey, null) ?: return null

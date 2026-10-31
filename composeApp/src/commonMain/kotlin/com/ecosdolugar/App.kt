@@ -67,7 +67,6 @@ private fun RowScope.AppNavigationBarItem(
 
 /** Screen shown by the system back gesture; null lets the platform handle it (exit app). */
 private fun backDestination(screen: NavigationScreen): NavigationScreen? = when (screen) {
-    NavigationScreen.CHARACTER_SELECTION,
     NavigationScreen.DETAIL,
     NavigationScreen.JOURNAL,
     NavigationScreen.GUIDE_DASHBOARD -> NavigationScreen.CATALOG
@@ -96,6 +95,9 @@ fun App(viewModel: AppViewModel) {
             viewModel.messages.collect { snackbarHostState.showSnackbar(it) }
         }
 
+        if (state.screen == NavigationScreen.CHARACTER_SELECTION) {
+            PlatformBackHandler { viewModel.cancelCharacterSelection() }
+        }
         backDestination(state.screen)?.let { destination ->
             PlatformBackHandler { viewModel.navigateTo(destination) }
         }
@@ -197,7 +199,7 @@ fun App(viewModel: AppViewModel) {
                                 language = appLanguage.current,
                                 onSelectCharacter = { viewModel.selectCharacter(it.id) },
                                 onConfirm = { viewModel.confirmCharacter(it.id) },
-                                onBack = { viewModel.navigateTo(NavigationScreen.CATALOG) }
+                                onBack = viewModel::cancelCharacterSelection
                             )
                         }
                         NavigationScreen.CATALOG -> {
@@ -212,9 +214,6 @@ fun App(viewModel: AppViewModel) {
                                 onSelectRoute = viewModel::openRoute,
                                 onToggleSaved = viewModel::toggleSavedRoute,
                                 onOpenProfile = { viewModel.navigateTo(NavigationScreen.JOURNAL) },
-                                onOpenCharacterSelection = {
-                                    viewModel.navigateTo(NavigationScreen.CHARACTER_SELECTION)
-                                },
                                 onOpenGuideMode = { viewModel.navigateTo(NavigationScreen.GUIDE_DASHBOARD) }
                             )
                         }
@@ -290,6 +289,9 @@ fun App(viewModel: AppViewModel) {
                                 onBack = { viewModel.navigateTo(NavigationScreen.CATALOG) },
                                 onOpenRoute = viewModel::openRouteById,
                                 onSaveDisplayName = viewModel::saveDisplayNameFromJournal,
+                                onOpenCharacterSelection = {
+                                    viewModel.openCharacterSelection(NavigationScreen.JOURNAL)
+                                },
                                 onSignOut = viewModel::signOut
                             )
                         }

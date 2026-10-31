@@ -198,7 +198,7 @@ fun ActiveExpeditionScreen(
                 )
                 ExpeditionPhase.TRIAL -> StopTrialContent(
                     stop = stop,
-                    characterId = userProfile.characterId,
+                    characterId = userProfile.effectiveCharacterId,
                     isSolved = isCompleted,
                     onSolved = { attempts, hintsUsed -> onSolveEnigma(stop.id, attempts, hintsUsed) },
                     onFinish = { if (isRouteCompleted) phase = ExpeditionPhase.SUMMARY else onBack() },

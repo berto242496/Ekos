@@ -70,12 +70,13 @@ fun JournalScreen(
     onBack: () -> Unit,
     onOpenRoute: (String) -> Unit,
     onSaveDisplayName: (String) -> Unit,
+    onOpenCharacterSelection: () -> Unit = {},
     onSignOut: () -> Unit
 ) {
     val character = remember(userProfile.characterId) {
-        CharactersRepository.getById(userProfile.characterId)
+        userProfile.characterId?.let { CharactersRepository.getById(it) }
     }
-    val charColor = Color(character.accentColorHex)
+    val charColor = character?.let { Color(it.accentColorHex) } ?: PineMoss
 
     val savedRoutes = remember(userProfile.savedRouteIds, routes) {
         routes.filter { userProfile.savedRouteIds.contains(it.id) }
@@ -127,8 +128,8 @@ fun JournalScreen(
             item {
                 PassportCard(
                     userProfile = userProfile,
-                    characterImage = character.avatarImage,
-                    characterName = "${character.name} (${character.galicianTitle})",
+                    characterImage = character?.avatarImage,
+                    characterName = character?.name ?: strings.noCharacter,
                     accentColor = charColor,
                     completedCount = completedRoutes.size,
                     trialsCount = userProfile.solvedEnigmaIds.size,
@@ -136,6 +137,7 @@ fun JournalScreen(
                     totalScore = userProfile.totalScore,
                     canEditName = userProfile.isGoogleAuthenticated,
                     onEditName = { showNameDialog = true },
+                    onChangeCharacter = onOpenCharacterSelection,
                     strings = strings
                 )
             }
@@ -278,7 +280,7 @@ fun JournalScreen(
 @Composable
 private fun PassportCard(
     userProfile: UserProfile,
-    characterImage: DrawableResource,
+    characterImage: DrawableResource?,
     characterName: String,
     accentColor: Color,
     completedCount: Int,
@@ -287,6 +289,7 @@ private fun PassportCard(
     totalScore: Int,
     canEditName: Boolean,
     onEditName: () -> Unit,
+    onChangeCharacter: () -> Unit,
     strings: JournalStrings
 ) {
     Surface(
@@ -306,7 +309,9 @@ private fun PassportCard(
                         .border(2.dp, accentColor, CircleShape),
                     contentAlignment = Alignment.Center
                 ) {
-                    CharacterAvatarImage(characterImage, Modifier.padding(3.dp))
+                    if (characterImage != null) {
+                        CharacterAvatarImage(characterImage, Modifier.padding(3.dp))
+                    }
                 }
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
@@ -343,6 +348,12 @@ private fun PassportCard(
                         fontSize = 12.sp,
                         color = accentColor
                     )
+                    TextButton(
+                        onClick = onChangeCharacter,
+                        contentPadding = PaddingValues(0.dp)
+                    ) {
+                        Text(strings.chooseCharacter, fontSize = 12.sp, color = TerracottaFixedDim)
+                    }
                 }
             }
 

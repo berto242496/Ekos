@@ -271,6 +271,61 @@ class SupabaseRoutesRepository(
             Unit
         }
 
+    override suspend fun loadAccountProfile(userId: String, accessToken: String): RemoteAccountProfile? =
+        withContext(Dispatchers.IO) {
+            requireConfigured()
+            require(userId.isNotBlank()) { "No se pudo identificar al usuario." }
+            require(accessToken.isNotBlank()) { "Inicia sesión para cargar tu perfil." }
+            val rows = JSONArray(
+                request(
+                    method = "GET",
+                    path = "/rest/v1/user_profiles?select=display_name,character_id,is_guide&user_id=eq.${encode(userId)}",
+                    accessToken = accessToken
+                )
+            )
+            rows.optJSONObject(0)?.let { row ->
+                RemoteAccountProfile(
+                    displayName = row.optionalString("display_name"),
+                    characterId = row.optionalString("character_id"),
+                    isGuide = row.optBoolean("is_guide")
+                )
+            }
+        }
+
+    override suspend fun saveCharacter(userId: String, characterId: String, accessToken: String) =
+        withContext(Dispatchers.IO) {
+            requireConfigured()
+            require(userId.isNotBlank()) { "No se pudo identificar al usuario." }
+            require(characterId.isNotBlank()) { "Elige un personaje para continuar." }
+            require(accessToken.isNotBlank()) { "Inicia sesión para guardar tu personaje." }
+            val profiles = JSONArray(
+                request(
+                    method = "GET",
+                    path = "/rest/v1/user_profiles?select=display_name&user_id=eq.${encode(userId)}",
+                    accessToken = accessToken
+                )
+            )
+            val storedName = profiles.optJSONObject(0)?.optionalString("display_name")
+                ?: error("Escribe tu nombre antes de elegir un personaje.")
+            request(
+                method = "POST",
+                path = "/rest/v1/user_profiles?on_conflict=user_id",
+                body = JSONArray().put(
+                    JSONObject()
+                        .put("user_id", userId)
+                        .put("display_name", storedName)
+                        .put("character_id", characterId)
+                ).toString(),
+                accessToken = accessToken,
+                contentType = "application/json",
+                prefer = "resolution=merge-duplicates,return=minimal"
+            )
+            Unit
+        }
+
+    private fun JSONObject.optionalString(key: String): String? =
+        if (isNull(key)) null else optString(key).takeIf(String::isNotBlank)
+
     override suspend fun saveGuideProfile(
         userId: String,
         displayName: String,
@@ -298,6 +353,7 @@ class SupabaseRoutesRepository(
                     .put("display_name", normalizedName)
                     .put("bio", normalizedBio)
                     .put("avatar_url", storedAvatarUrl ?: JSONObject.NULL)
+                    .put("is_guide", true)
             ).toString(),
             accessToken = accessToken,
             contentType = "application/json",

@@ -25,6 +25,8 @@ data class JournalStrings(
     val save: String,
     val cancel: String,
     val companionOf: (String) -> String,
+    val chooseCharacter: String,
+    val noCharacter: String,
     val stopsCount: (Int) -> String,
     val reviewRatings: (Int, Int) -> String
 )
@@ -56,6 +58,8 @@ fun journalStrings(language: AppLanguage): JournalStrings =
             save = "Guardar",
             cancel = "Cancelar",
             companionOf = { name -> "Compañero: $name" },
+            chooseCharacter = "Cambiar personaje",
+            noCharacter = "Sin personaje",
             stopsCount = { count -> "$count paradas" },
             reviewRatings = { route, guide -> "Ruta $route/5 · Guía $guide/5" }
         )
@@ -84,6 +88,8 @@ fun journalStrings(language: AppLanguage): JournalStrings =
             save = "Gardar",
             cancel = "Cancelar",
             companionOf = { name -> "Compañeiro: $name" },
+            chooseCharacter = "Cambiar personaxe",
+            noCharacter = "Sen personaxe",
             stopsCount = { count -> "$count paradas" },
             reviewRatings = { route, guide -> "Ruta $route/5 · Guía $guide/5" }
         )
@@ -112,6 +118,8 @@ fun journalStrings(language: AppLanguage): JournalStrings =
             save = "Save",
             cancel = "Cancel",
             companionOf = { name -> "Companion: $name" },
+            chooseCharacter = "Change character",
+            noCharacter = "No character",
             stopsCount = { count -> "$count stops" },
             reviewRatings = { route, guide -> "Route $route/5 · Guide $guide/5" }
         )

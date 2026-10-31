@@ -17,7 +17,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import com.ecosdolugar.ui.components.CharacterAvatarImage
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontStyle
@@ -33,6 +32,7 @@ import com.ecosdolugar.localization.routeCatalogStrings
 import com.ecosdolugar.model.Category
 import com.ecosdolugar.model.RouteItem
 import com.ecosdolugar.model.UserProfile
+import com.ecosdolugar.ui.components.CharacterAvatarImage
 import com.ecosdolugar.ui.components.RouteCoverImage
 import com.ecosdolugar.ui.theme.*
 
@@ -46,7 +46,6 @@ fun RoutesCatalogScreen(
     onSelectRoute: (RouteItem) -> Unit,
     onToggleSaved: (String) -> Unit,
     onOpenProfile: () -> Unit,
-    onOpenCharacterSelection: () -> Unit = {},
     onOpenGuideMode: () -> Unit = {}
 ) {
     var searchQuery by remember { mutableStateOf("") }
@@ -54,10 +53,7 @@ fun RoutesCatalogScreen(
     var onlySaved by remember { mutableStateOf(false) }
     val strings = routeCatalogStrings(language)
 
-    val activeCharacter = remember(userProfile.characterId) {
-        CharactersRepository.getById(userProfile.characterId)
-    }
-    val charColor = Color(activeCharacter.accentColorHex)
+    val profileCharacter = userProfile.characterId?.let { CharactersRepository.getById(it) }
 
     val filteredRoutes = remember(searchQuery, selectedCategories, onlySaved, routes, savedRouteIds) {
         routes.filter { route ->
@@ -144,33 +140,22 @@ fun RoutesCatalogScreen(
                             }
                         }
 
-                        // Character Quick Badge
+                        // Profile / Session Button (user photo or guide avatar)
                         Surface(
-                            onClick = onOpenCharacterSelection,
-                            shape = RoundedCornerShape(20.dp),
-                            color = charColor.copy(alpha = 0.15f),
-                            border = ButtonDefaults.outlinedButtonBorder.copy(
-                                brush = androidx.compose.ui.graphics.SolidColor(charColor.copy(alpha = 0.35f))
-                            )
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(4.dp)
-                            ) {
-                                CharacterAvatarImage(activeCharacter.avatarImage, Modifier.size(20.dp))
-                                Text(activeCharacter.name, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = PineDeep)
-                            }
-                        }
-
-                        // Profile / Session Button
-                        IconButton(
                             onClick = onOpenProfile,
-                            modifier = Modifier
-                                .size(34.dp)
-                                .background(PineDeep, CircleShape)
+                            shape = CircleShape,
+                            color = PineDeep,
+                            modifier = Modifier.size(34.dp)
                         ) {
-                            Icon(Icons.Default.Person, contentDescription = strings.profile, tint = Color.White, modifier = Modifier.size(16.dp))
+                            when {
+                                profileCharacter != null -> CharacterAvatarImage(
+                                    image = profileCharacter.avatarImage,
+                                    modifier = Modifier.fillMaxSize()
+                                )
+                                else -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                    Icon(Icons.Default.Person, contentDescription = strings.profile, tint = Color.White, modifier = Modifier.size(16.dp))
+                                }
+                            }
                         }
                     }
                 }

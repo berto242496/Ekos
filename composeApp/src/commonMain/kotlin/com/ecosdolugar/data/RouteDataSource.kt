@@ -4,6 +4,12 @@ import com.ecosdolugar.model.GuideProfileInfo
 import com.ecosdolugar.model.RouteItem
 import com.ecosdolugar.model.RouteReview
 
+data class RemoteAccountProfile(
+    val displayName: String?,
+    val characterId: String?,
+    val isGuide: Boolean
+)
+
 interface RouteDataSource {
     suspend fun loadRoutes(accessToken: String?): List<RouteItem>
     suspend fun loadRouteReviews(accessToken: String?): List<RouteReview>
@@ -36,7 +42,11 @@ interface RouteDataSource {
 
     suspend fun loadCompletedChallengesCount(): Int
 
+    suspend fun loadAccountProfile(userId: String, accessToken: String): RemoteAccountProfile?
+
     suspend fun saveDisplayName(userId: String, displayName: String, accessToken: String)
+
+    suspend fun saveCharacter(userId: String, characterId: String, accessToken: String)
 
     suspend fun saveGuideProfile(
         userId: String,

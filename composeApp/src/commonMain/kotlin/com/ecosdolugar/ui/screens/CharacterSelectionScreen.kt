@@ -30,18 +30,19 @@ import com.ecosdolugar.data.CharactersRepository
 import com.ecosdolugar.localization.AppLanguage
 import com.ecosdolugar.localization.characterSelectionStrings
 import com.ecosdolugar.model.CharacterItem
+import com.ecosdolugar.model.Scoring
 import com.ecosdolugar.ui.theme.*
 
 @Composable
 fun CharacterSelectionScreen(
-    currentCharacterId: String,
+    currentCharacterId: String?,
     language: AppLanguage,
     onSelectCharacter: (CharacterItem) -> Unit,
     onConfirm: (CharacterItem) -> Unit,
     onBack: () -> Unit
 ) {
     var selectedChar by remember(currentCharacterId) {
-        mutableStateOf(CharactersRepository.getById(currentCharacterId))
+        mutableStateOf(CharactersRepository.getById(currentCharacterId ?: Scoring.CHARACTER_MEIGA))
     }
     val strings = characterSelectionStrings(language, selectedChar.id)
     val scrollState = rememberScrollState()

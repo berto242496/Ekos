@@ -2,6 +2,7 @@ package com.ecosdolugar
 
 import com.ecosdolugar.auth.GoogleAuthResult
 import com.ecosdolugar.auth.GoogleAuthService
+import com.ecosdolugar.data.RemoteAccountProfile
 import com.ecosdolugar.data.RouteDataSource
 import com.ecosdolugar.model.Category
 import com.ecosdolugar.model.Difficulty
@@ -114,7 +115,41 @@ class AppViewModelTest {
         vm.beginGoogleSignIn(NavigationScreen.GUIDE_DASHBOARD)
         assertEquals(NavigationScreen.GUIDE_WELCOME, vm.state.value.screen)
         assertTrue(vm.state.value.userProfile.isGuideAccount)
-        assertTrue(auth.guideAccountSet)
+    }
+
+    @Test
+    fun returningGuideSignInGoesToDashboardWithoutOnboarding() {
+        auth.restoreResult = GoogleAuthResult.NoStoredSession
+        auth.signInResult = session(isGuide = true)
+        val vm = viewModel()
+        vm.beginGoogleSignIn(NavigationScreen.GUIDE_DASHBOARD)
+        assertEquals(NavigationScreen.GUIDE_DASHBOARD, vm.state.value.screen)
+    }
+
+    @Test
+    fun guideAccountSigningInAsTravelerRepeatsNameStep() {
+        auth.restoreResult = GoogleAuthResult.NoStoredSession
+        auth.signInResult = session(isGuide = true)
+        val vm = viewModel()
+        vm.beginGoogleSignIn(NavigationScreen.CHARACTER_SELECTION)
+        assertEquals(NavigationScreen.DISPLAY_NAME, vm.state.value.screen)
+        assertFalse(vm.state.value.userProfile.isGuideAccount)
+    }
+
+    @Test
+    fun travelerAccountSigningInAsGuideRepeatsWelcome() {
+        auth.restoreResult = GoogleAuthResult.NoStoredSession
+        auth.signInResult = session(profileComplete = true, isGuide = false)
+        val vm = viewModel()
+        vm.beginGoogleSignIn(NavigationScreen.GUIDE_DASHBOARD)
+        assertEquals(NavigationScreen.GUIDE_WELCOME, vm.state.value.screen)
+        assertTrue(vm.state.value.userProfile.isGuideAccount)
+    }
+
+    @Test
+    fun restoredGuideSessionGoesToDashboard() {
+        auth.restoreResult = session(isGuide = true)
+        assertEquals(NavigationScreen.GUIDE_DASHBOARD, viewModel().state.value.screen)
     }
 
     @Test
@@ -189,7 +224,7 @@ class AppViewModelTest {
         val vm = viewModel()
         vm.startExpedition(route)
         vm.solveEnigma("stop-1", 1)
-        val bonus = com.ecosdolugar.model.routeCompletionPoints(vm.state.value.userProfile.characterId)
+        val bonus = com.ecosdolugar.model.routeCompletionPoints(vm.state.value.userProfile.effectiveCharacterId)
         assertEquals(PointsGain(bonus, 1), vm.state.value.routeBonusGain)
         assertEquals(PointsGain(150, 1), vm.state.value.pointsGain)
         vm.consumeRouteBonusGain()
@@ -308,7 +343,7 @@ private class FakeAuth : GoogleAuthService {
     override suspend fun restoreSession() = restoreResult
     override suspend fun saveDisplayName(displayName: String) = Unit
     override suspend fun completeGuideProfile(displayName: String) = Unit
-    override suspend fun saveProfile(displayName: String, characterId: String) = Unit
+    override suspend fun saveProfile(displayName: String, characterId: String?) = Unit
     override suspend fun setGuideAccount(isGuideAccount: Boolean) {
         guideAccountSet = isGuideAccount
     }
@@ -360,6 +395,9 @@ private class FakeData : RouteDataSource {
     override suspend fun saveDisplayName(userId: String, displayName: String, accessToken: String) {
         savedNames += displayName
     }
+
+    override suspend fun loadAccountProfile(userId: String, accessToken: String): RemoteAccountProfile? = null
+    override suspend fun saveCharacter(userId: String, characterId: String, accessToken: String) = Unit
 
     override suspend fun saveGuideProfile(
         userId: String, displayName: String, bio: String, avatarUrl: String?, accessToken: String

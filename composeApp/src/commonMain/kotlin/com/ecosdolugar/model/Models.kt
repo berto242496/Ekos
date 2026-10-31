@@ -180,7 +180,10 @@ data class UserProfile(
     val name: String = "Explorador da Raia",
     val email: String = "explorador@ecosdolugar.gal",
     val isVisitor: Boolean = true,
-    val characterId: String = "meiga",
+    /** Null until a character is chosen (guides start without one). */
+    val characterId: String? = null,
+    /** Foto de perfil de Google; null si no hay. */
+    val photoUrl: String? = null,
     val isGoogleAuthenticated: Boolean = false,
     val isGuideAccount: Boolean = false,
     val googleId: String? = null,
@@ -190,7 +193,10 @@ data class UserProfile(
     val totalScore: Int = 0,
     /** Puntuación acumulada por parada (llegada + prueba + bonificación de ruta en la última parada). */
     val stopScores: Map<String, Int> = emptyMap()
-)
+) {
+    /** Personaje usado para puntuar; sin elección se usa el por defecto. */
+    val effectiveCharacterId: String get() = characterId ?: Scoring.CHARACTER_MEIGA
+}
 
 data class UserAchievementStatus(
     val id: String,

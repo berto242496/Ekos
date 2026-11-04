@@ -138,10 +138,11 @@ fun GuideDashboardScreen(
             }
 
             item {
-                TabRow(
+                ScrollableTabRow(
                     selectedTabIndex = selectedTab,
                     containerColor = SurfaceCream,
-                    contentColor = PineDeep
+                    contentColor = PineDeep,
+                    edgePadding = 0.dp
                 ) {
                     Tab(
                         selected = selectedTab == 0,

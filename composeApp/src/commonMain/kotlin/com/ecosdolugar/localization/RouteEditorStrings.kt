@@ -1,4 +1,4 @@
-package com.ecosdolugar.localization
+﻿package com.ecosdolugar.localization
 
 data class RouteEditorStrings(
     val createRoute: String,
@@ -47,7 +47,10 @@ data class RouteEditorStrings(
     val audioTag: String,
     val tomoRef: String,
     val stopsOverviewTitle: (Int) -> String,
-    val stopsOverviewDescription: String
+    val stopsOverviewDescription: String,
+    val moveStopUp: String,
+    val moveStopDown: String,
+    val maxStopsReached: String,
 )
 
 fun routeEditorStrings(language: AppLanguage): RouteEditorStrings =
@@ -99,7 +102,10 @@ fun routeEditorStrings(language: AppLanguage): RouteEditorStrings =
             audioTag = "Retos interactivos",
             tomoRef = "Cuaderno del Guía",
             stopsOverviewTitle = { "$it paradas" },
-            stopsOverviewDescription = "Enigmas geolocalizados creados por un guía local."
+            stopsOverviewDescription = "Enigmas geolocalizados creados por un guía local.",
+            moveStopUp = "Subir parada",
+            moveStopDown = "Bajar parada",
+            maxStopsReached = "Se ha alcanzado el límite de 15 paradas.",
         )
         AppLanguage.GALICIAN -> RouteEditorStrings(
             createRoute = "Crear ruta",
@@ -148,7 +154,10 @@ fun routeEditorStrings(language: AppLanguage): RouteEditorStrings =
             audioTag = "Retos interactivos",
             tomoRef = "Caderno do Guía",
             stopsOverviewTitle = { "$it paradas" },
-            stopsOverviewDescription = "Enigmas xeolocalizados creados por un guía local."
+            stopsOverviewDescription = "Enigmas xeolocalizados creados por un guía local.",
+            moveStopUp = "Subir parada",
+            moveStopDown = "Baixar parada",
+            maxStopsReached = "Alcanzouse o límite de 15 paradas.",
         )
         AppLanguage.ENGLISH -> RouteEditorStrings(
             createRoute = "Create route",
@@ -197,6 +206,9 @@ fun routeEditorStrings(language: AppLanguage): RouteEditorStrings =
             audioTag = "Interactive challenges",
             tomoRef = "Guide's notebook",
             stopsOverviewTitle = { "$it stops" },
-            stopsOverviewDescription = "Geolocated riddles created by a local guide."
+            stopsOverviewDescription = "Geolocated riddles created by a local guide.",
+            moveStopUp = "Move stop up",
+            moveStopDown = "Move stop down",
+            maxStopsReached = "The limit of 15 stops has been reached.",
         )
     }

@@ -446,22 +446,22 @@ private fun routeMapHtml(): String = """
         map.on('dragstart', () => { hasUserMovedMap = true; });
         map.on('zoomstart', () => { if (!settingUserLocation) hasUserMovedMap = true; });
 
-        function mapIcon(name, size) {
+        function mapIcon(file, size) {
           return L.icon({
-            iconUrl: 'map/map_' + name + '.png',
+            iconUrl: 'map/' + file,
             iconSize: [size, size],
             iconAnchor: [size / 2, size / 2]
           });
         }
         function startIcon() {
-          return mapIcon('inicio', 32);
+          return mapIcon('map_inicio.png', 32);
         }
         function stopIcon(stop, index, total) {
-          let name = 'parada';
-          if (stop.completed) name = 'completada';
-          else if (index === 0) name = 'inicio';
-          else if (index === total - 1) name = 'final';
-          return mapIcon(name, stop.id === selectedStopId ? 48 : 40);
+          const size = stop.id === selectedStopId ? 48 : 40;
+          if (stop.completed) return mapIcon('map_completada.png', size);
+          if (index === total - 1) return mapIcon('map_final.png', size);
+          const number = String(Math.min(index + 1, 15)).padStart(2, '0');
+          return mapIcon('parada_' + number + '.png', size);
         }
         function redrawVisibleStarts() {
           routeStartLayer.clearLayers();

@@ -25,6 +25,27 @@ import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import org.jetbrains.compose.resources.DrawableResource
+import org.jetbrains.compose.resources.painterResource
+import androidx.compose.foundation.Image
+import ecosdolugar.composeapp.generated.resources.Res
+import ecosdolugar.composeapp.generated.resources.parada_01
+import ecosdolugar.composeapp.generated.resources.parada_02
+import ecosdolugar.composeapp.generated.resources.parada_03
+import ecosdolugar.composeapp.generated.resources.parada_04
+import ecosdolugar.composeapp.generated.resources.parada_05
+import ecosdolugar.composeapp.generated.resources.parada_06
+import ecosdolugar.composeapp.generated.resources.parada_07
+import ecosdolugar.composeapp.generated.resources.parada_08
+import ecosdolugar.composeapp.generated.resources.parada_09
+import ecosdolugar.composeapp.generated.resources.parada_10
+import ecosdolugar.composeapp.generated.resources.parada_11
+import ecosdolugar.composeapp.generated.resources.parada_12
+import ecosdolugar.composeapp.generated.resources.parada_13
+import ecosdolugar.composeapp.generated.resources.parada_14
+import ecosdolugar.composeapp.generated.resources.parada_15
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -43,6 +64,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -145,6 +167,7 @@ fun RouteEditorScreen(
     var editingStopIndex by remember { mutableStateOf<Int?>(null) }
     var validationMessage by remember { mutableStateOf<String?>(null) }
     var currentStep by remember { mutableStateOf(1) }
+    LaunchedEffect(currentStep) { scrollState.scrollTo(0) }
     var showExitConfirmation by remember { mutableStateOf(false) }
     var pendingStatus by remember { mutableStateOf<String?>(null) }
 
@@ -179,6 +202,10 @@ fun RouteEditorScreen(
             stops[editing] = stopForm.toDraft()
             editingStopIndex = null
         } else {
+            if (stops.size >= MAX_STOPS) {
+                validationMessage = strings.maxStopsReached
+                return
+            }
             stops += stopForm.toDraft()
         }
         stopForm.reset()
@@ -196,6 +223,20 @@ fun RouteEditorScreen(
         editingStopIndex = index
         stopForm.loadFrom(stops[index])
         validationMessage = null
+    }
+
+    fun moveStop(from: Int, to: Int) {
+        if (to !in stops.indices) return
+        val item = stops.removeAt(from)
+        stops.add(to, item)
+        val editing = editingStopIndex
+        if (editing != null) {
+            editingStopIndex = when (editing) {
+                from -> to
+                in (minOf(from, to)..maxOf(from, to)) -> if (from < to) editing - 1 else editing + 1
+                else -> editing
+            }
+        }
     }
 
     fun save(status: String): Boolean {
@@ -449,12 +490,19 @@ fun RouteEditorScreen(
                                 .clip(RoundedCornerShape(16.dp))
                                 .background(SurfaceCream)
                                 .border(1.dp, FieldBorder, RoundedCornerShape(16.dp))
-                                .padding(start = 14.dp, end = 4.dp, top = 10.dp, bottom = 10.dp),
+                                .padding(start = 8.dp, end = 4.dp, top = 10.dp, bottom = 10.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
+                            // Icono numerado de la parada
+                            Image(
+                                painter = stopIconPainter(index),
+                                contentDescription = null,
+                                modifier = Modifier.size(36.dp)
+                            )
+                            Spacer(Modifier.size(8.dp))
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
-                                    "${index + 1}. ${stop.title}",
+                                    stop.title,
                                     color = InkDeep,
                                     fontFamily = FontFamily.Serif,
                                     fontWeight = FontWeight.Bold,
@@ -466,6 +514,33 @@ fun RouteEditorScreen(
                                     fontFamily = FontFamily.Serif,
                                     fontSize = 11.sp
                                 )
+                            }
+                            // Botones de reordenación (subir/bajar)
+                            Column(verticalArrangement = Arrangement.spacedBy(0.dp)) {
+                                IconButton(
+                                    onClick = { moveStop(index, index - 1) },
+                                    enabled = index > 0,
+                                    modifier = Modifier.size(32.dp)
+                                ) {
+                                    Icon(
+                                        Icons.Default.KeyboardArrowUp,
+                                        contentDescription = strings.moveStopUp,
+                                        tint = if (index > 0) PineContainer else InkMuted.copy(alpha = 0.3f),
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                                IconButton(
+                                    onClick = { moveStop(index, index + 1) },
+                                    enabled = index < stops.size - 1,
+                                    modifier = Modifier.size(32.dp)
+                                ) {
+                                    Icon(
+                                        Icons.Default.KeyboardArrowDown,
+                                        contentDescription = strings.moveStopDown,
+                                        tint = if (index < stops.size - 1) PineContainer else InkMuted.copy(alpha = 0.3f),
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
                             }
                             IconButton(onClick = { editStop(index) }) {
                                 Icon(Icons.Default.Edit, contentDescription = strings.editStop, tint = PineContainer)
@@ -480,18 +555,22 @@ fun RouteEditorScreen(
                             }
                         }
                     }
-                    StopEditorForm(
-                        form = stopForm,
-                        existingCoordinates = stops.mapIndexed { index, stop ->
-                            stop.latitude to stop.longitude
-                        }.filterIndexed { index, _ -> index != editingStopIndex },
-                        language = language,
-                        onMessage = { validationMessage = it },
-                        onAddStop = ::addStop,
-                        addLabel = if (editingStopIndex != null) strings.saveStopChanges else strings.addStop
-                    )
-                    if (editingStopIndex != null) {
-                        SecondaryButton(text = strings.cancelEdit, onClick = ::cancelStopEdit)
+                    if (stops.size < MAX_STOPS || editingStopIndex != null) {
+                        StopEditorForm(
+                            form = stopForm,
+                            existingCoordinates = stops.mapIndexed { index, stop ->
+                                stop.latitude to stop.longitude
+                            }.filterIndexed { index, _ -> index != editingStopIndex },
+                            language = language,
+                            onMessage = { validationMessage = it },
+                            onAddStop = ::addStop,
+                            addLabel = if (editingStopIndex != null) strings.saveStopChanges else strings.addStop
+                        )
+                        if (editingStopIndex != null) {
+                            SecondaryButton(text = strings.cancelEdit, onClick = ::cancelStopEdit)
+                        }
+                    } else {
+                        ValidationBanner(strings.maxStopsReached)
                     }
                 }
                 validationMessage?.let { ValidationBanner(it) }
@@ -796,6 +875,30 @@ private fun ValidationBanner(message: String) {
         Text(message, color = ErrorText, fontFamily = FontFamily.Serif, fontSize = 13.sp)
     }
 }
+
+private const val MAX_STOPS = 15
+
+@Composable
+private fun stopIconPainter(index: Int): androidx.compose.ui.graphics.painter.Painter =
+    painterResource(
+        when (index) {
+            0 -> Res.drawable.parada_01
+            1 -> Res.drawable.parada_02
+            2 -> Res.drawable.parada_03
+            3 -> Res.drawable.parada_04
+            4 -> Res.drawable.parada_05
+            5 -> Res.drawable.parada_06
+            6 -> Res.drawable.parada_07
+            7 -> Res.drawable.parada_08
+            8 -> Res.drawable.parada_09
+            9 -> Res.drawable.parada_10
+            10 -> Res.drawable.parada_11
+            11 -> Res.drawable.parada_12
+            12 -> Res.drawable.parada_13
+            13 -> Res.drawable.parada_14
+            else -> Res.drawable.parada_15
+        }
+    )
 
 private fun parseDurationPart(duration: String?, isHours: Boolean): String {
     val regex = if (isHours) Regex("(\\d+)\\s*h") else Regex("(\\d+)\\s*min")

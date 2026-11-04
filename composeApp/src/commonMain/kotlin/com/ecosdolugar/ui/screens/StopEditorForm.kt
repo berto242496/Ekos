@@ -52,6 +52,9 @@ import com.ecosdolugar.ui.theme.PineContainer
 import com.ecosdolugar.ui.theme.SurfaceCream
 import com.ecosdolugar.ui.theme.TerracottaGold
 
+/** Temporalmente ocultas (voces y modo TTS): pon a true para volver a mostrarlas. */
+private const val SHOW_TTS_NARRATION = false
+
 @Composable
 internal fun StopEditorForm(
     form: StopFormState,
@@ -122,25 +125,29 @@ internal fun StopEditorForm(
         FieldLabel(strings.narrationSection)
         StyledDropdown(
             selected = form.audioMode,
-            options = StopAudioMode.entries.map { it to narrationModeLabel(it, strings) },
+            options = StopAudioMode.entries
+                .filter { it != StopAudioMode.TTS || SHOW_TTS_NARRATION }
+                .map { it to narrationModeLabel(it, strings) },
             onSelected = { form.audioMode = it }
         )
         when (form.audioMode) {
             StopAudioMode.WRITTEN -> HelperText(strings.narrationWrittenHelper)
             StopAudioMode.TTS -> {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    SelectableChip(
-                        text = strings.femaleVoice,
-                        selected = form.narrationVoice == NarrationVoice.FEMALE,
-                        onClick = { form.narrationVoice = NarrationVoice.FEMALE },
-                        modifier = Modifier.weight(1f)
-                    )
-                    SelectableChip(
-                        text = strings.maleVoice,
-                        selected = form.narrationVoice == NarrationVoice.MALE,
-                        onClick = { form.narrationVoice = NarrationVoice.MALE },
-                        modifier = Modifier.weight(1f)
-                    )
+                if (SHOW_TTS_NARRATION) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        SelectableChip(
+                            text = strings.femaleVoice,
+                            selected = form.narrationVoice == NarrationVoice.FEMALE,
+                            onClick = { form.narrationVoice = NarrationVoice.FEMALE },
+                            modifier = Modifier.weight(1f)
+                        )
+                        SelectableChip(
+                            text = strings.maleVoice,
+                            selected = form.narrationVoice == NarrationVoice.MALE,
+                            onClick = { form.narrationVoice = NarrationVoice.MALE },
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
                 }
                 HelperText(strings.ttsHelper)
                 SecondaryButton(

@@ -19,6 +19,7 @@ actual fun rememberAppLanguageController(): AppLanguageController {
             )
         )
     }
+    @Suppress("RememberReturnType") // False positive: lint cannot resolve the commonMain class here.
     return remember(state, preferences) {
         AppLanguageController(state) { language ->
             preferences.edit().putString("language", language.code).apply()

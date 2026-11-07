@@ -884,8 +884,8 @@ private fun RouteStop.toJson(): JSONObject {
                 .put("x", mapPositionX)
                 .put("y", mapPositionY)
         )
-    if (trial != null) {
-        json.put("trial", trial.toJson())
+    trial?.let { stopTrial ->
+        json.put("trial", stopTrial.toJson())
         json.put("challengeId", challengeId)
     }
     return json

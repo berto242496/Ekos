@@ -9,3 +9,6 @@ local.properties
 *.log
 .env*
 !.env.example
+keystore.properties
+*.jks
+*.keystore

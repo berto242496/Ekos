@@ -9,6 +9,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -19,6 +23,11 @@ import androidx.compose.ui.unit.sp
 import com.ecosdolugar.data.formatRating
 import com.ecosdolugar.localization.AppLanguage
 import com.ecosdolugar.localization.guideProfileStrings
+import com.ecosdolugar.localization.safetyStrings
+import com.ecosdolugar.model.ReportReason
+import com.ecosdolugar.model.ReportTarget
+import com.ecosdolugar.ui.components.ConfirmActionDialog
+import com.ecosdolugar.ui.components.ReportDialog
 import com.ecosdolugar.model.GuideAuthor
 import com.ecosdolugar.model.RouteItem
 import com.ecosdolugar.model.RouteReview
@@ -34,9 +43,16 @@ fun GuideProfileScreen(
     reviews: List<RouteReview> = emptyList(),
     language: AppLanguage = AppLanguage.SPANISH,
     onBack: () -> Unit,
-    onSelectRoute: (String) -> Unit
+    onSelectRoute: (String) -> Unit,
+    canModerate: Boolean = false,
+    onReport: (ReportTarget, String, ReportReason) -> Unit = { _, _, _ -> },
+    onBlockGuide: () -> Unit = {}
 ) {
     val strings = guideProfileStrings(language)
+    val safety = safetyStrings(language)
+    var menuExpanded by remember { mutableStateOf(false) }
+    var showBlockDialog by remember { mutableStateOf(false) }
+    var pendingReport by remember { mutableStateOf<Pair<ReportTarget, String>?>(null) }
     val guideRoutes = allRoutes.filter { it.guide.id == guide.id }
     val firstName = guide.name.substringBefore(' ')
 
@@ -55,6 +71,31 @@ fun GuideProfileScreen(
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.Default.ArrowBack, contentDescription = strings.back)
+                    }
+                },
+                actions = {
+                    if (canModerate) {
+                        Box {
+                            IconButton(onClick = { menuExpanded = true }) {
+                                Icon(Icons.Default.MoreVert, contentDescription = safety.moreOptions)
+                            }
+                            DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
+                                DropdownMenuItem(
+                                    text = { Text(safety.reportGuide) },
+                                    onClick = {
+                                        menuExpanded = false
+                                        pendingReport = ReportTarget.GUIDE to guide.id
+                                    }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text(safety.blockGuide) },
+                                    onClick = {
+                                        menuExpanded = false
+                                        showBlockDialog = true
+                                    }
+                                )
+                            }
+                        }
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = SurfaceCream)
@@ -181,14 +222,32 @@ fun GuideProfileScreen(
                         shadowElevation = 1.dp
                     ) {
                         Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                            Text(
-                                text = review.routeTitle.ifBlank { strings.defaultRouteTitle },
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 14.sp,
-                                color = OnSurfaceDark,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    text = review.routeTitle.ifBlank { strings.defaultRouteTitle },
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 14.sp,
+                                    color = OnSurfaceDark,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.weight(1f)
+                                )
+                                if (canModerate) {
+                                    IconButton(
+                                        onClick = {
+                                            pendingReport = ReportTarget.REVIEW to "${review.routeId}/${review.userId}"
+                                        },
+                                        modifier = Modifier.size(28.dp)
+                                    ) {
+                                        Icon(
+                                            Icons.Default.Flag,
+                                            contentDescription = safety.reportReview,
+                                            tint = OnSurfaceVariant,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
+                                }
+                            }
                             Text(
                                 text = strings.routeAndGuideRating(review.routeRating, review.guideRating),
                                 fontSize = 12.sp,
@@ -281,5 +340,29 @@ fun GuideProfileScreen(
                 Spacer(Modifier.height(32.dp))
             }
         }
+    }
+
+    pendingReport?.let { (target, targetId) ->
+        ReportDialog(
+            strings = safety,
+            onDismiss = { pendingReport = null },
+            onSubmit = { reason ->
+                pendingReport = null
+                onReport(target, targetId, reason)
+            }
+        )
+    }
+    if (showBlockDialog) {
+        ConfirmActionDialog(
+            title = safety.blockDialogTitle(guide.name),
+            body = safety.blockDialogBody,
+            confirmLabel = safety.blockConfirm,
+            cancelLabel = safety.cancel,
+            onDismiss = { showBlockDialog = false },
+            onConfirm = {
+                showBlockDialog = false
+                onBlockGuide()
+            }
+        )
     }
 }

@@ -8,6 +8,8 @@ import com.ecosdolugar.model.Category
 import com.ecosdolugar.model.Difficulty
 import com.ecosdolugar.model.GuideAuthor
 import com.ecosdolugar.model.GuideProfileInfo
+import com.ecosdolugar.model.ReportReason
+import com.ecosdolugar.model.ReportTarget
 import com.ecosdolugar.model.RouteItem
 import com.ecosdolugar.model.RouteReview
 import com.ecosdolugar.model.RouteStop
@@ -165,6 +167,56 @@ class AppViewModelTest {
         assertTrue(state.userProfile.solvedEnigmaIds.isEmpty())
         assertEquals(0, state.userProfile.totalScore)
         assertEquals("offline", vm.messages.first())
+    }
+
+    @Test
+    fun deleteAccountRemovesRemoteDataAndSignsOut() = runTest {
+        auth.restoreResult = session()
+        val vm = viewModel()
+        vm.deleteAccount()
+        val state = vm.state.value
+        assertEquals(listOf("user-1"), data.deletedAccounts)
+        assertEquals(NavigationScreen.WELCOME, state.screen)
+        assertNull(state.accessToken)
+        assertFalse(state.isDeletingAccount)
+    }
+
+    @Test
+    fun deleteAccountFailureKeepsSession() = runTest {
+        auth.restoreResult = session()
+        data.deleteAccountError = IllegalStateException("sin red")
+        val vm = viewModel()
+        vm.deleteAccount()
+        val state = vm.state.value
+        assertEquals("token", state.accessToken)
+        assertFalse(state.isDeletingAccount)
+        assertEquals("sin red", vm.messages.first())
+    }
+
+    @Test
+    fun reportContentSendsReportForSignedInUser() {
+        auth.restoreResult = session()
+        val vm = viewModel()
+        vm.reportContent(ReportTarget.ROUTE, "ruta-1", ReportReason.SPAM)
+        assertEquals(listOf(Triple(ReportTarget.ROUTE, "ruta-1", ReportReason.SPAM)), data.reports)
+    }
+
+    @Test
+    fun blockingGuideHidesTheirRoutes() {
+        auth.restoreResult = session()
+        val vm = viewModel()
+        assertEquals(2, vm.state.value.routes.size)
+        vm.blockUser("guide-1")
+        assertEquals(listOf("guide-1"), data.newBlocks)
+        assertTrue(vm.state.value.routes.isEmpty())
+        assertEquals(setOf("guide-1"), vm.state.value.blockedUserIds)
+    }
+
+    @Test
+    fun blockedGuidesAreFilteredWhenLoadingData() {
+        data.blockedIds = setOf("guide-1")
+        auth.restoreResult = session()
+        assertTrue(viewModel().state.value.routes.isEmpty())
     }
 
     @Test
@@ -351,6 +403,9 @@ private class FakeAuth : GoogleAuthService {
     override suspend fun signOut(accessToken: String?) {
         signOutError?.let { throw it }
     }
+
+    var refreshedToken: String? = null
+    override suspend fun refreshAccessToken(): String? = refreshedToken
 }
 
 private class FakeData : RouteDataSource {
@@ -411,4 +466,27 @@ private class FakeData : RouteDataSource {
     }
 
     override suspend fun signOut(accessToken: String) = Unit
+
+    var deleteAccountError: Exception? = null
+    val deletedAccounts = mutableListOf<String>()
+    val reports = mutableListOf<Triple<ReportTarget, String, ReportReason>>()
+    var blockedIds: Set<String> = emptySet()
+    val newBlocks = mutableListOf<String>()
+
+    override suspend fun deleteAccount(userId: String, accessToken: String) {
+        deleteAccountError?.let { throw it }
+        deletedAccounts += userId
+    }
+
+    override suspend fun reportContent(
+        reporterId: String, targetType: ReportTarget, targetId: String, reason: ReportReason, accessToken: String
+    ) {
+        reports += Triple(targetType, targetId, reason)
+    }
+
+    override suspend fun loadBlockedUserIds(accessToken: String): Set<String> = blockedIds
+
+    override suspend fun blockUser(blockerId: String, blockedId: String, accessToken: String) {
+        newBlocks += blockedId
+    }
 }

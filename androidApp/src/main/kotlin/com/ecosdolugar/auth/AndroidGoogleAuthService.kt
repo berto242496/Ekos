@@ -194,6 +194,14 @@ class AndroidGoogleAuthService(
         writeStoredSession(stored)
     }
 
+    override suspend fun refreshAccessToken(): String? {
+        val stored = runCatching { readStoredSession() }.getOrNull() ?: return null
+        val session = routesRepository.refreshAuthSession(stored.getString("refresh_token"))
+        stored.put("access_token", session.accessToken).put("refresh_token", session.refreshToken)
+        writeStoredSession(stored)
+        return session.accessToken
+    }
+
     override suspend fun signOut(accessToken: String?) {
         try {
             // The in-memory access token expires after about an hour, so renew it before the remote logout.

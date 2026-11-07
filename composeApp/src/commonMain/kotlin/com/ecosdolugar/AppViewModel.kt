@@ -10,9 +10,13 @@ import com.ecosdolugar.data.enrichRoutes
 import com.ecosdolugar.data.withRouteTitles
 import com.ecosdolugar.localization.AppLanguage
 import com.ecosdolugar.localization.AppMessageStrings
+import com.ecosdolugar.localization.SafetyStrings
 import com.ecosdolugar.localization.appMessageStrings
+import com.ecosdolugar.localization.safetyStrings
 import com.ecosdolugar.model.GuideAuthor
 import com.ecosdolugar.model.GuideProfileInfo
+import com.ecosdolugar.model.ReportReason
+import com.ecosdolugar.model.ReportTarget
 import com.ecosdolugar.model.RouteItem
 import com.ecosdolugar.model.RouteReview
 import com.ecosdolugar.model.RouteStop
@@ -42,6 +46,8 @@ data class AppState(
     val routes: List<RouteItem> = emptyList(),
     val routeReviews: List<RouteReview> = emptyList(),
     val guideProfiles: List<GuideProfileInfo> = emptyList(),
+    val blockedUserIds: Set<String> = emptySet(),
+    val isDeletingAccount: Boolean = false,
     val selectedRoute: RouteItem? = null,
     val selectedGuide: GuideAuthor? = null,
     val mapRouteToFocus: String? = null,
@@ -99,6 +105,8 @@ class AppViewModel(
     private var language = AppLanguage.SPANISH
     private val strings: AppMessageStrings
         get() = appMessageStrings(language)
+    private val safety: SafetyStrings
+        get() = safetyStrings(language)
 
     fun onLanguageChanged(newLanguage: AppLanguage) {
         language = newLanguage
@@ -364,6 +372,82 @@ class AppViewModel(
                 )
             }
             reloadData()
+        }
+    }
+
+    // endregion
+
+    // region Account safety
+
+    fun deleteAccount() {
+        val current = _state.value
+        if (current.isDeletingAccount) return
+        val session = current.session() ?: return report(strings.sessionExpired)
+        viewModelScope.launch {
+            _state.update { it.copy(isDeletingAccount = true) }
+            try {
+                val token = try {
+                    googleAuthService.refreshAccessToken()
+                } catch (error: CancellationException) {
+                    throw error
+                } catch (error: Exception) {
+                    null
+                } ?: session.token
+                routeDataSource.deleteAccount(session.userId, token)
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Exception) {
+                _state.update { it.copy(isDeletingAccount = false) }
+                report(error.message ?: safety.deleteAccountFailed)
+                return@launch
+            }
+            try {
+                googleAuthService.signOut(null)
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Exception) {
+                // The account is already gone; the local session is cleared by the service.
+            }
+            _state.update {
+                it.copy(
+                    accessToken = null,
+                    userProfile = UserProfile(),
+                    triggeredStopIds = emptySet(),
+                    displayNameDraft = "",
+                    blockedUserIds = emptySet(),
+                    isDeletingAccount = false,
+                    screen = NavigationScreen.WELCOME
+                )
+            }
+            report(safety.accountDeleted)
+            reloadData()
+        }
+    }
+
+    fun reportContent(target: ReportTarget, targetId: String, reason: ReportReason) {
+        val session = _state.value.session() ?: return report(safety.signInToReport)
+        launchReportingErrors(safety.reportFailed) {
+            routeDataSource.reportContent(session.userId, target, targetId, reason, session.token)
+            report(safety.reportSent)
+        }
+    }
+
+    fun blockUser(blockedId: String) {
+        val session = _state.value.session() ?: return report(safety.signInToReport)
+        launchReportingErrors(safety.blockFailed) {
+            routeDataSource.blockUser(session.userId, blockedId, session.token)
+            _state.update { current ->
+                current.copy(
+                    blockedUserIds = current.blockedUserIds + blockedId,
+                    routes = current.routes.filter { it.guide.id != blockedId },
+                    routeReviews = current.routeReviews.filter { it.userId != blockedId && it.guideId != blockedId },
+                    selectedGuide = current.selectedGuide?.takeIf { it.id != blockedId },
+                    screen = if (current.screen == NavigationScreen.DETAIL ||
+                        current.screen == NavigationScreen.GUIDE_PROFILE
+                    ) NavigationScreen.CATALOG else current.screen
+                )
+            }
+            report(safety.userBlocked)
         }
     }
 
@@ -636,25 +720,36 @@ class AppViewModel(
                 .flatMap { it.stops }
                 .filter { it.challengeId in completedChallengeIds }
                 .map { it.id }
+            val blockedIds = token?.let {
+                try {
+                    routeDataSource.loadBlockedUserIds(it)
+                } catch (error: CancellationException) {
+                    throw error
+                } catch (error: Exception) {
+                    snapshot.blockedUserIds
+                }
+            }.orEmpty()
+            val visibleRoutes = remoteRoutes.filter { it.guide.id !in blockedIds }
             val reviews = withRouteTitles(
                 orEmptyOnFailure { routeDataSource.loadRouteReviews(token) },
-                remoteRoutes
-            )
+                visibleRoutes
+            ).filter { it.userId !in blockedIds && it.guideId !in blockedIds }
             val profiles = token?.let {
                 orEmptyOnFailure {
                     routeDataSource.loadGuideProfiles(
-                        remoteRoutes.map { route -> route.guide.id } + listOfNotNull(userId),
+                        visibleRoutes.map { route -> route.guide.id } + listOfNotNull(userId),
                         it
                     )
                 }
             }.orEmpty()
-            val enrichedRoutes = enrichRoutes(remoteRoutes, reviews, profiles)
+            val enrichedRoutes = enrichRoutes(visibleRoutes, reviews, profiles)
             val completedChallengesCount = orZeroOnFailure { routeDataSource.loadCompletedChallengesCount() }
             _state.update {
                 it.copy(
                     routes = enrichedRoutes,
                     routeReviews = reviews,
                     guideProfiles = profiles,
+                    blockedUserIds = blockedIds,
                     completedChallengesCount = completedChallengesCount,
                     selectedRoute = enrichedRoutes.firstOrNull { route -> route.id == it.selectedRoute?.id }
                         ?: enrichedRoutes.firstOrNull()

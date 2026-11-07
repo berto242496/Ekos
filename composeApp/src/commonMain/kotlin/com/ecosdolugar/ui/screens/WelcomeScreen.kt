@@ -31,6 +31,7 @@ import ecosdolugar.composeapp.generated.resources.google_g_logo
 import org.jetbrains.compose.resources.painterResource
 import com.ecosdolugar.localization.AppLanguageStrings
 import com.ecosdolugar.localization.appLanguageStrings
+import com.ecosdolugar.ui.components.LegalLinks
 import com.ecosdolugar.ui.theme.*
 
 @Composable
@@ -178,6 +179,11 @@ fun WelcomeScreen(
                         textAlign = TextAlign.Center
                     )
                 }
+                LegalLinks(
+                    language = language,
+                    color = OutlineVariant.copy(alpha = 0.8f),
+                    modifier = Modifier.padding(top = 6.dp)
+                )
             }
         }
     }

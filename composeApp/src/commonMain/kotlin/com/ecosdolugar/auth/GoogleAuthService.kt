@@ -30,4 +30,7 @@ interface GoogleAuthService {
     suspend fun saveProfile(displayName: String, characterId: String?)
     suspend fun setGuideAccount(isGuideAccount: Boolean)
     suspend fun signOut(accessToken: String?)
+
+    /** Renews the stored session and returns a fresh access token, or null when there is no session. */
+    suspend fun refreshAccessToken(): String?
 }

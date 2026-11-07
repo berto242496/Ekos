@@ -31,6 +31,9 @@ import com.ecosdolugar.data.CharactersRepository
 import com.ecosdolugar.localization.AppLanguage
 import com.ecosdolugar.localization.JournalStrings
 import com.ecosdolugar.localization.journalStrings
+import com.ecosdolugar.localization.safetyStrings
+import com.ecosdolugar.ui.components.ConfirmActionDialog
+import com.ecosdolugar.ui.components.LegalLinks
 import com.ecosdolugar.model.RouteItem
 import com.ecosdolugar.model.RouteReview
 import com.ecosdolugar.model.UserAchievementStatus
@@ -71,6 +74,8 @@ fun JournalScreen(
     onOpenRoute: (String) -> Unit,
     onSaveDisplayName: (String) -> Unit,
     onOpenCharacterSelection: () -> Unit = {},
+    isDeletingAccount: Boolean = false,
+    onDeleteAccount: () -> Unit = {},
     onSignOut: () -> Unit
 ) {
     val character = remember(userProfile.characterId) {
@@ -85,6 +90,8 @@ fun JournalScreen(
         completedRoutesOf(userProfile, routes)
     }
     val strings = journalStrings(language)
+    val safety = safetyStrings(language)
+    var showDeleteDialog by remember { mutableStateOf(false) }
     val achievements = remember(userProfile, completedRoutes, language) {
         userAchievementStatuses(userProfile, completedRoutes, language)
     }
@@ -259,8 +266,38 @@ fun JournalScreen(
                         }
                     }
                 }
+                item {
+                    TextButton(
+                        onClick = { showDeleteDialog = true },
+                        enabled = !isDeletingAccount,
+                        colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        if (isDeletingAccount) {
+                            CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                            Spacer(Modifier.width(8.dp))
+                        }
+                        Text(safety.deleteAccount, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                    }
+                }
             }
+
+            item { LegalLinks(language = language) }
         }
+    }
+
+    if (showDeleteDialog) {
+        ConfirmActionDialog(
+            title = safety.deleteAccountDialogTitle,
+            body = safety.deleteAccountDialogBody,
+            confirmLabel = safety.deleteAccountConfirm,
+            cancelLabel = safety.cancel,
+            onDismiss = { showDeleteDialog = false },
+            onConfirm = {
+                showDeleteDialog = false
+                onDeleteAccount()
+            }
+        )
     }
 
     if (showNameDialog) {

@@ -1,6 +1,8 @@
 package com.ecosdolugar.data
 
 import com.ecosdolugar.model.GuideProfileInfo
+import com.ecosdolugar.model.ReportReason
+import com.ecosdolugar.model.ReportTarget
 import com.ecosdolugar.model.RouteItem
 import com.ecosdolugar.model.RouteReview
 
@@ -66,4 +68,19 @@ interface RouteDataSource {
     )
 
     suspend fun signOut(accessToken: String)
+
+    /** Permanently deletes the account, its data and its uploaded media. */
+    suspend fun deleteAccount(userId: String, accessToken: String)
+
+    suspend fun reportContent(
+        reporterId: String,
+        targetType: ReportTarget,
+        targetId: String,
+        reason: ReportReason,
+        accessToken: String
+    )
+
+    suspend fun loadBlockedUserIds(accessToken: String): Set<String>
+
+    suspend fun blockUser(blockerId: String, blockedId: String, accessToken: String)
 }

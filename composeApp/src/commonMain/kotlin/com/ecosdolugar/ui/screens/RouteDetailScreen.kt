@@ -25,11 +25,14 @@ import com.ecosdolugar.localization.appLanguageStrings
 import com.ecosdolugar.localization.categoryDisplayName
 import com.ecosdolugar.localization.difficultyLabel
 import com.ecosdolugar.localization.routeDetailStrings
+import com.ecosdolugar.localization.safetyStrings
 import com.ecosdolugar.model.Category
 import com.ecosdolugar.model.GuideAuthor
+import com.ecosdolugar.model.ReportReason
 import com.ecosdolugar.model.RouteItem
 import com.ecosdolugar.platform.rememberShareText
 import com.ecosdolugar.ui.components.GuideAvatar
+import com.ecosdolugar.ui.components.ReportDialog
 import com.ecosdolugar.ui.components.RouteCoverImage
 import com.ecosdolugar.ui.theme.*
 
@@ -50,10 +53,24 @@ fun RouteDetailScreen(
     onStartRoute: (RouteItem) -> Unit,
     onOpenProfile: () -> Unit,
     onOpenGuideProfile: (GuideAuthor) -> Unit = {},
+    canReport: Boolean = false,
+    onReportRoute: (ReportReason) -> Unit = {},
     language: AppLanguage = AppLanguage.SPANISH
 ) {
     val shareText = rememberShareText()
     val strings = routeDetailStrings(language)
+    val safety = safetyStrings(language)
+    var showReportDialog by remember { mutableStateOf(false) }
+    if (showReportDialog) {
+        ReportDialog(
+            strings = safety,
+            onDismiss = { showReportDialog = false },
+            onSubmit = { reason ->
+                showReportDialog = false
+                onReportRoute(reason)
+            }
+        )
+    }
     Scaffold(
         topBar = {
             TopAppBar(
@@ -72,6 +89,11 @@ fun RouteDetailScreen(
                     }
                 },
                 actions = {
+                    if (canReport) {
+                        IconButton(onClick = { showReportDialog = true }) {
+                            Icon(Icons.Default.Flag, contentDescription = safety.reportRoute, tint = PineDeep)
+                        }
+                    }
                     IconButton(onClick = onOpenProfile) {
                         Surface(
                             shape = CircleShape,

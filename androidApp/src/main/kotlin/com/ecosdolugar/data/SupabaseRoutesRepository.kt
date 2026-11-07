@@ -5,6 +5,8 @@ import com.ecosdolugar.model.Difficulty
 import com.ecosdolugar.model.FieldEnigma
 import com.ecosdolugar.model.GuideAuthor
 import com.ecosdolugar.model.GuideProfileInfo
+import com.ecosdolugar.model.ReportReason
+import com.ecosdolugar.model.ReportTarget
 import com.ecosdolugar.model.NarrationVoice
 import com.ecosdolugar.model.OverviewFeature
 import com.ecosdolugar.model.RouteItem
@@ -132,6 +134,115 @@ class SupabaseRoutesRepository(
                 path = "/auth/v1/logout",
                 accessToken = accessToken
             )
+        }
+    }
+
+    override suspend fun deleteAccount(userId: String, accessToken: String) = withContext(Dispatchers.IO) {
+        requireConfigured()
+        require(UUID_PATTERN.matches(userId)) { "No se pudo identificar al usuario." }
+        require(accessToken.isNotBlank()) { "Inicia sesión para eliminar tu cuenta." }
+        deleteStoredMedia(userId, accessToken)
+        request(
+            method = "POST",
+            path = "/rest/v1/rpc/delete_my_account",
+            body = "{}",
+            accessToken = accessToken,
+            contentType = "application/json"
+        )
+        Unit
+    }
+
+    override suspend fun reportContent(
+        reporterId: String,
+        targetType: ReportTarget,
+        targetId: String,
+        reason: ReportReason,
+        accessToken: String
+    ) = withContext(Dispatchers.IO) {
+        requireConfigured()
+        require(accessToken.isNotBlank()) { "Inicia sesión para enviar un reporte." }
+        require(reporterId.isNotBlank() && targetId.isNotBlank()) { "No se pudo identificar el contenido." }
+        request(
+            method = "POST",
+            path = "/rest/v1/content_reports",
+            body = JSONObject()
+                .put("reporter_id", reporterId)
+                .put("target_type", targetType.code)
+                .put("target_id", targetId.take(200))
+                .put("reason", reason.code)
+                .toString(),
+            accessToken = accessToken,
+            contentType = "application/json",
+            prefer = "return=minimal"
+        )
+        Unit
+    }
+
+    override suspend fun loadBlockedUserIds(accessToken: String): Set<String> = withContext(Dispatchers.IO) {
+        requireConfigured()
+        require(accessToken.isNotBlank()) { "Inicia sesión para cargar los usuarios bloqueados." }
+        val rows = JSONArray(
+            request(
+                method = "GET",
+                path = "/rest/v1/user_blocks?select=blocked_id",
+                accessToken = accessToken
+            )
+        )
+        (0 until rows.length()).mapTo(mutableSetOf()) { rows.getJSONObject(it).getString("blocked_id") }
+    }
+
+    override suspend fun blockUser(blockerId: String, blockedId: String, accessToken: String) =
+        withContext(Dispatchers.IO) {
+            requireConfigured()
+            require(accessToken.isNotBlank()) { "Inicia sesión para bloquear a un usuario." }
+            require(blockerId != blockedId) { "No puedes bloquearte a ti mismo." }
+            request(
+                method = "POST",
+                path = "/rest/v1/user_blocks?on_conflict=blocker_id,blocked_id",
+                body = JSONArray().put(
+                    JSONObject().put("blocker_id", blockerId).put("blocked_id", blockedId)
+                ).toString(),
+                accessToken = accessToken,
+                contentType = "application/json",
+                prefer = "resolution=ignore-duplicates,return=minimal"
+            )
+            Unit
+        }
+
+    // Media lives under route-media/<userId>/<routeId>/<file>, so two listing levels cover everything.
+    private fun deleteStoredMedia(userId: String, accessToken: String) {
+        val paths = mutableListOf<String>()
+        for (entry in listStorageFolder(userId, accessToken)) {
+            val child = "$userId/${entry.first}"
+            if (entry.second) paths += child else paths += listStorageFolder(child, accessToken)
+                .filter { !it.second }
+                .map { "$child/${it.first}" }
+        }
+        paths.chunked(100).forEach { chunk ->
+            request(
+                method = "DELETE",
+                path = "/storage/v1/object/route-media",
+                body = JSONObject().put("prefixes", JSONArray(chunk)).toString(),
+                accessToken = accessToken,
+                contentType = "application/json"
+            )
+        }
+    }
+
+    /** Returns (name, isFile) pairs for the direct children of [prefix]. */
+    private fun listStorageFolder(prefix: String, accessToken: String): List<Pair<String, Boolean>> {
+        val rows = JSONArray(
+            request(
+                method = "POST",
+                path = "/storage/v1/object/list/route-media",
+                body = JSONObject().put("prefix", prefix).put("limit", 1000).put("offset", 0).toString(),
+                accessToken = accessToken,
+                contentType = "application/json"
+            )
+        )
+        return (0 until rows.length()).map { index ->
+            val row = rows.getJSONObject(index)
+            row.getString("name") to !row.isNull("id")
         }
     }
 

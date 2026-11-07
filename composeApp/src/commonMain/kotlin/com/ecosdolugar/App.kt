@@ -22,6 +22,7 @@ import com.ecosdolugar.localization.appLanguageStrings
 import com.ecosdolugar.localization.appShellStrings
 import com.ecosdolugar.localization.rememberAppLanguageController
 import com.ecosdolugar.model.GuideAuthor
+import com.ecosdolugar.model.ReportTarget
 import com.ecosdolugar.model.routeScore
 import com.ecosdolugar.platform.PlatformBackHandler
 import com.ecosdolugar.ui.screens.*
@@ -228,7 +229,12 @@ fun App(viewModel: AppViewModel) {
                                     onOpenMap = viewModel::openMapForSelectedRoute,
                                     onStartRoute = viewModel::startExpedition,
                                     onOpenProfile = { viewModel.navigateTo(NavigationScreen.JOURNAL) },
-                                    onOpenGuideProfile = viewModel::openGuideProfile
+                                    onOpenGuideProfile = viewModel::openGuideProfile,
+                                    canReport = userProfile.isGoogleAuthenticated &&
+                                        route.guide.id != userProfile.googleId,
+                                    onReportRoute = { reason ->
+                                        viewModel.reportContent(ReportTarget.ROUTE, route.id, reason)
+                                    }
                                 )
                             }
                         }
@@ -240,7 +246,11 @@ fun App(viewModel: AppViewModel) {
                                     allRoutes = state.routes,
                                     reviews = state.routeReviews.filter { it.guideId == guide.id },
                                     onBack = { viewModel.navigateTo(NavigationScreen.DETAIL) },
-                                    onSelectRoute = viewModel::openRouteById
+                                    onSelectRoute = viewModel::openRouteById,
+                                    canModerate = userProfile.isGoogleAuthenticated &&
+                                        guide.id != userProfile.googleId,
+                                    onReport = viewModel::reportContent,
+                                    onBlockGuide = { viewModel.blockUser(guide.id) }
                                 )
                             }
                         }
@@ -292,7 +302,9 @@ fun App(viewModel: AppViewModel) {
                                 onOpenCharacterSelection = {
                                     viewModel.openCharacterSelection(NavigationScreen.JOURNAL)
                                 },
-                                onSignOut = viewModel::signOut
+                                onSignOut = viewModel::signOut,
+                                isDeletingAccount = state.isDeletingAccount,
+                                onDeleteAccount = viewModel::deleteAccount
                             )
                         }
                         NavigationScreen.GUIDE_DASHBOARD -> {

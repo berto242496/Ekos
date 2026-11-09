@@ -53,4 +53,4 @@ Estos términos se rigen por la legislación española.
 
 ## 9. Contacto
 
-Para cualquier duda o para denunciar contenido: [EMAIL_DE_CONTACTO].
+Para cualquier duda o para denunciar contenido: info@bretemahr.com.

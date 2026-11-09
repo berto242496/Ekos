@@ -13,7 +13,7 @@ permalink: /legal/account-deletion
 
 ## Sin la aplicación
 
-Escribe a **[EMAIL_DE_CONTACTO]** desde el correo de tu cuenta de Google con el asunto «Eliminar cuenta Ecos do Lugar». Eliminaremos tu cuenta en un máximo de 30 días y te lo confirmaremos por correo.
+Escribe a info@bretemahr.com desde el correo de tu cuenta de Google con el asunto «Eliminar cuenta Ecos do Lugar». Eliminaremos tu cuenta en un máximo de 30 días y te lo confirmaremos por correo.
 
 ## Qué se elimina
 

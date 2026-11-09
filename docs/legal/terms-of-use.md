@@ -7,7 +7,7 @@ permalink: /legal/terms-of-use
 
 _Última actualización: 7 de noviembre de 2026_
 
-**Responsable:** [NOMBRE_DEL_RESPONSABLE] · **Contacto:** [EMAIL_DE_CONTACTO]
+**Responsable:** Brétema HR SL · **Contacto:** info@bretemahr.com
 
 Al usar Ecos do Lugar aceptas estos términos.
 

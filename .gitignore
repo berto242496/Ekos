@@ -3,6 +3,7 @@ build/
 dist/
 coverage/
 .gradle/
+.kotlin/
 .idea/
 local.properties
 .DS_Store

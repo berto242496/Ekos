@@ -7,7 +7,7 @@ permalink: /legal/privacy-policy
 
 _Última actualización: 7 de noviembre de 2026_
 
-**Responsable del tratamiento:** [NOMBRE_DEL_RESPONSABLE] · **Contacto:** [EMAIL_DE_CONTACTO]
+**Responsable del tratamiento:** Bretema HR SL · **Contacto:** info@bretemahr.com
 
 Ecos do Lugar (la «App») es una aplicación de rutas culturales interactivas por Galicia. Esta política explica qué datos tratamos, para qué y qué derechos tienes.
 
@@ -49,7 +49,7 @@ Conservamos tus datos mientras mantengas tu cuenta. Al eliminarla, se borran de 
 Puedes acceder, rectificar, exportar y eliminar tus datos.
 
 - **Desde la App:** Perfil → «Eliminar mi cuenta».
-- **Sin la App:** escribe a [EMAIL_DE_CONTACTO] desde el correo de tu cuenta de Google, o consulta [cómo eliminar tu cuenta](account-deletion).
+- **Sin la App:** escribe a info@bretemahr.com desde el correo de tu cuenta de Google, o consulta [cómo eliminar tu cuenta](account-deletion).
 
 También puedes reclamar ante la Agencia Española de Protección de Datos (www.aepd.es).
 

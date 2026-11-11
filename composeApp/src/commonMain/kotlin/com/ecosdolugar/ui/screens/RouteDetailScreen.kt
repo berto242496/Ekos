@@ -30,6 +30,7 @@ import com.ecosdolugar.model.Category
 import com.ecosdolugar.model.GuideAuthor
 import com.ecosdolugar.model.ReportReason
 import com.ecosdolugar.model.RouteItem
+import com.ecosdolugar.model.RoutePricing
 import com.ecosdolugar.platform.rememberShareText
 import com.ecosdolugar.ui.components.GuideAvatar
 import com.ecosdolugar.ui.components.ReportDialog
@@ -55,7 +56,10 @@ fun RouteDetailScreen(
     onOpenGuideProfile: (GuideAuthor) -> Unit = {},
     canReport: Boolean = false,
     onReportRoute: (ReportReason) -> Unit = {},
-    language: AppLanguage = AppLanguage.SPANISH
+    language: AppLanguage = AppLanguage.SPANISH,
+    requiresPurchase: Boolean = false,
+    isPurchasing: Boolean = false,
+    onPurchaseRoute: (RouteItem) -> Unit = {}
 ) {
     val shareText = rememberShareText()
     val strings = routeDetailStrings(language)
@@ -152,7 +156,8 @@ fun RouteDetailScreen(
                     }
 
                     Button(
-                        onClick = { onStartRoute(route) },
+                        onClick = { if (requiresPurchase) onPurchaseRoute(route) else onStartRoute(route) },
+                        enabled = !isPurchasing,
                         modifier = Modifier
                             .weight(1f)
                             .height(48.dp),
@@ -163,14 +168,26 @@ fun RouteDetailScreen(
                         )
                     ) {
                         Text(
-                            strings.startRoute,
+                            if (requiresPurchase) {
+                                strings.buyRoute(RoutePricing.formatEuros(route.priceCents))
+                            } else {
+                                strings.startRoute
+                            },
                             fontSize = 14.sp,
                             fontWeight = FontWeight.SemiBold,
                             maxLines = 1,
                             softWrap = false
                         )
                         Spacer(Modifier.width(6.dp))
-                        Icon(Icons.Default.ArrowForward, contentDescription = null, modifier = Modifier.size(22.dp))
+                        if (isPurchasing) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(18.dp),
+                                color = Color.White,
+                                strokeWidth = 2.dp
+                            )
+                        } else {
+                            Icon(Icons.Default.ArrowForward, contentDescription = null, modifier = Modifier.size(22.dp))
+                        }
                     }
                 }
             }

@@ -146,6 +146,8 @@ data class RouteItem(
     val tomoRef: String,
     val price: String = "Gratis",
     val isFree: Boolean = true,
+    /** Importe total de la ruta en céntimos. 0 si es gratuita. */
+    val priceCents: Int = 0,
     val guide: GuideAuthor = GuideAuthor(
         id = "guia_oficial",
         name = "Arquivo Histórico da Raia",

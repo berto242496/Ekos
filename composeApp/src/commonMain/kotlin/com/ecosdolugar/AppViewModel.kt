@@ -16,8 +16,10 @@ import com.ecosdolugar.localization.safetyStrings
 import com.ecosdolugar.model.GeoPoint
 import com.ecosdolugar.model.GuideAuthor
 import com.ecosdolugar.model.GuideProfileInfo
+import com.ecosdolugar.model.GuideSalesSummary
 import com.ecosdolugar.model.ReportReason
 import com.ecosdolugar.model.ReportTarget
+import com.ecosdolugar.model.RoutePricing
 import com.ecosdolugar.model.RouteItem
 import com.ecosdolugar.model.RouteReview
 import com.ecosdolugar.model.RouteStop
@@ -26,6 +28,8 @@ import com.ecosdolugar.model.routeCompletionPoints
 import com.ecosdolugar.model.stopArrivalPoints
 import com.ecosdolugar.model.trialPoints
 import com.ecosdolugar.model.withStopScore
+import com.ecosdolugar.payment.RoutePaymentService
+import com.ecosdolugar.payment.UnavailableRoutePaymentService
 import com.ecosdolugar.util.ProfanityFilter
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
@@ -66,6 +70,11 @@ data class AppState(
     val googleSignInError: String? = null,
     val guideSignInError: String? = null,
     val isSavingRoute: Boolean = false,
+    /** Ids de rutas de pago ya compradas por el usuario. */
+    val purchasedRouteIds: Set<String> = emptySet(),
+    val isPurchasingRoute: Boolean = false,
+    /** Ventas y saldo de las rutas del guía con sesión iniciada. */
+    val guideSales: GuideSalesSummary? = null,
     val triggeredStopIds: Set<String> = emptySet(),
     val completedChallengesCount: Int = 0,
     val pointsGain: PointsGain? = null,
@@ -91,7 +100,8 @@ private fun AppState.withRouteBonusGain(points: Int): AppState =
  */
 class AppViewModel(
     private val googleAuthService: GoogleAuthService,
-    private val routeDataSource: RouteDataSource
+    private val routeDataSource: RouteDataSource,
+    private val paymentService: RoutePaymentService = UnavailableRoutePaymentService
 ) : ViewModel() {
     private val _state = MutableStateFlow(AppState())
     val state: StateFlow<AppState> = _state.asStateFlow()
@@ -151,6 +161,10 @@ class AppViewModel(
     }
 
     fun startExpedition(route: RouteItem) {
+        if (route.requiresPurchase(_state.value.purchasedRouteIds)) {
+            report(strings.paidRouteRequiresPurchase)
+            return
+        }
         if (_state.value.userProfile.isGuideAccount && _state.value.userProfile.characterId == null) {
             _state.update {
                 it.copy(
@@ -576,6 +590,45 @@ class AppViewModel(
 
     // region Routes and progress
 
+    /** Devuelve un access token renovado o null si no se pudo renovar. */
+    private suspend fun freshAccessTokenOrNull(): String? =
+        try {
+            googleAuthService.refreshAccessToken()
+        } catch (error: CancellationException) {
+            throw error
+        } catch (error: Exception) {
+            null
+        }
+
+    /** Compra la ruta de pago con Google Play y la registra en la cuenta del usuario. */
+    fun purchaseRoute(route: RouteItem) {
+        val current = _state.value
+        val token = current.accessToken?.takeIf { it.isNotBlank() } ?: return
+        if (route.priceCents <= 0 || current.isPurchasingRoute || !route.requiresPurchase(current.purchasedRouteIds)) {
+            return
+        }
+        _state.update { it.copy(isPurchasingRoute = true) }
+        viewModelScope.launch {
+            try {
+                val purchase = paymentService.purchase(RoutePricing.productIdFor(route.priceCents)) ?: return@launch
+                // Google Play puede tardar: renovamos el token justo antes de verificar la compra.
+                val freshToken = freshAccessTokenOrNull() ?: token
+                routeDataSource.verifyRoutePurchase(route.id, purchase.productId, purchase.purchaseToken, freshToken)
+                val purchased = routeDataSource.loadPurchasedRouteIds(freshToken)
+                _state.update { it.copy(purchasedRouteIds = purchased) }
+                report(strings.routePurchaseCompleted)
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: UnsupportedOperationException) {
+                report(strings.routePurchaseNotAvailable)
+            } catch (error: Exception) {
+                report(error.message ?: strings.routePurchaseFailed)
+            } finally {
+                _state.update { it.copy(isPurchasingRoute = false) }
+            }
+        }
+    }
+
     fun toggleSavedRoute(routeId: String) {
         var nextSaved = emptySet<String>()
         _state.update {
@@ -745,12 +798,32 @@ class AppViewModel(
             }.orEmpty()
             val enrichedRoutes = withRoutePaths(routeDataSource, enrichRoutes(visibleRoutes, reviews, profiles), token)
             val completedChallengesCount = orZeroOnFailure { routeDataSource.loadCompletedChallengesCount() }
+            val purchasedRouteIds = token?.let {
+                try {
+                    routeDataSource.loadPurchasedRouteIds(it)
+                } catch (error: CancellationException) {
+                    throw error
+                } catch (error: Exception) {
+                    snapshot.purchasedRouteIds
+                }
+            }.orEmpty()
+            val guideSales = token?.let {
+                try {
+                    routeDataSource.loadGuideSalesSummary(it)
+                } catch (error: CancellationException) {
+                    throw error
+                } catch (error: Exception) {
+                    snapshot.guideSales
+                }
+            }
             _state.update {
                 it.copy(
                     routes = enrichedRoutes,
                     routeReviews = reviews,
                     guideProfiles = profiles,
                     blockedUserIds = blockedIds,
+                    purchasedRouteIds = purchasedRouteIds,
+                    guideSales = guideSales,
                     completedChallengesCount = completedChallengesCount,
                     selectedRoute = enrichedRoutes.firstOrNull { route -> route.id == it.selectedRoute?.id }
                         ?: enrichedRoutes.firstOrNull()
@@ -787,6 +860,10 @@ class AppViewModel(
 }
 
 private class Session(val userId: String, val token: String)
+
+/** Una ruta de pago solo puede iniciarse después de comprarla. */
+fun RouteItem.requiresPurchase(purchasedRouteIds: Set<String>): Boolean =
+    priceCents > 0 && id !in purchasedRouteIds
 
 /** Aplica el perfil de guía recién guardado a las rutas y guías ya cargados en memoria. */
 private fun AppState.withGuideProfile(profile: GuideProfileInfo): AppState {

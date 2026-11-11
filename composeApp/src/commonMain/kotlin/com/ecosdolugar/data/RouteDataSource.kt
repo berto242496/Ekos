@@ -2,6 +2,7 @@ package com.ecosdolugar.data
 
 import com.ecosdolugar.model.GeoPoint
 import com.ecosdolugar.model.GuideProfileInfo
+import com.ecosdolugar.model.GuideSalesSummary
 import com.ecosdolugar.model.ReportReason
 import com.ecosdolugar.model.ReportTarget
 import com.ecosdolugar.model.RouteItem
@@ -69,6 +70,22 @@ interface RouteDataSource {
     ): String?
 
     suspend fun loadSavedRouteIds(userId: String, accessToken: String): Set<String>
+
+    /** Ids of the paid routes the signed-in user has already bought. */
+    suspend fun loadPurchasedRouteIds(accessToken: String): Set<String> = emptySet()
+
+    /** Sales and balance of the routes the signed-in guide owns. Null when unavailable. */
+    suspend fun loadGuideSalesSummary(accessToken: String): GuideSalesSummary? = null
+
+    /** Verifies a Google Play purchase on the server, records it for the user and consumes it. */
+    suspend fun verifyRoutePurchase(
+        routeId: String,
+        productId: String,
+        purchaseToken: String,
+        accessToken: String
+    ) {
+        throw UnsupportedOperationException("Las compras no están disponibles.")
+    }
 
     suspend fun saveSavedRouteIds(
         userId: String,

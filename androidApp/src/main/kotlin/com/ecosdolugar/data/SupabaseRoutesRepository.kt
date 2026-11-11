@@ -6,6 +6,8 @@ import com.ecosdolugar.model.FieldEnigma
 import com.ecosdolugar.model.GeoPoint
 import com.ecosdolugar.model.GuideAuthor
 import com.ecosdolugar.model.GuideProfileInfo
+import com.ecosdolugar.model.GuideSalesSummary
+import com.ecosdolugar.model.RouteSales
 import com.ecosdolugar.model.ReportReason
 import com.ecosdolugar.model.ReportTarget
 import com.ecosdolugar.model.NarrationVoice
@@ -517,6 +519,71 @@ class SupabaseRoutesRepository(
             }
         }
 
+    override suspend fun loadPurchasedRouteIds(accessToken: String): Set<String> =
+        withContext(Dispatchers.IO) {
+            requireConfigured()
+            if (accessToken.isBlank()) return@withContext emptySet()
+            val rows = JSONArray(
+                request(
+                    method = "GET",
+                    path = "/rest/v1/route_purchases?select=route_id",
+                    accessToken = accessToken
+                )
+            )
+            (0 until rows.length()).mapTo(mutableSetOf()) { rows.getJSONObject(it).getString("route_id") }
+        }
+
+    override suspend fun loadGuideSalesSummary(accessToken: String): GuideSalesSummary? =
+        withContext(Dispatchers.IO) {
+            requireConfigured()
+            if (accessToken.isBlank()) return@withContext null
+            val response = JSONObject(
+                request(
+                    method = "POST",
+                    path = "/rest/v1/rpc/get_guide_sales_summary",
+                    body = "{}",
+                    accessToken = accessToken,
+                    contentType = "application/json"
+                )
+            )
+            val routes = response.optJSONArray("routes") ?: JSONArray()
+            GuideSalesSummary(
+                totalCents = response.optLong("total_cents"),
+                paidCents = response.optLong("paid_cents"),
+                pendingCents = response.optLong("pending_cents"),
+                routes = (0 until routes.length()).associate { index ->
+                    val row = routes.getJSONObject(index)
+                    row.getString("route_id") to RouteSales(
+                        salesCount = row.optInt("sales_count"),
+                        earnedCents = row.optLong("earned_cents")
+                    )
+                }
+            )
+        }
+
+    override suspend fun verifyRoutePurchase(
+        routeId: String,
+        productId: String,
+        purchaseToken: String,
+        accessToken: String
+    ) = withContext(Dispatchers.IO) {
+        requireConfigured()
+        require(accessToken.isNotBlank()) { "Inicia sesión para comprar la ruta." }
+        val body = JSONObject()
+            .put("routeId", routeId)
+            .put("productId", productId)
+            .put("purchaseToken", purchaseToken)
+            .toString()
+        request(
+            method = "POST",
+            path = "/functions/v1/verify-route-purchase",
+            body = body,
+            accessToken = accessToken,
+            contentType = "application/json"
+        )
+        Unit
+    }
+
     override suspend fun saveSavedRouteIds(
         userId: String,
         displayName: String,
@@ -793,6 +860,7 @@ private fun JSONObject.toRoute(): RouteItem {
         tomoRef = metadata.optString("tomoRef"),
         price = metadata.optString("price", "Gratis"),
         isFree = metadata.optBoolean("isFree", true),
+        priceCents = metadata.optInt("priceCents", 0),
         guide = guideJson.toGuide(),
         overviewFeatures = features.toFeatures(),
         stops = stops,
@@ -970,6 +1038,7 @@ private fun RouteItem.toRouteJson(status: String): JSONObject = JSONObject()
     .put("tomoRef", tomoRef)
     .put("price", price)
     .put("isFree", isFree)
+    .put("priceCents", priceCents)
     .put("status", status)
     .put("guide", guide.toJson())
     .put("overviewFeatures", JSONArray(overviewFeatures.map { it.toJson() }))

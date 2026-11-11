@@ -99,6 +99,7 @@ import com.ecosdolugar.model.FieldEnigma
 import com.ecosdolugar.model.GuideAuthor
 import com.ecosdolugar.model.OverviewFeature
 import com.ecosdolugar.model.RouteItem
+import com.ecosdolugar.model.RoutePricing
 import com.ecosdolugar.model.RouteStop
 import com.ecosdolugar.model.StopTrial
 import com.ecosdolugar.model.TrialType
@@ -170,6 +171,10 @@ fun RouteEditorScreen(
     LaunchedEffect(currentStep) { scrollState.scrollTo(0) }
     var showExitConfirmation by remember { mutableStateOf(false) }
     var pendingStatus by remember { mutableStateOf<String?>(null) }
+    var isPaid by remember(initialRoute?.id) { mutableStateOf((initialRoute?.priceCents ?: 0) > 0) }
+    var selectedPriceCents by remember(initialRoute?.id) {
+        mutableStateOf(initialRoute?.priceCents?.takeIf { it > 0 } ?: RoutePricing.TIERS_CENTS.first())
+    }
 
     fun toggleCategory(category: Category) {
         val next = if (category in selectedCategories) {
@@ -257,6 +262,8 @@ fun RouteEditorScreen(
             validationMessage = strings.stopRequired
             return false
         }
+        val priceCents = if (isPaid) selectedPriceCents else 0
+        val priceLabel = if (isPaid) RoutePricing.formatEuros(selectedPriceCents) else "Gratis"
         val creatorId = userProfile.googleId
         if (creatorId.isNullOrBlank()) {
             validationMessage = strings.loginRequired
@@ -283,7 +290,10 @@ fun RouteEditorScreen(
             distance = formattedDistance,
             difficulty = difficulty,
             categories = selectedCategories,
-            stops = routeStops
+            stops = routeStops,
+            priceCents = priceCents,
+            price = priceLabel,
+            isFree = !isPaid
         ) ?: RouteItem(
                 id = routeId,
                 title = title.trim(),
@@ -308,7 +318,10 @@ fun RouteEditorScreen(
                         accentTag = "primary"
                     )
                 ),
-                stops = routeStops
+                stops = routeStops,
+                priceCents = priceCents,
+                price = priceLabel,
+                isFree = !isPaid
             )
         pendingStatus = status
         onSave(route, status)
@@ -323,6 +336,8 @@ fun RouteEditorScreen(
         durationMinutes != parseDurationPart(initialRoute?.duration, isHours = false) ||
         selectedCategories != initialCategories(initialRoute) ||
         difficulty != (initialRoute?.difficulty ?: Difficulty.FACIL) ||
+        isPaid != ((initialRoute?.priceCents ?: 0) > 0) ||
+        (isPaid && selectedPriceCents != initialRoute?.priceCents) ||
         (initialRoute == null && stops.isNotEmpty()) ||
         (initialRoute != null && stops.size != initialRoute.stops.size)
 
@@ -477,7 +492,7 @@ fun RouteEditorScreen(
                 ) {
                     Text(strings.continueToStops, fontFamily = FontFamily.Serif, fontWeight = FontWeight.Bold)
                 }
-            } else {
+            } else if (currentStep == 2) {
                 EditorSection(
                     badge = strings.stopsAndChallengesBadge,
                     title = strings.stopsAndChallengesTitle(stops.size),
@@ -577,6 +592,82 @@ fun RouteEditorScreen(
                 SecondaryButton(
                     text = strings.backToRouteDetails,
                     onClick = { currentStep = 1 },
+                    enabled = !isSaving
+                )
+                Button(
+                    onClick = { currentStep = 3 },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = PineContainer, contentColor = SurfaceCream)
+                ) {
+                    Text(strings.continueToPricing, fontFamily = FontFamily.Serif, fontWeight = FontWeight.Bold)
+                }
+            } else {
+                EditorSection(
+                    badge = strings.pricingBadge,
+                    title = strings.pricingTitle,
+                    description = strings.pricingDescription
+                ) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        SelectableChip(
+                            text = strings.freeRouteLabel,
+                            selected = !isPaid,
+                            onClick = { isPaid = false },
+                            modifier = Modifier.weight(1f)
+                        )
+                        SelectableChip(
+                            text = strings.paidRouteLabel,
+                            selected = isPaid,
+                            onClick = { isPaid = true },
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                    Text(
+                        if (isPaid) strings.paidRouteHelper else strings.freeRouteHelper,
+                        color = InkMuted,
+                        fontFamily = FontFamily.Serif,
+                        fontSize = 12.sp
+                    )
+                    if (isPaid) {
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            FieldLabel(strings.priceTierLabel)
+                            RoutePricing.TIERS_CENTS.chunked(3).forEach { rowTiers ->
+                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    rowTiers.forEach { cents ->
+                                        SelectableChip(
+                                            text = RoutePricing.formatEuros(cents),
+                                            selected = selectedPriceCents == cents,
+                                            onClick = { selectedPriceCents = cents },
+                                            modifier = Modifier.weight(1f)
+                                        )
+                                    }
+                                    repeat(3 - rowTiers.size) { Spacer(Modifier.weight(1f)) }
+                                }
+                            }
+                        }
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(16.dp))
+                                .background(PineContainer.copy(alpha = 0.08f))
+                                .padding(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Text(
+                                strings.guideEarningsLabel(
+                                    RoutePricing.formatEuros(RoutePricing.guideShareCents(selectedPriceCents))
+                                ),
+                                color = InkDeep,
+                                fontFamily = FontFamily.Serif,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                }
+                validationMessage?.let { ValidationBanner(it) }
+                SecondaryButton(
+                    text = strings.backToStops,
+                    onClick = { currentStep = 2 },
                     enabled = !isSaving
                 )
                 SecondaryButton(

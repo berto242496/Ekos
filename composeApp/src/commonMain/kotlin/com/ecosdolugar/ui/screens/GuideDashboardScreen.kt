@@ -25,8 +25,11 @@ import com.ecosdolugar.localization.AppLanguage
 import com.ecosdolugar.localization.GuideDashboardStrings
 import com.ecosdolugar.localization.guideDashboardStrings
 import com.ecosdolugar.model.GuideAuthor
+import com.ecosdolugar.model.GuideSalesSummary
 import com.ecosdolugar.model.RouteItem
+import com.ecosdolugar.model.RoutePricing
 import com.ecosdolugar.model.RouteReview
+import com.ecosdolugar.model.RouteSales
 import com.ecosdolugar.ui.components.GuideAvatar
 import com.ecosdolugar.ui.components.RouteCoverImage
 import com.ecosdolugar.ui.theme.*
@@ -36,6 +39,7 @@ import com.ecosdolugar.ui.theme.*
 fun GuideDashboardScreen(
     guide: GuideAuthor,
     routes: List<RouteItem>,
+    guideSales: GuideSalesSummary? = null,
     reviews: List<RouteReview> = emptyList(),
     isSaving: Boolean = false,
     language: AppLanguage = AppLanguage.SPANISH,
@@ -137,6 +141,12 @@ fun GuideDashboardScreen(
                 }
             }
 
+            if (guideSales != null && (guideSales.totalCents > 0L || guideSales.routes.isNotEmpty())) {
+                item {
+                    EarningsCard(sales = guideSales, strings = strings)
+                }
+            }
+
             item {
                 ScrollableTabRow(
                     selectedTabIndex = selectedTab,
@@ -212,6 +222,7 @@ fun GuideDashboardScreen(
                     val route = visibleRoutes[index]
                     GuideRouteCard(
                         route = route,
+                        sales = guideSales?.routes?.get(route.id),
                         isSaving = isSaving,
                         onEdit = { onEditRoute(route) },
                         onPublish = { onPublishDraft(route) },
@@ -388,8 +399,42 @@ private fun StatTile(
 }
 
 @Composable
+private fun EarningsCard(sales: GuideSalesSummary, strings: GuideDashboardStrings) {
+    Surface(
+        shape = RoundedCornerShape(20.dp),
+        color = Color.White,
+        modifier = Modifier.fillMaxWidth(),
+        shadowElevation = 1.dp
+    ) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text(
+                text = strings.earningsTitle,
+                fontWeight = FontWeight.Bold,
+                fontSize = 15.sp,
+                color = OnSurfaceDark
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                StatTile(
+                    label = strings.totalGeneratedStat,
+                    value = RoutePricing.formatEuros(sales.totalCents.toInt()),
+                    icon = Icons.Default.CheckCircle,
+                    modifier = Modifier.weight(1f)
+                )
+                StatTile(
+                    label = strings.pendingBalanceStat,
+                    value = RoutePricing.formatEuros(sales.pendingCents.toInt()),
+                    icon = Icons.Default.Schedule,
+                    modifier = Modifier.weight(1f)
+                )
+            }
+        }
+    }
+}
+
+@Composable
 private fun GuideRouteCard(
     route: RouteItem,
+    sales: RouteSales?,
     isSaving: Boolean,
     onEdit: () -> Unit,
     onPublish: () -> Unit,
@@ -508,6 +553,27 @@ private fun GuideRouteCard(
                                 overflow = TextOverflow.Ellipsis
                             )
                         }
+                    }
+                }
+                if (route.priceCents > 0) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            text = strings.salesCount(sales?.salesCount ?: 0),
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = OnSurfaceDark
+                        )
+                        Text(
+                            text = strings.earnedAmount(
+                                RoutePricing.formatEuros((sales?.earnedCents ?: 0L).toInt())
+                            ),
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = PineDeep
+                        )
                     }
                 }
             }

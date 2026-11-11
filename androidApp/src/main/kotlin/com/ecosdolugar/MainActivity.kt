@@ -10,6 +10,7 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import com.ecosdolugar.auth.AndroidGoogleAuthService
 import com.ecosdolugar.auth.CurrentActivity
 import com.ecosdolugar.data.SupabaseRoutesRepository
+import com.ecosdolugar.payment.GooglePlayRoutePaymentService
 
 class MainActivity : ComponentActivity() {
     private val appViewModel: AppViewModel by viewModels {
@@ -20,7 +21,11 @@ class MainActivity : ComponentActivity() {
                     projectUrl = getString(R.string.supabase_url),
                     publishableKey = getString(R.string.supabase_publishable_key)
                 )
-                AppViewModel(AndroidGoogleAuthService(applicationContext, routesRepository), routesRepository)
+                AppViewModel(
+                    googleAuthService = AndroidGoogleAuthService(applicationContext, routesRepository),
+                    routeDataSource = routesRepository,
+                    paymentService = GooglePlayRoutePaymentService(applicationContext)
+                )
             }
         }
     }

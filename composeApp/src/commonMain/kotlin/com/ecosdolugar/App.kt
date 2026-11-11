@@ -228,6 +228,9 @@ fun App(viewModel: AppViewModel) {
                                     onToggleSaved = viewModel::toggleSavedRoute,
                                     onOpenMap = viewModel::openMapForSelectedRoute,
                                     onStartRoute = viewModel::startExpedition,
+                                    requiresPurchase = route.requiresPurchase(state.purchasedRouteIds),
+                                    isPurchasing = state.isPurchasingRoute,
+                                    onPurchaseRoute = viewModel::purchaseRoute,
                                     onOpenProfile = { viewModel.navigateTo(NavigationScreen.JOURNAL) },
                                     onOpenGuideProfile = viewModel::openGuideProfile,
                                     canReport = userProfile.isGoogleAuthenticated &&
@@ -332,6 +335,7 @@ fun App(viewModel: AppViewModel) {
                                 guide = currentGuide,
                                 language = appLanguage.current,
                                 routes = guideRoutes,
+                                guideSales = state.guideSales,
                                 reviews = state.routeReviews.filter { it.guideId == userProfile.googleId },
                                 isSaving = state.isSavingRoute,
                                 onBack = { viewModel.navigateTo(NavigationScreen.CATALOG) },

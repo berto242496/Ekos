@@ -19,7 +19,11 @@ data class AppMessageStrings(
     val loadRoutesFailed: String,
     val displayNameEmpty: String,
     val displayNameTooLong: (maxLength: Int) -> String,
-    val displayNameProfanity: String
+    val displayNameProfanity: String,
+    val paidRouteRequiresPurchase: String,
+    val routePurchaseFailed: String,
+    val routePurchaseCompleted: String,
+    val routePurchaseNotAvailable: String
 )
 
 fun appMessageStrings(language: AppLanguage): AppMessageStrings =
@@ -43,7 +47,11 @@ fun appMessageStrings(language: AppLanguage): AppMessageStrings =
             loadRoutesFailed = "No se pudieron cargar las rutas de Supabase.",
             displayNameEmpty = "Escribe el nombre que quieres mostrar.",
             displayNameTooLong = { maxLength -> "El nombre no puede superar los $maxLength caracteres." },
-            displayNameProfanity = "Ese nombre contiene palabras no permitidas."
+            displayNameProfanity = "Ese nombre contiene palabras no permitidas.",
+            paidRouteRequiresPurchase = "Debes comprar esta ruta antes de iniciarla.",
+            routePurchaseFailed = "No se pudo completar la compra de la ruta.",
+            routePurchaseCompleted = "Ruta comprada. Ya puedes iniciarla.",
+            routePurchaseNotAvailable = "Las compras no están disponibles en este dispositivo."
         )
         AppLanguage.GALICIAN -> AppMessageStrings(
             signInFailed = "Non se puido iniciar sesión con Google.",
@@ -64,7 +72,11 @@ fun appMessageStrings(language: AppLanguage): AppMessageStrings =
             loadRoutesFailed = "Non se puideron cargar as rutas de Supabase.",
             displayNameEmpty = "Escribe o nome que queres amosar.",
             displayNameTooLong = { maxLength -> "O nome non pode superar os $maxLength caracteres." },
-            displayNameProfanity = "Ese nome contén palabras non permitidas."
+            displayNameProfanity = "Ese nome contén palabras non permitidas.",
+            paidRouteRequiresPurchase = "Debes mercar esta ruta antes de iniciala.",
+            routePurchaseFailed = "Non se puido completar a compra da ruta.",
+            routePurchaseCompleted = "Ruta mercada. Xa podes iniciala.",
+            routePurchaseNotAvailable = "As compras non están dispoñibles neste dispositivo."
         )
         AppLanguage.ENGLISH -> AppMessageStrings(
             signInFailed = "Could not sign in with Google.",
@@ -85,6 +97,10 @@ fun appMessageStrings(language: AppLanguage): AppMessageStrings =
             loadRoutesFailed = "The routes could not be loaded from Supabase.",
             displayNameEmpty = "Enter the name you want to display.",
             displayNameTooLong = { maxLength -> "The name cannot exceed $maxLength characters." },
-            displayNameProfanity = "That name contains words that are not allowed."
+            displayNameProfanity = "That name contains words that are not allowed.",
+            paidRouteRequiresPurchase = "You must buy this route before starting it.",
+            routePurchaseFailed = "The route purchase could not be completed.",
+            routePurchaseCompleted = "Route purchased. You can start it now.",
+            routePurchaseNotAvailable = "Purchases are not available on this device."
         )
     }

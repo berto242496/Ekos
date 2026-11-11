@@ -111,7 +111,7 @@ class SupabaseRoutesRepository(
     override suspend fun loadRoutePaths(
         stopsByRouteId: Map<String, List<GeoPoint>>,
         accessToken: String
-    ): Map<String, List<GeoPoint>> = withContext(Dispatchers.IO) {
+    ): Map<String, RoutePath> = withContext(Dispatchers.IO) {
         requireConfigured()
         val routes = JSONArray()
         stopsByRouteId.forEach { (routeId, stops) ->
@@ -127,9 +127,15 @@ class SupabaseRoutesRepository(
             accessToken = accessToken,
             contentType = "application/json"
         )
-        val paths = JSONObject(response).optJSONObject("paths") ?: return@withContext emptyMap()
+        val json = JSONObject(response)
+        val paths = json.optJSONObject("paths") ?: return@withContext emptyMap()
+        val durations = json.optJSONObject("durations")
         paths.keys().asSequence()
-            .mapNotNull { id -> paths.optString(id, "").takeIf { it.isNotBlank() }?.let { id to decodePolyline(it) } }
+            .mapNotNull { id ->
+                val encoded = paths.optString(id, "").takeIf { it.isNotBlank() } ?: return@mapNotNull null
+                val seconds = durations?.takeUnless { it.isNull(id) }?.optInt(id, -1)?.takeIf { it >= 0 }
+                id to RoutePath(decodePolyline(encoded), seconds)
+            }
             .toMap()
     }
 

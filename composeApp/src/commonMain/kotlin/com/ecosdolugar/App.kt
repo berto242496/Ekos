@@ -351,7 +351,8 @@ fun App(viewModel: AppViewModel) {
                                 language = appLanguage.current,
                                 isSaving = state.isSavingRoute,
                                 onBack = { viewModel.navigateTo(NavigationScreen.GUIDE_DASHBOARD) },
-                                onSave = viewModel::saveEditedRoute
+                                onSave = viewModel::saveEditedRoute,
+                                onCalculateDuration = viewModel::calculateRouteMinutes
                             )
                         }
                     }

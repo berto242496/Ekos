@@ -26,7 +26,9 @@ function isValidCoordinates(coordinates: unknown): coordinates is LatLng[] {
       Math.abs(c[0]) <= 90 && Math.abs(c[1]) <= 180);
 }
 
-async function fetchOrsPath(coordinates: LatLng[], apiKey: string): Promise<string | null> {
+interface OrsPath { geometry: string; durationSeconds: number }
+
+async function fetchOrsPath(coordinates: LatLng[], apiKey: string): Promise<OrsPath | null> {
   // ORS espera [longitud, latitud].
   const response = await fetch(ORS_URL, {
     method: 'POST',
@@ -38,8 +40,11 @@ async function fetchOrsPath(coordinates: LatLng[], apiKey: string): Promise<stri
     return null;
   }
   const payload = await response.json();
-  const geometry = payload?.routes?.[0]?.geometry;
-  return typeof geometry === 'string' ? geometry : null;
+  const route = payload?.routes?.[0];
+  const geometry = route?.geometry;
+  const duration = route?.summary?.duration;
+  if (typeof geometry !== 'string' || typeof duration !== 'number') return null;
+  return { geometry, durationSeconds: Math.round(duration) };
 }
 
 Deno.serve(async (request) => {
@@ -60,39 +65,46 @@ Deno.serve(async (request) => {
   const admin = createClient(supabaseUrl, serviceRoleKey, { auth: { persistSession: false } });
 
   const paths: Record<string, string | null> = {};
+  const durations: Record<string, number | null> = {};
   for (const route of routes) {
     if (typeof route?.id !== 'string') continue;
     if (!isValidCoordinates(route.coordinates)) {
       paths[route.id] = null;
+      durations[route.id] = null;
       continue;
     }
     try {
       const key = await cacheKey(route.coordinates);
       const { data: cached } = await admin
         .from('route_path_cache')
-        .select('encoded_polyline')
+        .select('encoded_polyline, duration_seconds')
         .eq('cache_key', key)
         .maybeSingle();
 
-      if (cached) {
+      // Entradas antiguas sin duración se recalculan para completarlas.
+      if (cached && cached.duration_seconds != null) {
         paths[route.id] = cached.encoded_polyline;
+        durations[route.id] = cached.duration_seconds;
         continue;
       }
 
-      const encoded = await fetchOrsPath(route.coordinates, apiKey);
-      if (encoded) {
+      const ors = await fetchOrsPath(route.coordinates, apiKey);
+      if (ors) {
         await admin.from('route_path_cache').upsert({
           cache_key: key,
           coordinates: route.coordinates,
-          encoded_polyline: encoded
+          encoded_polyline: ors.geometry,
+          duration_seconds: ors.durationSeconds
         });
       }
-      paths[route.id] = encoded;
+      paths[route.id] = ors?.geometry ?? null;
+      durations[route.id] = ors?.durationSeconds ?? null;
     } catch (error) {
       console.error('route-path failed', route.id, error);
       paths[route.id] = null;
+      durations[route.id] = null;
     }
   }
 
-  return json({ paths });
+  return json({ paths, durations });
 });

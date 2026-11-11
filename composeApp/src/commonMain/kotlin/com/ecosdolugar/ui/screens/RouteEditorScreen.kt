@@ -96,6 +96,7 @@ import com.ecosdolugar.localization.stopEditorStrings
 import com.ecosdolugar.model.Category
 import com.ecosdolugar.model.Difficulty
 import com.ecosdolugar.model.FieldEnigma
+import com.ecosdolugar.model.GeoPoint
 import com.ecosdolugar.model.GuideAuthor
 import com.ecosdolugar.model.OverviewFeature
 import com.ecosdolugar.model.RouteItem
@@ -134,7 +135,8 @@ fun RouteEditorScreen(
     language: AppLanguage,
     isSaving: Boolean,
     onBack: () -> Unit,
-    onSave: (RouteItem, String) -> Unit
+    onSave: (RouteItem, String) -> Unit,
+    onCalculateDuration: suspend (List<GeoPoint>) -> Int?
 ) {
     val strings = routeEditorStrings(language)
     val stopStrings = stopEditorStrings(language)
@@ -154,12 +156,11 @@ fun RouteEditorScreen(
     var imageUrl by remember(initialRoute?.id) {
         mutableStateOf(initialRoute?.imageUrl ?: RoutesRepository.HERO_FOREST_URL)
     }
-    var durationHours by remember(initialRoute?.id) {
-        mutableStateOf(parseDurationPart(initialRoute?.duration, isHours = true))
-    }
     var durationMinutes by remember(initialRoute?.id) {
-        mutableStateOf(parseDurationPart(initialRoute?.duration, isHours = false))
+        mutableStateOf(parseDurationMinutes(initialRoute?.duration)?.toString().orEmpty())
     }
+    var calculatedMinutes by remember { mutableStateOf<Int?>(null) }
+    var isCalculatingDuration by remember { mutableStateOf(false) }
     var difficulty by remember(initialRoute?.id) { mutableStateOf(initialRoute?.difficulty ?: Difficulty.FACIL) }
     var selectedCategories by remember(initialRoute?.id) {
         mutableStateOf(initialCategories(initialRoute))
@@ -169,6 +170,17 @@ fun RouteEditorScreen(
     var validationMessage by remember { mutableStateOf<String?>(null) }
     var currentStep by remember { mutableStateOf(1) }
     LaunchedEffect(currentStep) { scrollState.scrollTo(0) }
+    LaunchedEffect(currentStep) {
+        if (currentStep != 4) return@LaunchedEffect
+        isCalculatingDuration = true
+        val result = onCalculateDuration(stops.map { GeoPoint(it.latitude, it.longitude) })
+        calculatedMinutes = result
+        isCalculatingDuration = false
+        if (result != null) {
+            val current = durationMinutes.toIntOrNull()
+            if (current == null || current < result) durationMinutes = result.toString()
+        }
+    }
     var showExitConfirmation by remember { mutableStateOf(false) }
     var pendingStatus by remember { mutableStateOf<String?>(null) }
     var isPaid by remember(initialRoute?.id) { mutableStateOf((initialRoute?.priceCents ?: 0) > 0) }
@@ -189,8 +201,6 @@ fun RouteEditorScreen(
         validationMessage = when {
             title.isBlank() || location.isBlank() -> strings.routeNameAndLocationRequired
             selectedCategories.isEmpty() -> strings.routeTypeRequired
-            formatDuration(durationHours, durationMinutes) == null ->
-                strings.invalidDuration
             else -> null
         }
         if (validationMessage == null) currentStep = 2
@@ -253,11 +263,21 @@ fun RouteEditorScreen(
             validationMessage = strings.routeTypeRequired
             return false
         }
-        val formattedDuration = formatDuration(durationHours, durationMinutes)
-        if (formattedDuration == null) {
+        val totalMinutes = durationMinutes.toIntOrNull()
+        if (totalMinutes == null || totalMinutes <= 0) {
             validationMessage = strings.invalidDuration
             return false
         }
+        val calculated = calculatedMinutes
+        if (calculated != null && totalMinutes < calculated) {
+            validationMessage = strings.durationBelowProposed(calculated.toString())
+            return false
+        }
+        if (status != "borrador" && calculated == null) {
+            validationMessage = strings.durationUnavailable
+            return false
+        }
+        val formattedDuration = formatDurationMinutes(totalMinutes)
         if (status != "borrador" && stops.isEmpty()) {
             validationMessage = strings.stopRequired
             return false
@@ -332,8 +352,7 @@ fun RouteEditorScreen(
         location != initialRoute?.location.orEmpty() ||
         description != initialRoute?.description.orEmpty() ||
         imageUrl != (initialRoute?.imageUrl ?: RoutesRepository.HERO_FOREST_URL) ||
-        durationHours != parseDurationPart(initialRoute?.duration, isHours = true) ||
-        durationMinutes != parseDurationPart(initialRoute?.duration, isHours = false) ||
+        durationMinutes != parseDurationMinutes(initialRoute?.duration)?.toString().orEmpty() ||
         selectedCategories != initialCategories(initialRoute) ||
         difficulty != (initialRoute?.difficulty ?: Difficulty.FACIL) ||
         isPaid != ((initialRoute?.priceCents ?: 0) > 0) ||
@@ -432,24 +451,6 @@ fun RouteEditorScreen(
                                 if (rowOptions.size < 2) Spacer(Modifier.weight(1f))
                             }
                         }
-                    }
-                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        RouteEditorTextField(
-                            value = durationHours,
-                            onValueChange = { durationHours = it.filter(Char::isDigit).take(2) },
-                            label = strings.hoursLabel,
-                            modifier = Modifier.weight(1f),
-                            singleLine = true,
-                            keyboardType = KeyboardType.Number
-                        )
-                        RouteEditorTextField(
-                            value = durationMinutes,
-                            onValueChange = { durationMinutes = it.filter(Char::isDigit).take(2) },
-                            label = strings.minutesLabel,
-                            modifier = Modifier.weight(1f),
-                            singleLine = true,
-                            keyboardType = KeyboardType.Number
-                        )
                     }
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         FieldLabel(strings.difficultyLabel)
@@ -602,7 +603,7 @@ fun RouteEditorScreen(
                 ) {
                     Text(strings.continueToPricing, fontFamily = FontFamily.Serif, fontWeight = FontWeight.Bold)
                 }
-            } else {
+            } else if (currentStep == 3) {
                 EditorSection(
                     badge = strings.pricingBadge,
                     title = strings.pricingTitle,
@@ -670,6 +671,87 @@ fun RouteEditorScreen(
                     onClick = { currentStep = 2 },
                     enabled = !isSaving
                 )
+                Button(
+                    onClick = { currentStep = 4 },
+                    enabled = !isSaving,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = PineContainer, contentColor = SurfaceCream)
+                ) {
+                    Text(strings.continueToSummary, fontFamily = FontFamily.Serif, fontWeight = FontWeight.Bold)
+                }
+            } else {
+                EditorSection(
+                    badge = strings.summaryBadge,
+                    title = strings.summaryTitle,
+                    description = strings.summaryDescription
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(SurfaceCream)
+                            .border(1.dp, FieldBorder, RoundedCornerShape(16.dp))
+                            .padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Text(
+                            title.trim(),
+                            color = InkDeep,
+                            fontFamily = FontFamily.Serif,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 16.sp
+                        )
+                        Text(
+                            strings.summaryStopsLabel(stops.size),
+                            color = InkMuted,
+                            fontFamily = FontFamily.Serif,
+                            fontSize = 13.sp
+                        )
+                        Text(
+                            strings.summaryAccessLabel(
+                                if (isPaid) RoutePricing.formatEuros(selectedPriceCents) else strings.freeRouteLabel
+                            ),
+                            color = InkMuted,
+                            fontFamily = FontFamily.Serif,
+                            fontSize = 13.sp
+                        )
+                        when {
+                            isCalculatingDuration -> Text(
+                                strings.calculatingDuration,
+                                color = InkMuted,
+                                fontFamily = FontFamily.Serif,
+                                fontSize = 13.sp
+                            )
+                            calculatedMinutes == null -> Text(
+                                strings.durationUnavailable,
+                                color = TerracottaGold,
+                                fontFamily = FontFamily.Serif,
+                                fontSize = 13.sp
+                            )
+                            else -> Text(
+                                strings.proposedDurationLabel(formatDurationMinutes(calculatedMinutes!!)),
+                                color = InkDeep,
+                                fontFamily = FontFamily.Serif,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 14.sp
+                            )
+                        }
+                    }
+                    RouteEditorTextField(
+                        value = durationMinutes,
+                        onValueChange = { durationMinutes = it.filter(Char::isDigit).take(4) },
+                        label = strings.finalDurationLabel,
+                        singleLine = true,
+                        keyboardType = KeyboardType.Number
+                    )
+                }
+                validationMessage?.let { ValidationBanner(it) }
+                SecondaryButton(
+                    text = strings.backToPricing,
+                    onClick = { currentStep = 3 },
+                    enabled = !isSaving
+                )
                 SecondaryButton(
                     text = strings.saveDraft,
                     onClick = { save("borrador") },
@@ -678,7 +760,7 @@ fun RouteEditorScreen(
                 )
                 Button(
                     onClick = { save("pendiente") },
-                    enabled = !isSaving,
+                    enabled = !isSaving && !isCalculatingDuration,
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(16.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = PineContainer, contentColor = SurfaceCream)
@@ -991,15 +1073,16 @@ private fun stopIconPainter(index: Int): androidx.compose.ui.graphics.painter.Pa
         }
     )
 
-private fun parseDurationPart(duration: String?, isHours: Boolean): String {
-    val regex = if (isHours) Regex("(\\d+)\\s*h") else Regex("(\\d+)\\s*min")
-    return duration?.let { regex.find(it)?.groupValues?.get(1) }.orEmpty()
+private fun parseDurationMinutes(duration: String?): Int? {
+    if (duration.isNullOrBlank()) return null
+    val hours = Regex("(\\d+)\\s*h").find(duration)?.groupValues?.get(1)?.toIntOrNull() ?: 0
+    val minutes = Regex("(\\d+)\\s*min").find(duration)?.groupValues?.get(1)?.toIntOrNull() ?: 0
+    return (hours * 60 + minutes).takeIf { it > 0 }
 }
 
-private fun formatDuration(hours: String, minutes: String): String? {
-    val h = hours.ifBlank { "0" }.toIntOrNull() ?: return null
-    val m = minutes.ifBlank { "0" }.toIntOrNull() ?: return null
-    if (h < 0 || m !in 0..59 || (h == 0 && m == 0)) return null
+private fun formatDurationMinutes(totalMinutes: Int): String {
+    val h = totalMinutes / 60
+    val m = totalMinutes % 60
     return when {
         h == 0 -> "$m min"
         m == 0 -> "${h}h"

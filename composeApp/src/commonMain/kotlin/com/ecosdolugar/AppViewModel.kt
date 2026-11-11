@@ -723,6 +723,12 @@ class AppViewModel(
         }
     }, fallbackMessage = strings.saveRouteFailed)
 
+    /** Calculated walking minutes for the stops of the route being edited. Null when unavailable. */
+    suspend fun calculateRouteMinutes(stops: List<GeoPoint>): Int? {
+        val token = _state.value.accessToken ?: return null
+        return calculateWalkingMinutes(routeDataSource, stops, token)
+    }
+
     private fun saveRoute(
         route: RouteItem,
         status: String,
@@ -918,7 +924,24 @@ private suspend fun withRoutePaths(
     } catch (error: Exception) {
         emptyMap()
     }
-    return routes.map { route -> paths[route.id]?.let { route.copy(path = it) } ?: route }
+    return routes.map { route -> paths[route.id]?.let { route.copy(path = it.points) } ?: route }
+}
+
+/** Walking duration in whole minutes for the given stops, or null when the service cannot calculate it. */
+suspend fun calculateWalkingMinutes(
+    dataSource: RouteDataSource,
+    stops: List<GeoPoint>,
+    token: String
+): Int? {
+    if (stops.size < 2) return null
+    val seconds: Int? = try {
+        dataSource.loadRoutePaths(mapOf("draft" to stops), token)["draft"]?.durationSeconds
+    } catch (error: CancellationException) {
+        throw error
+    } catch (error: Exception) {
+        null
+    }
+    return seconds?.let { (it + 59) / 60 }
 }
 
 /** Optional data: a failed load yields an empty list, but cancellation must still propagate. */

@@ -8,6 +8,12 @@ import com.ecosdolugar.model.ReportTarget
 import com.ecosdolugar.model.RouteItem
 import com.ecosdolugar.model.RouteReview
 
+/** Walking path between stops and its duration in seconds, as calculated by the routing service. */
+data class RoutePath(
+    val points: List<GeoPoint>,
+    val durationSeconds: Int?
+)
+
 data class RemoteAccountProfile(
     val displayName: String?,
     val characterId: String?,
@@ -22,13 +28,13 @@ interface RouteDataSource {
     suspend fun saveRoute(route: RouteItem, status: String, accessToken: String): RouteItem
 
     /**
-     * Returns the walking path for each route id, given its ordered stop coordinates.
+     * Returns the walking path and duration for each route id, given its ordered stop coordinates.
      * Routes whose path cannot be calculated are omitted, and callers fall back to straight lines.
      */
     suspend fun loadRoutePaths(
         stopsByRouteId: Map<String, List<GeoPoint>>,
         accessToken: String
-    ): Map<String, List<GeoPoint>> = emptyMap()
+    ): Map<String, RoutePath> = emptyMap()
 
     suspend fun saveChallengeProgress(
         userId: String,

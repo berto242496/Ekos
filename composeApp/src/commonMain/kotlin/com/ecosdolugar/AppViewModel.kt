@@ -615,7 +615,9 @@ class AppViewModel(
                 val freshToken = freshAccessTokenOrNull() ?: token
                 routeDataSource.verifyRoutePurchase(route.id, purchase.productId, purchase.purchaseToken, freshToken)
                 val purchased = routeDataSource.loadPurchasedRouteIds(freshToken)
-                _state.update { it.copy(purchasedRouteIds = purchased) }
+                _state.update { it.copy(purchasedRouteIds = purchased, accessToken = freshToken) }
+                // El servidor solo entrega las paradas de una ruta de pago a quien la ha comprado.
+                loadData()
                 report(strings.routePurchaseCompleted)
             } catch (error: CancellationException) {
                 throw error

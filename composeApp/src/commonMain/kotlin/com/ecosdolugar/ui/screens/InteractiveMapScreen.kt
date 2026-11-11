@@ -307,7 +307,7 @@ fun InteractiveMapScreen(
                                             maxLines = 1
                                         )
                                         Text(
-                                            "${route.stops.size} ${strings.stopsLabel} • ${difficultyLabel(route.difficulty, language)}",
+                                            "${route.stopsCount} ${strings.stopsLabel} • ${difficultyLabel(route.difficulty, language)}",
                                             color = textColor.copy(alpha = 0.72f),
                                             fontSize = 10.sp,
                                             maxLines = 1

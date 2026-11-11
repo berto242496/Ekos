@@ -851,7 +851,7 @@ private fun JSONObject.toRoute(): RouteItem {
         region = metadata.optString("region"),
         imageUrl = metadata.optString("image", metadata.optString("imageUrl")),
         isFeatured = metadata.optBoolean("isFeatured"),
-        stopsCount = stops.size,
+        stopsCount = maxOf(stops.size, metadata.optInt("stopsCount", 0)),
         duration = metadata.optString("duration"),
         distance = metadata.optString("distance"),
         difficulty = metadata.optString("difficulty").toDifficulty(),

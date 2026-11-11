@@ -157,8 +157,12 @@ data class RouteItem(
     val status: String = "publicada",
     val startedCount: Int = 0,
     val rating: Double = 0.0,
-    val reviewsCount: Int = 0
+    val reviewsCount: Int = 0,
+    /** Trazado a pie que une las paradas en orden. Vacío si aún no se ha calculado. */
+    val path: List<GeoPoint> = emptyList()
 )
+
+data class GeoPoint(val latitude: Double, val longitude: Double)
 
 data class FieldNote(
     val id: String,

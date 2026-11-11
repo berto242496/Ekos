@@ -371,11 +371,14 @@ private fun encodeRoutes(routes: List<RouteItem>, completedStopIds: Set<String>)
             .filter { it.latitude.isFinite() && it.longitude.isFinite() }
             .sortedBy { it.order }
             .forEach { stop -> stops.put(stop.toJson(completed = stop.id in completedStopIds)) }
+        val path = JSONArray()
+        route.path.forEach { point -> path.put(JSONArray(listOf(point.latitude, point.longitude))) }
         encoded.put(
             JSONObject()
                 .put("id", route.id)
                 .put("title", route.title)
                 .put("stops", stops)
+                .put("path", path)
         )
     }
     return encoded.toString()
@@ -420,7 +423,7 @@ private fun routeMapHtml(): String = """
         L.control.attribution({ position: 'topright' }).addTo(map);
         const tiles = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
           maxZoom: 19,
-          attribution: 'Tiles &copy; Esri — Source: Esri, DeLorme, NAVTEQ, TomTom, Intermap, iPC, USGS, FAO, NPS, NRCAN, GeoBase, Kadaster NL, Ordnance Survey, Esri Japan, METI, Esri China (Hong Kong), and the GIS User Community'
+          attribution: 'Tiles &copy; Esri — Source: Esri, DeLorme, NAVTEQ, TomTom, Intermap, iPC, USGS, FAO, NPS, NRCAN, GeoBase, Kadaster NL, Ordnance Survey, Esri Japan, METI, Esri China (Hong Kong), and the GIS User Community | Rutas &copy; <a href="https://openrouteservice.org">openrouteservice</a>, datos &copy; OpenStreetMap'
         }).addTo(map);
         let loadedTiles = 0;
         tiles.on('tileload', () => {
@@ -483,6 +486,8 @@ private fun routeMapHtml(): String = """
           const route = allRoutes.find(item => item.id === activeRouteId);
           if (!route || route.stops.length === 0) return;
           const points = route.stops.map(stop => [stop.lat, stop.lng]);
+          const linePoints = route.path && route.path.length > 1 ? route.path : points;
+          L.polyline(linePoints, { color: '#2E7D5B', weight: 5, opacity: 0.85 }).addTo(selectedRouteLayer);
           route.stops.forEach((stop, index) => {
             const marker = L.marker([stop.lat, stop.lng], { icon: stopIcon(stop, index, route.stops.length) }).addTo(selectedRouteLayer);
             const label = document.createElement('div');

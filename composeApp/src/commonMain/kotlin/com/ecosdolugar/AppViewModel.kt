@@ -13,6 +13,7 @@ import com.ecosdolugar.localization.AppMessageStrings
 import com.ecosdolugar.localization.SafetyStrings
 import com.ecosdolugar.localization.appMessageStrings
 import com.ecosdolugar.localization.safetyStrings
+import com.ecosdolugar.model.GeoPoint
 import com.ecosdolugar.model.GuideAuthor
 import com.ecosdolugar.model.GuideProfileInfo
 import com.ecosdolugar.model.ReportReason
@@ -742,7 +743,7 @@ class AppViewModel(
                     )
                 }
             }.orEmpty()
-            val enrichedRoutes = enrichRoutes(visibleRoutes, reviews, profiles)
+            val enrichedRoutes = withRoutePaths(routeDataSource, enrichRoutes(visibleRoutes, reviews, profiles), token)
             val completedChallengesCount = orZeroOnFailure { routeDataSource.loadCompletedChallengesCount() }
             _state.update {
                 it.copy(
@@ -816,6 +817,30 @@ private fun UserProfile.signedIn(result: GoogleAuthResult.Success, name: String,
     characterId = result.characterId ?: characterId,
     photoUrl = result.photoUrl ?: photoUrl
 )
+
+/**
+ * Attaches the walking path to each route with at least two stops. Paths are cached server-side,
+ * so this only reflects stop changes. If the service fails, routes keep straight lines between stops.
+ */
+private suspend fun withRoutePaths(
+    dataSource: RouteDataSource,
+    routes: List<RouteItem>,
+    token: String?
+): List<RouteItem> {
+    if (token == null) return routes
+    val stopsByRouteId = routes
+        .filter { it.stops.size >= 2 }
+        .associate { route -> route.id to route.stops.map { GeoPoint(it.latitude, it.longitude) } }
+    if (stopsByRouteId.isEmpty()) return routes
+    val paths = try {
+        dataSource.loadRoutePaths(stopsByRouteId, token)
+    } catch (error: CancellationException) {
+        throw error
+    } catch (error: Exception) {
+        emptyMap()
+    }
+    return routes.map { route -> paths[route.id]?.let { route.copy(path = it) } ?: route }
+}
 
 /** Optional data: a failed load yields an empty list, but cancellation must still propagate. */
 private suspend inline fun <T> orEmptyOnFailure(block: () -> List<T>): List<T> =

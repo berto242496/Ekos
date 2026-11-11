@@ -3,6 +3,7 @@ package com.ecosdolugar.data
 import com.ecosdolugar.model.Category
 import com.ecosdolugar.model.Difficulty
 import com.ecosdolugar.model.FieldEnigma
+import com.ecosdolugar.model.GeoPoint
 import com.ecosdolugar.model.GuideAuthor
 import com.ecosdolugar.model.GuideProfileInfo
 import com.ecosdolugar.model.ReportReason
@@ -16,6 +17,7 @@ import com.ecosdolugar.model.RuneGlyph
 import com.ecosdolugar.model.StopAudioMode
 import com.ecosdolugar.model.StopTrial
 import com.ecosdolugar.model.TrialType
+import com.ecosdolugar.util.decodePolyline
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
@@ -103,6 +105,31 @@ class SupabaseRoutesRepository(
                 )
             }
         }
+
+    override suspend fun loadRoutePaths(
+        stopsByRouteId: Map<String, List<GeoPoint>>,
+        accessToken: String
+    ): Map<String, List<GeoPoint>> = withContext(Dispatchers.IO) {
+        requireConfigured()
+        val routes = JSONArray()
+        stopsByRouteId.forEach { (routeId, stops) ->
+            val coordinates = JSONArray()
+            stops.forEach { coordinates.put(JSONArray(listOf(it.latitude, it.longitude))) }
+            routes.put(JSONObject().put("id", routeId).put("coordinates", coordinates))
+        }
+        if (routes.length() == 0) return@withContext emptyMap()
+        val response = request(
+            method = "POST",
+            path = "/functions/v1/route-path",
+            body = JSONObject().put("routes", routes).toString(),
+            accessToken = accessToken,
+            contentType = "application/json"
+        )
+        val paths = JSONObject(response).optJSONObject("paths") ?: return@withContext emptyMap()
+        paths.keys().asSequence()
+            .mapNotNull { id -> paths.optString(id, "").takeIf { it.isNotBlank() }?.let { id to decodePolyline(it) } }
+            .toMap()
+    }
 
     override suspend fun saveRoute(route: RouteItem, status: String, accessToken: String): RouteItem =
         withContext(Dispatchers.IO) {

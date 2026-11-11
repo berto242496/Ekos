@@ -1,5 +1,6 @@
 package com.ecosdolugar.data
 
+import com.ecosdolugar.model.GeoPoint
 import com.ecosdolugar.model.GuideProfileInfo
 import com.ecosdolugar.model.ReportReason
 import com.ecosdolugar.model.ReportTarget
@@ -18,6 +19,15 @@ interface RouteDataSource {
     suspend fun loadGuideProfiles(guideIds: List<String>, accessToken: String): List<GuideProfileInfo>
 
     suspend fun saveRoute(route: RouteItem, status: String, accessToken: String): RouteItem
+
+    /**
+     * Returns the walking path for each route id, given its ordered stop coordinates.
+     * Routes whose path cannot be calculated are omitted, and callers fall back to straight lines.
+     */
+    suspend fun loadRoutePaths(
+        stopsByRouteId: Map<String, List<GeoPoint>>,
+        accessToken: String
+    ): Map<String, List<GeoPoint>> = emptyMap()
 
     suspend fun saveChallengeProgress(
         userId: String,

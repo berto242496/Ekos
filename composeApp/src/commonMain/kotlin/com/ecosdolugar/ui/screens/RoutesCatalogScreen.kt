@@ -1,6 +1,7 @@
 package com.ecosdolugar.ui.screens
 
 import androidx.compose.animation.*
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -19,6 +20,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -35,6 +37,9 @@ import com.ecosdolugar.model.UserProfile
 import com.ecosdolugar.ui.components.CharacterAvatarImage
 import com.ecosdolugar.ui.components.RouteCoverImage
 import com.ecosdolugar.ui.theme.*
+import ecosdolugar.composeapp.generated.resources.Res
+import ecosdolugar.composeapp.generated.resources.app_icon
+import org.jetbrains.compose.resources.painterResource
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -89,15 +94,14 @@ fun RoutesCatalogScreen(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Surface(
-                            shape = CircleShape,
-                            color = PineDeep,
-                            modifier = Modifier.size(34.dp)
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Text("🌿", fontSize = 18.sp)
-                            }
-                        }
+                        Image(
+                            painter = painterResource(Res.drawable.app_icon),
+                            contentDescription = null,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier
+                                .size(34.dp)
+                                .clip(CircleShape)
+                        )
                         Column {
                             Text(
                                 text = appLanguageStrings(language).brandName,

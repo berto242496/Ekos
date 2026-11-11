@@ -400,6 +400,7 @@ private fun StatTile(
 
 @Composable
 private fun EarningsCard(sales: GuideSalesSummary, strings: GuideDashboardStrings) {
+    var showInfo by remember { mutableStateOf(false) }
     Surface(
         shape = RoundedCornerShape(20.dp),
         color = Color.White,
@@ -407,12 +408,25 @@ private fun EarningsCard(sales: GuideSalesSummary, strings: GuideDashboardString
         shadowElevation = 1.dp
     ) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text(
-                text = strings.earningsTitle,
-                fontWeight = FontWeight.Bold,
-                fontSize = 15.sp,
-                color = OnSurfaceDark
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = strings.earningsTitle,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 15.sp,
+                    color = OnSurfaceDark,
+                    modifier = Modifier.weight(1f)
+                )
+                IconButton(onClick = { showInfo = true }, modifier = Modifier.size(32.dp)) {
+                    Icon(
+                        imageVector = Icons.Default.Info,
+                        contentDescription = strings.earningsInfoTitle,
+                        tint = OnSurfaceDark
+                    )
+                }
+            }
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 StatTile(
                     label = strings.totalGeneratedStat,
@@ -428,6 +442,19 @@ private fun EarningsCard(sales: GuideSalesSummary, strings: GuideDashboardString
                 )
             }
         }
+    }
+
+    if (showInfo) {
+        AlertDialog(
+            onDismissRequest = { showInfo = false },
+            title = { Text(text = strings.earningsInfoTitle, fontWeight = FontWeight.Bold) },
+            text = { Text(text = strings.earningsInfoBody, fontSize = 14.sp) },
+            confirmButton = {
+                TextButton(onClick = { showInfo = false }) {
+                    Text(text = strings.closeAction)
+                }
+            }
+        )
     }
 }
 

@@ -3,7 +3,6 @@ package com.ecosdolugar.ui.screens
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -17,7 +16,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -65,9 +63,20 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.snapping.SnapPosition
+import androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.snapshotFlow
+import kotlin.math.abs
+import kotlinx.coroutines.flow.filter
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -1161,10 +1170,9 @@ private fun DurationPickerDialog(
     onConfirm: (Int) -> Unit,
     onDismiss: () -> Unit
 ) {
-    var total by remember { mutableStateOf(initialMinutes.coerceIn(minMinutes, MAX_DURATION_MINUTES)) }
-
-    fun adjust(delta: Int) {
-        total = (total + delta).coerceIn(minMinutes, MAX_DURATION_MINUTES)
+    val floorMinutes = minMinutes.coerceAtMost(MAX_DURATION_MINUTES)
+    var total by remember {
+        mutableStateOf(initialMinutes.coerceIn(floorMinutes, MAX_DURATION_MINUTES))
     }
 
     AlertDialog(
@@ -1174,29 +1182,40 @@ private fun DurationPickerDialog(
             Column(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Text(
-                    formatDurationMinutes(total),
-                    color = InkDeep,
-                    fontFamily = FontFamily.Serif,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 32.sp
-                )
-                StepperRow(
-                    label = "h",
-                    onMinus = { adjust(-60) },
-                    onPlus = { adjust(60) },
-                    minusEnabled = total - 60 >= minMinutes,
-                    plusEnabled = total + 60 <= MAX_DURATION_MINUTES
-                )
-                StepperRow(
-                    label = "min",
-                    onMinus = { adjust(-5) },
-                    onPlus = { adjust(5) },
-                    minusEnabled = total - 5 >= minMinutes,
-                    plusEnabled = total + 5 <= MAX_DURATION_MINUTES
-                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    WheelColumn(label = "h") {
+                        WheelPicker(
+                            range = 0..23,
+                            selected = total / 60,
+                            onSettled = { hours ->
+                                total = (hours * 60 + total % 60).coerceIn(floorMinutes, MAX_DURATION_MINUTES)
+                            },
+                            modifier = Modifier.width(88.dp)
+                        )
+                    }
+                    Text(
+                        ":",
+                        color = InkDeep,
+                        fontFamily = FontFamily.Serif,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 28.sp
+                    )
+                    WheelColumn(label = "min") {
+                        WheelPicker(
+                            range = 0..59,
+                            selected = total % 60,
+                            onSettled = { minutes ->
+                                total = (total / 60 * 60 + minutes).coerceIn(floorMinutes, MAX_DURATION_MINUTES)
+                            },
+                            modifier = Modifier.width(88.dp)
+                        )
+                    }
+                }
                 belowMinimumMessage?.let {
                     Text(
                         it,
@@ -1221,53 +1240,106 @@ private fun DurationPickerDialog(
     )
 }
 
+private const val WHEEL_ITEM_HEIGHT_DP = 44
+private const val WHEEL_VISIBLE_ITEMS = 5
+private const val WHEEL_CENTER_ROW = WHEEL_VISIBLE_ITEMS / 2
+
 @Composable
-private fun StepperRow(
-    label: String,
-    onMinus: () -> Unit,
-    onPlus: () -> Unit,
-    minusEnabled: Boolean,
-    plusEnabled: Boolean
-) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-        StepperButton(text = "−", enabled = minusEnabled, onClick = onMinus)
+private fun WheelColumn(label: String, wheel: @Composable () -> Unit) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        wheel()
         Text(
             label,
             color = InkMuted,
             fontFamily = FontFamily.Serif,
             fontWeight = FontWeight.Bold,
-            fontSize = 14.sp,
-            modifier = Modifier.width(40.dp),
-            textAlign = TextAlign.Center
+            fontSize = 14.sp
         )
-        StepperButton(text = "+", enabled = plusEnabled, onClick = onPlus)
     }
 }
 
+// Wheel values sit between two blank items so that any value can be centered.
 @Composable
-private fun StepperButton(text: String, enabled: Boolean, onClick: () -> Unit) {
+private fun WheelPicker(
+    range: IntRange,
+    selected: Int,
+    onSettled: (Int) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val listState = rememberLazyListState()
+    val currentOnSettled by rememberUpdatedState(onSettled)
+    val centeredValue by remember(range) {
+        derivedStateOf {
+            val info = listState.layoutInfo
+            val viewportCenter = (info.viewportStartOffset + info.viewportEndOffset) / 2
+            info.visibleItemsInfo
+                .filter { it.index >= 2 && it.index < range.count() + 2 }
+                .minByOrNull { abs(it.offset + it.size / 2 - viewportCenter) }
+                ?.let { range.first + it.index - 2 }
+        }
+    }
+
+    LaunchedEffect(selected) {
+        if (centeredValue != selected) {
+            listState.scrollToItem(selected - range.first)
+        }
+    }
+
+    LaunchedEffect(listState) {
+        snapshotFlow { listState.isScrollInProgress }
+            .filter { !it }
+            .collect {
+                centeredValue?.let { value ->
+                    if (value != selected) currentOnSettled(value)
+                }
+            }
+    }
+
     Box(
-        contentAlignment = Alignment.Center,
-        modifier = Modifier
-            .size(44.dp)
-            .clip(CircleShape)
-            .background(if (enabled) PineContainer.copy(alpha = 0.12f) else FieldBorder.copy(alpha = 0.3f))
-            .clickable(enabled = enabled, onClick = onClick)
+        modifier = modifier.height((WHEEL_ITEM_HEIGHT_DP * WHEEL_VISIBLE_ITEMS).dp),
+        contentAlignment = Alignment.Center
     ) {
-        Text(
-            text,
-            color = if (enabled) InkDeep else InkMuted,
-            fontFamily = FontFamily.Serif,
-            fontWeight = FontWeight.Bold,
-            fontSize = 20.sp
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(WHEEL_ITEM_HEIGHT_DP.dp)
+                .clip(RoundedCornerShape(10.dp))
+                .background(PineContainer.copy(alpha = 0.12f))
         )
+        LazyColumn(
+            state = listState,
+            flingBehavior = rememberSnapFlingBehavior(
+                lazyListState = listState,
+                snapPosition = SnapPosition.Center
+            ),
+            modifier = Modifier.fillMaxSize()
+        ) {
+            items(2) {
+                Box(Modifier.height(WHEEL_ITEM_HEIGHT_DP.dp).fillMaxWidth())
+            }
+            items(range.count()) { offset ->
+                val value = range.first + offset
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier.height(WHEEL_ITEM_HEIGHT_DP.dp).fillMaxWidth()
+                ) {
+                    Text(
+                        value.toString().padStart(2, '0'),
+                        color = if (value == centeredValue) InkDeep else InkMuted,
+                        fontFamily = FontFamily.Serif,
+                        fontWeight = if (value == centeredValue) FontWeight.Bold else FontWeight.Normal,
+                        fontSize = if (value == centeredValue) 26.sp else 20.sp
+                    )
+                }
+            }
+            items(2) {
+                Box(Modifier.height(WHEEL_ITEM_HEIGHT_DP.dp).fillMaxWidth())
+            }
+        }
     }
 }
 
-private const val MAX_DURATION_MINUTES = 9999
+private const val MAX_DURATION_MINUTES = 23 * 60 + 59
 
 private fun formatDurationMinutes(totalMinutes: Int): String {
     val h = totalMinutes / 60

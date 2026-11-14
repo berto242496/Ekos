@@ -524,7 +524,7 @@ private fun routeMapHtml(): String = """
         window.setUserLocation = function(latitude, longitude) {
           const position = [latitude, longitude];
           if (!userMarker) {
-            userMarker = L.marker(position, { icon: mapIcon('ubicacion_actual', 32) }).addTo(map);
+            userMarker = L.marker(position, { icon: mapIcon('map_ubicacion_actual.png', 32) }).addTo(map);
             userMarker.bindPopup('Tu ubicación');
           } else {
             userMarker.setLatLng(position);

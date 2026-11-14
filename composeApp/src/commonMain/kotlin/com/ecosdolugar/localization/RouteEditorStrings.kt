@@ -155,7 +155,7 @@ fun routeEditorStrings(language: AppLanguage): RouteEditorStrings =
             calculatingDuration = "Calculando el tiempo de la ruta…",
             durationUnavailable = "No se pudo calcular el tiempo. Revisa la conexión o añade al menos 2 paradas.",
             finalDurationLabel = "Tiempo de la ruta (minutos)",
-            durationBelowProposed = { "No puede ser menor que el tiempo calculado ($it min)." },
+            durationBelowProposed = { "No puede ser menor que el tiempo calculado ($it)." },
         )
         AppLanguage.GALICIAN -> RouteEditorStrings(
             createRoute = "Crear ruta",
@@ -232,7 +232,7 @@ fun routeEditorStrings(language: AppLanguage): RouteEditorStrings =
             calculatingDuration = "Calculando o tempo da ruta…",
             durationUnavailable = "Non se puido calcular o tempo. Revisa a conexión ou engade polo menos 2 paradas.",
             finalDurationLabel = "Tempo da ruta (minutos)",
-            durationBelowProposed = { "Non pode ser menor que o tempo calculado ($it min)." },
+            durationBelowProposed = { "Non pode ser menor que o tempo calculado ($it)." },
         )
         AppLanguage.ENGLISH -> RouteEditorStrings(
             createRoute = "Create route",
@@ -309,6 +309,6 @@ fun routeEditorStrings(language: AppLanguage): RouteEditorStrings =
             calculatingDuration = "Calculating route time…",
             durationUnavailable = "Could not calculate the time. Check your connection or add at least 2 stops.",
             finalDurationLabel = "Route time (minutes)",
-            durationBelowProposed = { "It cannot be less than the calculated time ($it min)." },
+            durationBelowProposed = { "It cannot be less than the calculated time ($it)." },
         )
     }

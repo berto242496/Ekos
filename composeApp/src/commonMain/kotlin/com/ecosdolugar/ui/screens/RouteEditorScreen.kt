@@ -283,7 +283,7 @@ fun RouteEditorScreen(
         }
         val calculated = calculatedMinutes
         if (calculated != null && totalMinutes < calculated) {
-            validationMessage = strings.durationBelowProposed(calculated.toString())
+            validationMessage = strings.durationBelowProposed(formatDurationMinutes(calculated))
             return false
         }
         if (status != "borrador" && calculated == null) {

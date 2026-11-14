@@ -15,7 +15,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -76,6 +78,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
@@ -182,6 +185,7 @@ fun RouteEditorScreen(
         }
     }
     var showExitConfirmation by remember { mutableStateOf(false) }
+    var showDurationPicker by remember { mutableStateOf(false) }
     var pendingStatus by remember { mutableStateOf<String?>(null) }
     var isPaid by remember(initialRoute?.id) { mutableStateOf((initialRoute?.priceCents ?: 0) > 0) }
     var selectedPriceCents by remember(initialRoute?.id) {
@@ -681,70 +685,81 @@ fun RouteEditorScreen(
                     Text(strings.continueToSummary, fontFamily = FontFamily.Serif, fontWeight = FontWeight.Bold)
                 }
             } else {
-                EditorSection(
-                    badge = strings.summaryBadge,
-                    title = strings.summaryTitle,
-                    description = strings.summaryDescription
+                Text(
+                    strings.summaryDescription,
+                    color = InkMuted,
+                    fontFamily = FontFamily.Serif,
+                    fontSize = 14.sp
+                )
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(SurfaceCream)
+                        .border(1.dp, FieldBorder, RoundedCornerShape(16.dp))
+                        .padding(horizontal = 16.dp)
                 ) {
-                    Column(
+                    SummaryRow(strings.summaryTitleRow, title.trim())
+                    SummaryDivider()
+                    SummaryRow(strings.summaryStopsRow, stops.size.toString())
+                    SummaryDivider()
+                    SummaryRow(
+                        strings.summaryAccessRow,
+                        if (isPaid) RoutePricing.formatEuros(selectedPriceCents) else strings.freeRouteLabel
+                    )
+                    SummaryDivider()
+                    Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clip(RoundedCornerShape(16.dp))
-                            .background(SurfaceCream)
-                            .border(1.dp, FieldBorder, RoundedCornerShape(16.dp))
-                            .padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                            .padding(vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(
-                            title.trim(),
-                            color = InkDeep,
-                            fontFamily = FontFamily.Serif,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 16.sp
-                        )
-                        Text(
-                            strings.summaryStopsLabel(stops.size),
-                            color = InkMuted,
-                            fontFamily = FontFamily.Serif,
-                            fontSize = 13.sp
-                        )
-                        Text(
-                            strings.summaryAccessLabel(
-                                if (isPaid) RoutePricing.formatEuros(selectedPriceCents) else strings.freeRouteLabel
-                            ),
-                            color = InkMuted,
-                            fontFamily = FontFamily.Serif,
-                            fontSize = 13.sp
-                        )
-                        when {
-                            isCalculatingDuration -> Text(
-                                strings.calculatingDuration,
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                strings.summaryTimeRow,
                                 color = InkMuted,
                                 fontFamily = FontFamily.Serif,
                                 fontSize = 13.sp
                             )
-                            calculatedMinutes == null -> Text(
-                                strings.durationUnavailable,
-                                color = TerracottaGold,
-                                fontFamily = FontFamily.Serif,
-                                fontSize = 13.sp
-                            )
-                            else -> Text(
-                                strings.proposedDurationLabel(formatDurationMinutes(calculatedMinutes!!)),
-                                color = InkDeep,
-                                fontFamily = FontFamily.Serif,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 14.sp
-                            )
+                            when {
+                                isCalculatingDuration -> Text(
+                                    strings.calculatingDuration,
+                                    color = InkMuted,
+                                    fontFamily = FontFamily.Serif,
+                                    fontSize = 13.sp
+                                )
+                                calculatedMinutes == null -> Text(
+                                    strings.durationUnavailable,
+                                    color = TerracottaGold,
+                                    fontFamily = FontFamily.Serif,
+                                    fontSize = 13.sp
+                                )
+                                else -> {
+                                    Text(
+                                        durationMinutes.toIntOrNull()?.let(::formatDurationMinutes).orEmpty(),
+                                        color = InkDeep,
+                                        fontFamily = FontFamily.Serif,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 18.sp
+                                    )
+                                    Text(
+                                        strings.proposedDurationLabel(formatDurationMinutes(calculatedMinutes!!)),
+                                        color = InkMuted,
+                                        fontFamily = FontFamily.Serif,
+                                        fontSize = 12.sp
+                                    )
+                                }
+                            }
+                        }
+                        TextButton(
+                            onClick = { showDurationPicker = true },
+                            enabled = !isSaving && !isCalculatingDuration && calculatedMinutes != null
+                        ) {
+                            Icon(Icons.Filled.Edit, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(Modifier.size(4.dp))
+                            Text(strings.editDurationLabel, fontFamily = FontFamily.Serif, fontWeight = FontWeight.Bold)
                         }
                     }
-                    RouteEditorTextField(
-                        value = durationMinutes,
-                        onValueChange = { durationMinutes = it.filter(Char::isDigit).take(4) },
-                        label = strings.finalDurationLabel,
-                        singleLine = true,
-                        keyboardType = KeyboardType.Number
-                    )
                 }
                 validationMessage?.let { ValidationBanner(it) }
                 SecondaryButton(
@@ -777,6 +792,22 @@ fun RouteEditorScreen(
                 }
             }
         }
+    }
+
+    if (showDurationPicker) {
+        DurationPickerDialog(
+            initialMinutes = durationMinutes.toIntOrNull() ?: calculatedMinutes ?: 0,
+            minMinutes = calculatedMinutes ?: 0,
+            title = strings.durationPickerTitle,
+            confirmLabel = strings.durationPickerConfirm,
+            cancelLabel = strings.durationPickerCancel,
+            belowMinimumMessage = calculatedMinutes?.let { strings.durationBelowProposed(formatDurationMinutes(it)) },
+            onConfirm = { minutes ->
+                durationMinutes = minutes.toString()
+                showDurationPicker = false
+            },
+            onDismiss = { showDurationPicker = false }
+        )
     }
 
     if (showExitConfirmation) {
@@ -1079,6 +1110,164 @@ private fun parseDurationMinutes(duration: String?): Int? {
     val minutes = Regex("(\\d+)\\s*min").find(duration)?.groupValues?.get(1)?.toIntOrNull() ?: 0
     return (hours * 60 + minutes).takeIf { it > 0 }
 }
+
+@Composable
+private fun SummaryRow(label: String, value: String) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            label,
+            color = InkMuted,
+            fontFamily = FontFamily.Serif,
+            fontSize = 13.sp,
+            modifier = Modifier.weight(0.4f)
+        )
+        Text(
+            value,
+            color = InkDeep,
+            fontFamily = FontFamily.Serif,
+            fontWeight = FontWeight.Bold,
+            fontSize = 15.sp,
+            textAlign = TextAlign.End,
+            overflow = TextOverflow.Ellipsis,
+            maxLines = 1,
+            modifier = Modifier.weight(0.6f)
+        )
+    }
+}
+
+@Composable
+private fun SummaryDivider() {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(1.dp)
+            .background(FieldBorder)
+    )
+}
+
+@Composable
+private fun DurationPickerDialog(
+    initialMinutes: Int,
+    minMinutes: Int,
+    title: String,
+    confirmLabel: String,
+    cancelLabel: String,
+    belowMinimumMessage: String?,
+    onConfirm: (Int) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var total by remember { mutableStateOf(initialMinutes.coerceIn(minMinutes, MAX_DURATION_MINUTES)) }
+
+    fun adjust(delta: Int) {
+        total = (total + delta).coerceIn(minMinutes, MAX_DURATION_MINUTES)
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title, fontFamily = FontFamily.Serif, fontWeight = FontWeight.Bold) },
+        text = {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                Text(
+                    formatDurationMinutes(total),
+                    color = InkDeep,
+                    fontFamily = FontFamily.Serif,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 32.sp
+                )
+                StepperRow(
+                    label = "h",
+                    onMinus = { adjust(-60) },
+                    onPlus = { adjust(60) },
+                    minusEnabled = total - 60 >= minMinutes,
+                    plusEnabled = total + 60 <= MAX_DURATION_MINUTES
+                )
+                StepperRow(
+                    label = "min",
+                    onMinus = { adjust(-5) },
+                    onPlus = { adjust(5) },
+                    minusEnabled = total - 5 >= minMinutes,
+                    plusEnabled = total + 5 <= MAX_DURATION_MINUTES
+                )
+                belowMinimumMessage?.let {
+                    Text(
+                        it,
+                        color = TerracottaGold,
+                        fontFamily = FontFamily.Serif,
+                        fontSize = 12.sp,
+                        textAlign = TextAlign.Center
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onConfirm(total) }) {
+                Text(confirmLabel, fontFamily = FontFamily.Serif, fontWeight = FontWeight.Bold)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(cancelLabel, fontFamily = FontFamily.Serif)
+            }
+        }
+    )
+}
+
+@Composable
+private fun StepperRow(
+    label: String,
+    onMinus: () -> Unit,
+    onPlus: () -> Unit,
+    minusEnabled: Boolean,
+    plusEnabled: Boolean
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        StepperButton(text = "−", enabled = minusEnabled, onClick = onMinus)
+        Text(
+            label,
+            color = InkMuted,
+            fontFamily = FontFamily.Serif,
+            fontWeight = FontWeight.Bold,
+            fontSize = 14.sp,
+            modifier = Modifier.width(40.dp),
+            textAlign = TextAlign.Center
+        )
+        StepperButton(text = "+", enabled = plusEnabled, onClick = onPlus)
+    }
+}
+
+@Composable
+private fun StepperButton(text: String, enabled: Boolean, onClick: () -> Unit) {
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = Modifier
+            .size(44.dp)
+            .clip(CircleShape)
+            .background(if (enabled) PineContainer.copy(alpha = 0.12f) else FieldBorder.copy(alpha = 0.3f))
+            .clickable(enabled = enabled, onClick = onClick)
+    ) {
+        Text(
+            text,
+            color = if (enabled) InkDeep else InkMuted,
+            fontFamily = FontFamily.Serif,
+            fontWeight = FontWeight.Bold,
+            fontSize = 20.sp
+        )
+    }
+}
+
+private const val MAX_DURATION_MINUTES = 9999
 
 private fun formatDurationMinutes(totalMinutes: Int): String {
     val h = totalMinutes / 60

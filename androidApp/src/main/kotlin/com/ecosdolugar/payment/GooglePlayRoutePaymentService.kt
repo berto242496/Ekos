@@ -6,6 +6,7 @@ import com.android.billingclient.api.BillingClientStateListener
 import com.android.billingclient.api.BillingFlowParams
 import com.android.billingclient.api.BillingResult
 import com.android.billingclient.api.ProductDetails
+import com.android.billingclient.api.PendingPurchasesParams
 import com.android.billingclient.api.Purchase
 import com.android.billingclient.api.QueryProductDetailsParams
 import com.ecosdolugar.auth.CurrentActivity
@@ -21,7 +22,9 @@ class GooglePlayRoutePaymentService(context: Context) : RoutePaymentService {
 
     private val billingClient: BillingClient = BillingClient.newBuilder(context.applicationContext)
         .setListener { result, purchases -> onPurchasesUpdated(result, purchases) }
-        .enablePendingPurchases()
+        .enablePendingPurchases(
+            PendingPurchasesParams.newBuilder().enableOneTimeProducts().build()
+        )
         .build()
 
     @Volatile
@@ -117,11 +120,11 @@ class GooglePlayRoutePaymentService(context: Context) : RoutePaymentService {
             )
             .build()
         return suspendCancellableCoroutine { continuation ->
-            billingClient.queryProductDetailsAsync(params) { result, detailsList ->
+            billingClient.queryProductDetailsAsync(params) { result, queryResult ->
                 if (continuation.isActive) {
                     continuation.resume(
                         if (result.responseCode == BillingClient.BillingResponseCode.OK) {
-                            detailsList.firstOrNull { it.productId == productId }
+                            queryResult.productDetailsList.firstOrNull { it.productId == productId }
                         } else {
                             null
                         }

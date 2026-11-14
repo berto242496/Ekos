@@ -9,7 +9,7 @@ navigation-compose = "2.9.2"
 coroutines = "1.10.2"
 androidx-credentials = "1.5.0"
 googleid = "1.1.1"
-billing = "7.1.1"
+billing = "8.0.0"
 
 [libraries]
 androidx-activity-compose = { module = "androidx.activity:activity-compose", version.ref = "androidx-activityCompose" }

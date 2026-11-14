@@ -5,7 +5,7 @@ permalink: /legal/privacy-policy
 
 # Política de privacidad de Ecos do Lugar
 
-_Última actualización: 7 de noviembre de 2026_
+_Última actualización: 14 de noviembre de 2026_
 
 **Responsable del tratamiento:** Bretema HR SL · **Contacto:** info@bretemahr.com
 
@@ -23,6 +23,7 @@ Ecos do Lugar (la «App») es una aplicación de rutas culturales interactivas p
 | Reportes y bloqueos de contenido | Si reportas o bloqueas | Moderación y seguridad de la comunidad |
 | Ubicación aproximada o precisa | Solo mientras usas el mapa y las rutas, con tu permiso | Mostrar tu posición y detectar que llegas a una parada. **Se procesa en tu dispositivo y no se envía a nuestros servidores.** |
 | Micrófono | Solo si, como guía, grabas la narración de una parada, con tu permiso | Grabar el audio que se sube a la ruta |
+| Compras de rutas: identificadores de compra y producto de Google Play, ruta comprada, fecha e importe | Al comprar una ruta de pago | Dar acceso a la ruta comprada, verificar la compra y calcular el reparto con el guía |
 
 No usamos publicidad, no vendemos tus datos y no te rastreamos entre aplicaciones.
 
@@ -30,7 +31,8 @@ No usamos publicidad, no vendemos tus datos y no te rastreamos entre aplicacione
 
 - **Supabase** (base de datos, autenticación y almacenamiento de archivos): aloja los datos de tu cuenta y el contenido que subes.
 - **Google** (Inicio de sesión con Google / Credential Manager): autentica tu identidad.
-- **Proveedores de teselas de mapa** (actualmente Esri/ArcGIS y OpenStreetMap): al mostrar el mapa reciben tu dirección IP y las coordenadas de las teselas solicitadas.
+- **Google Play** (Facturación): gestiona las compras de rutas de pago y nos confirma su validez.
+- **OpenFreeMap** (proveedor de teselas del mapa): al mostrar el mapa recibe tu dirección IP y las coordenadas de las teselas solicitadas. Sus datos se rigen por su propia política.
 
 ## 3. Base legal
 

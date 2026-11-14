@@ -5,7 +5,7 @@ permalink: /legal/terms-of-use
 
 # Términos de uso de Ecos do Lugar
 
-_Última actualización: 7 de noviembre de 2026_
+_Última actualización: 14 de noviembre de 2026_
 
 **Responsable:** Brétema HR SL · **Contacto:** info@bretemahr.com
 
@@ -13,7 +13,7 @@ Al usar Ecos do Lugar aceptas estos términos.
 
 ## 1. El servicio
 
-La App ofrece rutas culturales interactivas por Galicia, con mapa, paradas, retos y valoraciones.
+La App ofrece rutas culturales interactivas por Galicia, con mapa, paradas, retos y valoraciones. Algunas rutas son de pago (ver sección 7).
 
 ## 2. Tu cuenta
 
@@ -43,14 +43,22 @@ Las rutas transcurren por espacios reales. Usa tu criterio, respeta la señaliza
 
 La App se ofrece «tal cual». Podemos modificar, suspender o interrumpir funciones en cualquier momento.
 
-## 7. Privacidad
+## 7. Rutas de pago
+
+- **Precio y compra.** Algunas rutas tienen un precio entre 1,99 € y 9,99 € que se paga una sola vez por ruta a través de Google Play. Al comprarla, obtienes acceso a sus paradas, retos y audios. El precio mostrado en la App es el que se cobra.
+- **Reparto con el guía.** El 65 % del importe neto de cada venta corresponde al guía autor de la ruta y el 35 % restante a Brétema HR SL.
+- **Liquidación.** Los pagos a los guías se realizan manualmente una vez al mes, por transferencia bancaria a los datos que el guía nos facilite. Antes de cobrar, el guía debe facilitar sus datos fiscales y bancarios.
+- **Reembolsos.** Las solicitudes de reembolso se tramitan a través de Google Play según sus políticas. Si una compra se reembolsa, el acceso a la ruta puede retirarse y la venta correspondiente puede descontarse del saldo del guía.
+- **Compras de Google Play.** Google Play gestiona el cobro y los impuestos aplicables a la compra. Los términos de Google Play también se aplican a tu compra.
+
+## 8. Privacidad
 
 El tratamiento de tus datos se describe en la [Política de privacidad](privacy-policy).
 
-## 8. Ley aplicable
+## 9. Ley aplicable
 
 Estos términos se rigen por la legislación española.
 
-## 9. Contacto
+## 10. Contacto
 
 Para cualquier duda o para denunciar contenido: info@bretemahr.com.

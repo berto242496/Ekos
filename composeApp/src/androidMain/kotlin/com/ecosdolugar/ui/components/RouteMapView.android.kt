@@ -11,9 +11,12 @@ import android.os.Looper
 import android.view.MotionEvent
 import android.webkit.JavascriptInterface
 import android.webkit.WebChromeClient
+import android.webkit.WebResourceRequest
+import android.webkit.WebResourceResponse
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.webkit.WebViewAssetLoader
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -246,6 +249,16 @@ private fun createRouteMap(
     settings.domStorageEnabled = false
     settings.loadsImagesAutomatically = true
     webViewClient = object : WebViewClient() {
+        private val assetLoader = WebViewAssetLoader.Builder()
+            .setDomain(MAP_ASSET_DOMAIN)
+            .addPathHandler("/assets/", WebViewAssetLoader.AssetsPathHandler(context))
+            .build()
+
+        override fun shouldInterceptRequest(
+            view: WebView?,
+            request: WebResourceRequest?
+        ): WebResourceResponse? = request?.url?.let { assetLoader.shouldInterceptRequest(it) }
+
         override fun onReceivedError(
             view: WebView?,
             request: android.webkit.WebResourceRequest?,
@@ -285,8 +298,11 @@ private fun createRouteMap(
         },
         "AndroidMap"
     )
-    loadDataWithBaseURL("file:///android_asset/", routeMapHtml(), "text/html", "UTF-8", null)
+    loadDataWithBaseURL("https://$MAP_ASSET_DOMAIN/assets/map/", routeMapHtml(), "text/html", "UTF-8", null)
 }
+
+private const val MAP_ASSET_DOMAIN = "appassets.androidplatform.net"
+private const val OPENFREEMAP_STYLE_URL = "https://tiles.openfreemap.org/styles/liberty"
 
 private class RouteMapWebView(context: Context) : WebView(context) {
     private var pageLoaded = false
@@ -397,7 +413,9 @@ private fun routeMapHtml(): String = """
     <html>
     <head>
       <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-      <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+      <link rel="stylesheet" href="vendor/leaflet.css"
+            onerror="window.AndroidMap.onMapStatus('leaflet-error')">
+      <link rel="stylesheet" href="vendor/maplibre-gl.css"
             onerror="window.AndroidMap.onMapStatus('leaflet-error')">
       <style>
         html, body { width: 100%; height: 100%; min-height: 100vh; margin: 0; }
@@ -408,30 +426,35 @@ private fun routeMapHtml(): String = """
     </head>
     <body>
       <div id="map"></div>
-      <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+      <script src="vendor/ekos-map-vendor.js"
               onerror="window.AndroidMap.onMapStatus('leaflet-error')"></script>
       <script>
         window.onerror = function(message, source, line, column) {
           if (window.AndroidMap) window.AndroidMap.onMapStatus('leaflet-error');
           console.error(message + ' (' + source + ':' + line + ':' + column + ')');
         };
+        window.EkosMapLibre.setWorkerUrl(new URL('vendor/maplibre-gl-worker.js', window.location.href).href);
         const map = L.map('map', {
           zoomControl: true,
           scrollWheelZoom: true,
-          attributionControl: false
+          attributionControl: true,
+          minZoom: 1,
+          maxBounds: [[-85, -180], [85, 180]],
+          maxBoundsViscosity: 1
         }).setView([42.65, -8.2], 8);
-        L.control.attribution({ position: 'topright' }).addTo(map);
-        const tiles = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
-          maxZoom: 19,
-          attribution: 'Tiles &copy; Esri — Source: Esri, DeLorme, NAVTEQ, TomTom, Intermap, iPC, USGS, FAO, NPS, NRCAN, GeoBase, Kadaster NL, Ordnance Survey, Esri Japan, METI, Esri China (Hong Kong), and the GIS User Community | Rutas &copy; <a href="https://openrouteservice.org">openrouteservice</a>, datos &copy; OpenStreetMap'
+        map.attributionControl.setPosition('topright');
+        const tiles = window.EkosMapLibre.maplibreGL({
+          style: '${OPENFREEMAP_STYLE_URL}'
         }).addTo(map);
-        let loadedTiles = 0;
-        tiles.on('tileload', () => {
-          loadedTiles += 1;
+        map.attributionControl.addAttribution('Rutas &copy; <a href="https://openrouteservice.org">openrouteservice</a>');
+        let mapLoaded = false;
+        const tileMap = tiles.getMaplibreMap();
+        tileMap.on('load', () => {
+          mapLoaded = true;
           if (map.getSize().y > 0 && window.AndroidMap) window.AndroidMap.onMapStatus('ready');
         });
-        tiles.on('tileerror', () => {
-          if (loadedTiles === 0 && window.AndroidMap) window.AndroidMap.onMapStatus('tiles-error');
+        tileMap.on('error', () => {
+          if (!mapLoaded && window.AndroidMap) window.AndroidMap.onMapStatus('tiles-error');
         });
 
         const routeStartLayer = L.layerGroup().addTo(map);
@@ -451,7 +474,7 @@ private fun routeMapHtml(): String = """
 
         function mapIcon(file, size) {
           return L.icon({
-            iconUrl: 'map/' + file,
+            iconUrl: file,
             iconSize: [size, size],
             iconAnchor: [size / 2, size / 2]
           });
@@ -556,7 +579,7 @@ private fun routeMapHtml(): String = """
         map.on('moveend', redrawVisibleStarts);
         setTimeout(() => {
           map.invalidateSize();
-          if (loadedTiles === 0 && window.AndroidMap) window.AndroidMap.onMapStatus('tiles-error');
+          if (!mapLoaded && window.AndroidMap) window.AndroidMap.onMapStatus('tiles-error');
         }, 5000);
       </script>
     </body>

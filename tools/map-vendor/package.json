@@ -1,0 +1,17 @@
+{
+  "name": "ekos-map-vendor",
+  "private": true,
+  "type": "module",
+  "description": "Builds the local Leaflet + MapLibre GL assets used by the Android route map WebView",
+  "scripts": {
+    "build": "node build.mjs"
+  },
+  "dependencies": {
+    "@maplibre/maplibre-gl-leaflet": "0.1.4",
+    "leaflet": "1.9.4",
+    "maplibre-gl": "6.3.0"
+  },
+  "devDependencies": {
+    "esbuild": "0.25.12"
+  }
+}

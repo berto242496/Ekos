@@ -1,6 +1,7 @@
 package com.ecosdolugar.ui.screens
 
 import androidx.compose.animation.*
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -19,16 +20,26 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ecosdolugar.data.CharactersRepository
+import com.ecosdolugar.localization.AppLanguage
+import com.ecosdolugar.localization.appLanguageStrings
+import com.ecosdolugar.localization.categoryDisplayName
+import com.ecosdolugar.localization.routeCatalogStrings
 import com.ecosdolugar.model.Category
 import com.ecosdolugar.model.RouteItem
 import com.ecosdolugar.model.UserProfile
+import com.ecosdolugar.ui.components.CharacterAvatarImage
+import com.ecosdolugar.ui.components.RouteCoverImage
 import com.ecosdolugar.ui.theme.*
+import ecosdolugar.composeapp.generated.resources.Res
+import ecosdolugar.composeapp.generated.resources.app_icon
+import org.jetbrains.compose.resources.painterResource
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -36,39 +47,29 @@ fun RoutesCatalogScreen(
     routes: List<RouteItem>,
     savedRouteIds: Set<String>,
     userProfile: UserProfile = UserProfile(),
+    language: AppLanguage,
     onSelectRoute: (RouteItem) -> Unit,
     onToggleSaved: (String) -> Unit,
     onOpenProfile: () -> Unit,
-    onOpenCharacterSelection: () -> Unit = {},
     onOpenGuideMode: () -> Unit = {}
 ) {
     var searchQuery by remember { mutableStateOf("") }
-    var selectedCategory by remember { mutableStateOf(Category.ALL) }
-    var selectedPriceFilter by remember { mutableStateOf("all") }
+    var selectedCategories by remember { mutableStateOf(emptySet<Category>()) }
     var onlySaved by remember { mutableStateOf(false) }
-    var isAmbientPlaying by remember { mutableStateOf(false) }
-    var activeFilterDrawer by remember { mutableStateOf<String?>(null) } // "price", "guide", "zone"
+    val strings = routeCatalogStrings(language)
 
-    val activeCharacter = remember(userProfile.characterId) {
-        CharactersRepository.getById(userProfile.characterId)
-    }
-    val charColor = Color(activeCharacter.accentColorHex)
+    val profileCharacter = userProfile.characterId?.let { CharactersRepository.getById(it) }
 
-    val filteredRoutes = remember(searchQuery, selectedCategory, selectedPriceFilter, onlySaved, routes) {
+    val filteredRoutes = remember(searchQuery, selectedCategories, onlySaved, routes, savedRouteIds) {
         routes.filter { route ->
-            val matchesCategory = selectedCategory == Category.ALL || route.categories.contains(selectedCategory)
+            val matchesCategory = selectedCategories.isEmpty() || route.categories.any { it in selectedCategories }
             val matchesSearch = searchQuery.isBlank() ||
                 route.title.contains(searchQuery, ignoreCase = true) ||
                 route.location.contains(searchQuery, ignoreCase = true) ||
                 route.description.contains(searchQuery, ignoreCase = true) ||
                 route.guide.name.contains(searchQuery, ignoreCase = true)
             val matchesSaved = !onlySaved || savedRouteIds.contains(route.id)
-            val matchesPrice = when (selectedPriceFilter) {
-                "free" -> route.isFree || route.price.contains("Gratis", ignoreCase = true)
-                "paid" -> !route.isFree && !route.price.contains("Gratis", ignoreCase = true)
-                else -> true
-            }
-            matchesCategory && matchesSearch && matchesSaved && matchesPrice
+            matchesCategory && matchesSearch && matchesSaved
         }
     }
 
@@ -93,25 +94,24 @@ fun RoutesCatalogScreen(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Surface(
-                            shape = CircleShape,
-                            color = PineDeep,
-                            modifier = Modifier.size(34.dp)
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Text("🌿", fontSize = 18.sp)
-                            }
-                        }
+                        Image(
+                            painter = painterResource(Res.drawable.app_icon),
+                            contentDescription = null,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier
+                                .size(34.dp)
+                                .clip(CircleShape)
+                        )
                         Column {
                             Text(
-                                text = "ECOS DO LUGAR",
+                                text = appLanguageStrings(language).brandName,
                                 fontSize = 10.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = PineMoss,
                                 letterSpacing = 1.sp
                             )
                             Text(
-                                text = "Rutas",
+                                text = strings.routesTitle,
                                 fontSize = 17.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = OnSurfaceDark
@@ -122,54 +122,44 @@ fun RoutesCatalogScreen(
                     // Actions Header (Soy Guía, Personaje, Perfil)
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        // Soy Guía Pill Button
-                        Surface(
-                            onClick = onOpenGuideMode,
-                            shape = RoundedCornerShape(20.dp),
-                            color = TerracottaGold.copy(alpha = 0.15f),
-                            border = ButtonDefaults.outlinedButtonBorder.copy(
-                                brush = androidx.compose.ui.graphics.SolidColor(TerracottaGold.copy(alpha = 0.4f))
-                            )
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        if (userProfile.isGuideAccount) {
+                            Surface(
+                                onClick = onOpenGuideMode,
+                                shape = RoundedCornerShape(20.dp),
+                                color = TerracottaGold.copy(alpha = 0.15f),
+                                border = ButtonDefaults.outlinedButtonBorder.copy(
+                                    brush = androidx.compose.ui.graphics.SolidColor(TerracottaGold.copy(alpha = 0.4f))
+                                )
                             ) {
-                                Icon(Icons.Default.CompassCalibration, contentDescription = null, tint = TerracottaGold, modifier = Modifier.size(13.dp))
-                                Text("Guía", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = TerracottaGold)
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    Icon(Icons.Default.CompassCalibration, contentDescription = null, tint = TerracottaGold, modifier = Modifier.size(13.dp))
+                                    Text(strings.guideButton, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = TerracottaGold)
+                                }
                             }
                         }
 
-                        // Character Quick Badge
+                        // Profile / Session Button (user photo or guide avatar)
                         Surface(
-                            onClick = onOpenCharacterSelection,
-                            shape = RoundedCornerShape(20.dp),
-                            color = charColor.copy(alpha = 0.15f),
-                            border = ButtonDefaults.outlinedButtonBorder.copy(
-                                brush = androidx.compose.ui.graphics.SolidColor(charColor.copy(alpha = 0.35f))
-                            )
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(4.dp)
-                            ) {
-                                Text(activeCharacter.avatarEmoji, fontSize = 14.sp)
-                                Text(activeCharacter.name, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = PineDeep)
-                            }
-                        }
-
-                        // Profile / Session Button
-                        IconButton(
                             onClick = onOpenProfile,
-                            modifier = Modifier
-                                .size(34.dp)
-                                .background(PineDeep, CircleShape)
+                            shape = CircleShape,
+                            color = PineDeep,
+                            modifier = Modifier.size(34.dp)
                         ) {
-                            Icon(Icons.Default.Person, contentDescription = "Perfil", tint = Color.White, modifier = Modifier.size(16.dp))
+                            when {
+                                profileCharacter != null -> CharacterAvatarImage(
+                                    image = profileCharacter.avatarImage,
+                                    modifier = Modifier.fillMaxSize()
+                                )
+                                else -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                    Icon(Icons.Default.Person, contentDescription = strings.profile, tint = Color.White, modifier = Modifier.size(16.dp))
+                                }
+                            }
                         }
                     }
                 }
@@ -201,7 +191,7 @@ fun RoutesCatalogScreen(
                     ) {
                         Icon(Icons.Default.NearMe, contentDescription = null, tint = PineMoss, modifier = Modifier.size(15.dp))
                         Text(
-                            text = "TODA GALICIA · LAS 4 PROVINCIAS",
+                            text = strings.topLabel,
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Bold,
                             color = PineMoss,
@@ -218,7 +208,7 @@ fun RoutesCatalogScreen(
                         Box(contentAlignment = Alignment.Center) {
                             Icon(
                                 if (onlySaved) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
-                                contentDescription = "Guardadas",
+                                contentDescription = strings.savedRoutes,
                                 tint = if (onlySaved) Color.White else OnSurfaceVariant,
                                 modifier = Modifier.size(18.dp)
                             )
@@ -231,7 +221,7 @@ fun RoutesCatalogScreen(
             item {
                 Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     Text(
-                        text = "Elige tu ruta mágica",
+                        text = strings.heading,
                         style = MaterialTheme.typography.headlineLarge.copy(
                             color = PineDeep,
                             fontWeight = FontWeight.Bold
@@ -243,112 +233,24 @@ fun RoutesCatalogScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "${filteredRoutes.size} experiencia${if (filteredRoutes.size == 1) "" else "s"} en catálogo",
+                            text = strings.routesAvailable(filteredRoutes.size),
                             style = MaterialTheme.typography.bodyMedium.copy(
                                 color = OnSurfaceVariant,
                                 fontStyle = FontStyle.Italic
                             )
                         )
 
-                        if (selectedCategory != Category.ALL || selectedPriceFilter != "all" || onlySaved || searchQuery.isNotBlank()) {
+                        if (selectedCategories.isNotEmpty() || onlySaved || searchQuery.isNotBlank()) {
                             TextButton(
                                 onClick = {
-                                    selectedCategory = Category.ALL
-                                    selectedPriceFilter = "all"
+                                    selectedCategories = emptySet()
                                     onlySaved = false
                                     searchQuery = ""
-                                    activeFilterDrawer = null
                                 }
                             ) {
                                 Icon(Icons.Default.RestartAlt, contentDescription = null, tint = TerracottaGold, modifier = Modifier.size(14.dp))
                                 Spacer(Modifier.width(4.dp))
-                                Text("Limpiar filtros", color = TerracottaGold, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                            }
-                        }
-                    }
-                }
-            }
-
-            // Character Companion Banner (Identical to Web)
-            item {
-                Surface(
-                    onClick = onOpenCharacterSelection,
-                    shape = RoundedCornerShape(18.dp),
-                    color = Color.Transparent,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .background(
-                                Brush.horizontalGradient(
-                                    listOf(Color(0xFF1B3022), Color(0xFF0B2414))
-                                ),
-                                RoundedCornerShape(18.dp)
-                            )
-                            .border(1.dp, Color(0xFF2B4C37), RoundedCornerShape(18.dp))
-                            .padding(14.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(12.dp)
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(46.dp)
-                                        .background(Color.White.copy(alpha = 0.1f), RoundedCornerShape(12.dp))
-                                        .border(1.dp, Color.White.copy(alpha = 0.2f), RoundedCornerShape(12.dp)),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Text(activeCharacter.avatarEmoji, fontSize = 24.sp)
-                                }
-
-                                Column {
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                                    ) {
-                                        Text(activeCharacter.name, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                                        Surface(
-                                            shape = RoundedCornerShape(8.dp),
-                                            color = TerracottaFixedDim.copy(alpha = 0.2f),
-                                            border = ButtonDefaults.outlinedButtonBorder.copy(
-                                                brush = androidx.compose.ui.graphics.SolidColor(TerracottaFixedDim.copy(alpha = 0.4f))
-                                            )
-                                        ) {
-                                            Text(
-                                                activeCharacter.archetype.uppercase(),
-                                                fontSize = 9.sp,
-                                                fontWeight = FontWeight.Bold,
-                                                color = TerracottaFixedDim,
-                                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                                            )
-                                        }
-                                    }
-                                    Spacer(Modifier.height(2.dp))
-                                    Text(
-                                        text = "Don activo: ${activeCharacter.abilityName}",
-                                        fontSize = 12.sp,
-                                        color = TerracottaFixedDim
-                                    )
-                                }
-                            }
-
-                            Surface(
-                                shape = RoundedCornerShape(10.dp),
-                                color = Color.White.copy(alpha = 0.12f)
-                            ) {
-                                Text(
-                                    "Cambiar",
-                                    color = TerracottaFixedDim,
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
-                                )
+                                Text(strings.clearFilters, color = TerracottaGold, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                             }
                         }
                     }
@@ -360,14 +262,14 @@ fun RoutesCatalogScreen(
                 OutlinedTextField(
                     value = searchQuery,
                     onValueChange = { searchQuery = it },
-                    placeholder = { Text("Buscar por título, pueblo, zona o guía...", fontSize = 13.sp) },
+                    placeholder = { Text(strings.searchPlaceholder, fontSize = 13.sp) },
                     leadingIcon = {
                         Icon(Icons.Default.Search, contentDescription = null, tint = OutlineGrey)
                     },
                     trailingIcon = {
                         if (searchQuery.isNotEmpty()) {
                             IconButton(onClick = { searchQuery = "" }) {
-                                Icon(Icons.Default.Clear, contentDescription = null, tint = OutlineGrey)
+                                Icon(Icons.Default.Clear, contentDescription = strings.clearSearch, tint = OutlineGrey)
                             }
                         }
                     },
@@ -383,71 +285,18 @@ fun RoutesCatalogScreen(
                 )
             }
 
-            // 3 Filter Pills: Precio, Guías, Zona (Matching Web)
-            item {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    // Precio Button
-                    FilterChip(
-                        selected = selectedPriceFilter != "all",
-                        onClick = {
-                            selectedPriceFilter = when (selectedPriceFilter) {
-                                "all" -> "free"
-                                "free" -> "paid"
-                                else -> "all"
-                            }
-                        },
-                        label = {
-                            Text(
-                                when (selectedPriceFilter) {
-                                    "free" -> "Precio: Gratis"
-                                    "paid" -> "Precio: Pago"
-                                    else -> "Precio"
-                                },
-                                fontSize = 12.sp
-                            )
-                        },
-                        leadingIcon = {
-                            Icon(Icons.Default.Sell, contentDescription = null, tint = TerracottaGold, modifier = Modifier.size(14.dp))
-                        },
-                        modifier = Modifier.weight(1f)
-                    )
-
-                    // Guía Button
-                    FilterChip(
-                        selected = false,
-                        onClick = onOpenGuideMode,
-                        label = { Text("Guías", fontSize = 12.sp) },
-                        leadingIcon = {
-                            Icon(Icons.Default.Badge, contentDescription = null, tint = PineMoss, modifier = Modifier.size(14.dp))
-                        },
-                        modifier = Modifier.weight(1f)
-                    )
-
-                    // Zona Button
-                    FilterChip(
-                        selected = false,
-                        onClick = { },
-                        label = { Text("Zona", fontSize = 12.sp) },
-                        leadingIcon = {
-                            Icon(Icons.Default.LocationOn, contentDescription = null, tint = PineMoss, modifier = Modifier.size(14.dp))
-                        },
-                        modifier = Modifier.weight(1f)
-                    )
-                }
-            }
-
             // Categories Filter Chips Row
             item {
                 LazyRow(
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    items(Category.values()) { category ->
-                        val isSelected = selectedCategory == category
+                    items(Category.values().filter { it != Category.ALL }) { category ->
+                        val isSelected = category in selectedCategories
                         Surface(
-                            onClick = { selectedCategory = category },
+                            onClick = {
+                                selectedCategories = if (isSelected) selectedCategories - category
+                                else selectedCategories + category
+                            },
                             shape = RoundedCornerShape(20.dp),
                             color = if (isSelected) PineDeep else SurfaceContainerHigh,
                             border = ButtonDefaults.outlinedButtonBorder.copy(
@@ -457,7 +306,7 @@ fun RoutesCatalogScreen(
                             )
                         ) {
                             Text(
-                                text = category.displayName,
+                                text = categoryDisplayName(category, language),
                                 fontSize = 12.sp,
                                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                                 color = if (isSelected) Color.White else OnSurfaceVariant,
@@ -468,61 +317,28 @@ fun RoutesCatalogScreen(
                 }
             }
 
-            // Soundscape Bar (Rías & Fragas)
-            item {
-                Surface(
-                    shape = RoundedCornerShape(16.dp),
-                    color = Color(0xFF132B1B),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(14.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
+            // Route Cards List
+            if (filteredRoutes.isEmpty()) {
+                item {
+                    Column(
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 32.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(10.dp)
-                        ) {
-                            Icon(Icons.Default.Forest, contentDescription = null, tint = MossContainer, modifier = Modifier.size(24.dp))
-                            Column {
-                                Text(
-                                    text = "PAISAXE SONORA GALEGA",
-                                    fontSize = 10.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = TerracottaFixedDim
-                                )
-                                Text(
-                                    text = if (isAmbientPlaying) "Reproducindo rumor de auga e bosque" else "Activar ambiente natural",
-                                    fontSize = 12.sp,
-                                    color = Color.White
-                                )
-                            }
-                        }
-
-                        IconButton(onClick = { isAmbientPlaying = !isAmbientPlaying }) {
-                            Icon(
-                                if (isAmbientPlaying) Icons.Default.PauseCircle else Icons.Default.PlayCircle,
-                                contentDescription = null,
-                                tint = TerracottaGold,
-                                modifier = Modifier.size(34.dp)
-                            )
-                        }
+                        Text(strings.noRoutesTitle, color = PineDeep, fontWeight = FontWeight.Bold)
+                        Text(strings.noRoutesDescription, color = OnSurfaceVariant, fontSize = 13.sp)
                     }
                 }
-            }
-
-            // Route Cards List
-            items(filteredRoutes) { route ->
-                val isSaved = savedRouteIds.contains(route.id)
-                RouteCard(
-                    route = route,
-                    isSaved = isSaved,
-                    onClick = { onSelectRoute(route) },
-                    onToggleSaved = { onToggleSaved(route.id) }
-                )
+            } else {
+                items(filteredRoutes, key = { it.id }) { route ->
+                    val isSaved = savedRouteIds.contains(route.id)
+                    RouteCard(
+                        route = route,
+                        isSaved = isSaved,
+                        strings = strings,
+                        onClick = { onSelectRoute(route) },
+                        onToggleSaved = { onToggleSaved(route.id) }
+                    )
+                }
             }
 
             item {
@@ -536,6 +352,7 @@ fun RoutesCatalogScreen(
 fun RouteCard(
     route: RouteItem,
     isSaved: Boolean,
+    strings: com.ecosdolugar.localization.RouteCatalogStrings,
     onClick: () -> Unit,
     onToggleSaved: () -> Unit
 ) {
@@ -559,7 +376,11 @@ fun RouteCard(
                         )
                     )
             ) {
-                // Top Badges
+            RouteCoverImage(
+                url = route.imageUrl,
+                modifier = Modifier.fillMaxSize()
+            )
+            // Top Badges
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -573,7 +394,8 @@ fun RouteCard(
                             color = PineDeep.copy(alpha = 0.9f)
                         ) {
                             Text(
-                                text = "DESTACADA · ${route.stopsCount} PARADAS",
+                                text = "${strings.featured} · ${route.stopsCount} " +
+                                    if (route.stopsCount == 1) strings.stopsSingular else strings.stopsPlural,
                                 color = TerracottaFixedDim,
                                 fontSize = 10.sp,
                                 fontWeight = FontWeight.Bold,
@@ -587,7 +409,8 @@ fun RouteCard(
                             color = Color.Black.copy(alpha = 0.5f)
                         ) {
                             Text(
-                                text = "${route.stopsCount} PARADAS",
+                                text = "${route.stopsCount} " +
+                                    if (route.stopsCount == 1) strings.stopsSingular else strings.stopsPlural,
                                 color = Color.White,
                                 fontSize = 10.sp,
                                 fontWeight = FontWeight.Bold,
@@ -604,7 +427,7 @@ fun RouteCard(
                     ) {
                         Icon(
                             imageVector = if (isSaved) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
-                            contentDescription = "Guardar",
+                            contentDescription = strings.saveRoute,
                             tint = if (isSaved) TerracottaGold else Color.White,
                             modifier = Modifier.size(18.dp)
                         )
@@ -632,17 +455,19 @@ fun RouteCard(
                         }
                     }
 
-                    Surface(
-                        shape = RoundedCornerShape(8.dp),
-                        color = if (route.isFree) MossContainer.copy(alpha = 0.9f) else TerracottaGold.copy(alpha = 0.9f)
-                    ) {
-                        Text(
-                            text = route.price,
-                            color = PineDeep,
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                        )
+                    if (!route.isFree && !route.price.equals("Gratis", ignoreCase = true)) {
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = TerracottaGold.copy(alpha = 0.9f)
+                        ) {
+                            Text(
+                                text = route.price,
+                                color = PineDeep,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                            )
+                        }
                     }
                 }
             }
@@ -696,7 +521,7 @@ fun RouteCard(
                 ) {
                     Icon(Icons.Default.AccountCircle, contentDescription = null, tint = PineMoss, modifier = Modifier.size(14.dp))
                     Text(
-                        text = "Por ${route.guide.name}",
+                        text = "${strings.byGuide} ${route.guide.name}",
                         fontSize = 11.sp,
                         color = OutlineGrey
                     )
@@ -710,7 +535,8 @@ fun RouteCard(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "${route.stopsCount} paradas geolocalizadas",
+                        text = "${route.stopsCount} " +
+                            if (route.stopsCount == 1) strings.geolocatedStopsSingular else strings.geolocatedStopsPlural,
                         color = OutlineGrey,
                         fontSize = 12.sp
                     )
@@ -724,7 +550,7 @@ fun RouteCard(
                         ),
                         contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp)
                     ) {
-                        Text("Ver ruta", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                        Text(strings.viewRoute, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
                         Spacer(Modifier.width(4.dp))
                         Icon(Icons.Default.ArrowForward, contentDescription = null, modifier = Modifier.size(14.dp))
                     }

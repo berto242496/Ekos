@@ -4,23 +4,31 @@ enum class Category(val displayName: String) {
     ALL("Todas"),
     HISTORIA("Historia"),
     LEYENDAS("Leyendas"),
-    FAMILIAS("Familias"),
-    PATRIMONIO("Patrimonio"),
-    NATURALEZA("Naturaleza")
+    NATURALEZA("Naturaleza"),
+    GASTRONOMIA("Gastronomía"),
+    ARTE("Arte"),
+    TRADICIONES("Tradiciones")
 }
 
-enum class Difficulty(val label: String) {
-    FACIL("Fácil"),
-    MEDIA("Media"),
-    EXIGENTE("Exigente")
+enum class Difficulty(val label: String, val detail: String) {
+    FACIL("Fácil", "Paseo accesible"),
+    MEDIA("Media", "Camino tradicional"),
+    EXIGENTE("Exigente", "Costa o desnivel")
 }
 
 enum class TrialType(val label: String) {
     ACERTIJO("Acertijo Clásico"),
     PUZLE_RUNICO("Puzle Rúnico"),
     CIFRADO_MAGICO("Cifrado Mágico"),
-    ALINEACION_SIMBOLOS("Alineación de Símbolos")
+    ALINEACION_SIMBOLOS("Alineación de Símbolos"),
+    PUZLE_IMAGEN("Puzle de imagen"),
+    ORDENAR_PALABRA("Ordenar palabra"),
+    COMPLETAR_FRASE("Completar frase")
 }
+
+enum class StopAudioMode { WRITTEN, TTS, RECORDED }
+
+enum class NarrationVoice { FEMALE, MALE }
 
 data class RuneGlyph(
     val id: String,
@@ -41,6 +49,12 @@ data class StopTrial(
     val cipherWord: String = "",
     val scrambledLetters: List<String> = emptyList(),
     val cipherClue: String = "",
+    // For 'puzle_imagen': imagen completa que se trocea y se desordena
+    val imageUrl: String = "",
+    val puzzleGridSize: Int = 3,
+    // For 'completar_frase': frase completa y palabra oculta en ella
+    val sentence: String = "",
+    val missingWord: String = "",
     val generalHint: String,
     val characterClues: Map<String, String> = emptyMap(),
     val solutionExplanation: String,
@@ -63,8 +77,13 @@ data class RouteStop(
     val historicalNote: String,
     val enigma: FieldEnigma,
     val trial: StopTrial? = null,
+    val challengeId: String? = null,
     val audioDuration: String,
     val audioNarration: String? = null,
+    val imageUrl: String = "",
+    val audioMode: StopAudioMode = StopAudioMode.WRITTEN,
+    val narrationVoice: NarrationVoice = NarrationVoice.FEMALE,
+    val recordedAudioUrl: String? = null,
     val latitude: Double,
     val longitude: Double,
     val mapPositionX: Float, // 0f to 100f
@@ -88,7 +107,25 @@ data class GuideAuthor(
     val location: String = "Tui - Valença",
     val verified: Boolean = true,
     val routesCount: Int = 3,
-    val availableBalance: Double = 142.50
+    val avatarUrl: String? = null
+)
+
+data class RouteReview(
+    val routeId: String,
+    val routeTitle: String = "",
+    val guideId: String,
+    val userId: String,
+    val routeRating: Int,
+    val guideRating: Int,
+    val comment: String,
+    val createdAt: String
+)
+
+data class GuideProfileInfo(
+    val userId: String,
+    val displayName: String,
+    val bio: String,
+    val avatarUrl: String?
 )
 
 data class RouteItem(
@@ -109,6 +146,8 @@ data class RouteItem(
     val tomoRef: String,
     val price: String = "Gratis",
     val isFree: Boolean = true,
+    /** Importe total de la ruta en céntimos. 0 si es gratuita. */
+    val priceCents: Int = 0,
     val guide: GuideAuthor = GuideAuthor(
         id = "guia_oficial",
         name = "Arquivo Histórico da Raia",
@@ -116,8 +155,16 @@ data class RouteItem(
         bio = "Especialistas na memoria oral, arquivos transfronteirizos e camiños clandestinos."
     ),
     val overviewFeatures: List<OverviewFeature>,
-    val stops: List<RouteStop>
+    val stops: List<RouteStop>,
+    val status: String = "publicada",
+    val startedCount: Int = 0,
+    val rating: Double = 0.0,
+    val reviewsCount: Int = 0,
+    /** Trazado a pie que une las paradas en orden. Vacío si aún no se ha calculado. */
+    val path: List<GeoPoint> = emptyList()
 )
+
+data class GeoPoint(val latitude: Double, val longitude: Double)
 
 data class FieldNote(
     val id: String,
@@ -139,12 +186,28 @@ data class UserProfile(
     val name: String = "Explorador da Raia",
     val email: String = "explorador@ecosdolugar.gal",
     val isVisitor: Boolean = true,
-    val characterId: String = "meiga",
+    /** Null until a character is chosen (guides start without one). */
+    val characterId: String? = null,
+    /** Foto de perfil de Google; null si no hay. */
+    val photoUrl: String? = null,
     val isGoogleAuthenticated: Boolean = false,
+    val isGuideAccount: Boolean = false,
     val googleId: String? = null,
-    val savedRouteIds: Set<String> = setOf("contrabando"),
-    val visitedStopIds: Set<String> = setOf("stop-c1"),
-    val solvedEnigmaIds: Set<String> = setOf("stop-c1"),
-    val completedRouteIds: Set<String> = emptySet(),
-    val unlockedAchievementIds: Set<String> = setOf("primera_ruta", "espiritu_raiano")
+    val savedRouteIds: Set<String> = emptySet(),
+    val visitedStopIds: Set<String> = emptySet(),
+    val solvedEnigmaIds: Set<String> = emptySet(),
+    val totalScore: Int = 0,
+    /** Puntuación acumulada por parada (llegada + prueba + bonificación de ruta en la última parada). */
+    val stopScores: Map<String, Int> = emptyMap()
+) {
+    /** Personaje usado para puntuar; sin elección se usa el por defecto. */
+    val effectiveCharacterId: String get() = characterId ?: Scoring.CHARACTER_MEIGA
+}
+
+data class UserAchievementStatus(
+    val id: String,
+    val title: String,
+    val description: String,
+    val icon: String,
+    val isUnlocked: Boolean
 )

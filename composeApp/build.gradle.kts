@@ -2,17 +2,21 @@ import org.jetbrains.compose.desktop.application.dsl.TargetFormat
 
 plugins {
     alias(libs.plugins.kotlinMultiplatform)
-    alias(libs.plugins.androidApplication)
+    alias(libs.plugins.androidMultiplatformLibrary)
     alias(libs.plugins.composeMultiplatform)
     alias(libs.plugins.composeCompiler)
 }
 
 kotlin {
-    androidTarget {
-        compilations.all {
-            kotlinOptions {
-                jvmTarget = "17"
-            }
+    android {
+        namespace = "com.ecosdolugar.shared"
+        compileSdk = 36
+        minSdk = 24
+        androidResources {
+            enable = true
+        }
+        compilerOptions {
+            jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
         }
     }
     
@@ -47,15 +51,24 @@ kotlin {
                 // Coroutines & Lifecycle
                 implementation(libs.kotlinx.coroutines.core)
                 implementation(libs.lifecycle.viewmodel.compose)
+                implementation(libs.lifecycle.runtime.compose)
                 implementation(libs.navigation.compose)
             }
         }
         
+        val commonTest by getting {
+            dependencies {
+                implementation(kotlin("test"))
+                implementation(libs.kotlinx.coroutines.test)
+            }
+        }
+
         val androidMain by getting {
             dependencies {
                 implementation(libs.androidx.activity.compose)
-                implementation("androidx.appcompat:appcompat:1.7.0")
-                implementation("androidx.core:core-ktx:1.13.1")
+                implementation("androidx.appcompat:appcompat:1.7.1")
+                implementation("androidx.core:core-ktx:1.18.0")
+                implementation(libs.androidx.webkit)
             }
         }
         
@@ -64,34 +77,5 @@ kotlin {
                 implementation(compose.desktop.currentOs)
             }
         }
-    }
-}
-
-android {
-    namespace = "com.ecosdolugar"
-    compileSdk = 34
-
-    defaultConfig {
-        applicationId = "com.ecosdolugar"
-        minSdk = 24
-        targetSdk = 34
-        versionCode = 1
-        versionName = "1.0.0"
-    }
-
-    packaging {
-        resources {
-            excludes += "/META-INF/{AL2.0,LGPL2.1}"
-        }
-    }
-
-    buildTypes {
-        getByName("release") {
-            isMinifyEnabled = false
-        }
-    }
-    compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_17
-        targetCompatibility = JavaVersion.VERSION_17
     }
 }

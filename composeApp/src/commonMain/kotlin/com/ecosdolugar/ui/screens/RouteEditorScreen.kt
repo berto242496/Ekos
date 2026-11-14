@@ -1170,10 +1170,8 @@ private fun DurationPickerDialog(
     onConfirm: (Int) -> Unit,
     onDismiss: () -> Unit
 ) {
-    val floorMinutes = minMinutes.coerceAtMost(MAX_DURATION_MINUTES)
-    var total by remember {
-        mutableStateOf(initialMinutes.coerceIn(floorMinutes, MAX_DURATION_MINUTES))
-    }
+    var total by remember { mutableStateOf(initialMinutes.coerceIn(0, MAX_DURATION_MINUTES)) }
+    val isBelowMinimum = total < minMinutes
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -1193,7 +1191,7 @@ private fun DurationPickerDialog(
                             range = 0..23,
                             selected = total / 60,
                             onSettled = { hours ->
-                                total = (hours * 60 + total % 60).coerceIn(floorMinutes, MAX_DURATION_MINUTES)
+                                total = hours * 60 + total % 60
                             },
                             modifier = Modifier.width(88.dp)
                         )
@@ -1210,13 +1208,13 @@ private fun DurationPickerDialog(
                             range = 0..59,
                             selected = total % 60,
                             onSettled = { minutes ->
-                                total = (total / 60 * 60 + minutes).coerceIn(floorMinutes, MAX_DURATION_MINUTES)
+                                total = total / 60 * 60 + minutes
                             },
                             modifier = Modifier.width(88.dp)
                         )
                     }
                 }
-                belowMinimumMessage?.let {
+                belowMinimumMessage?.takeIf { isBelowMinimum }?.let {
                     Text(
                         it,
                         color = TerracottaGold,
@@ -1228,7 +1226,7 @@ private fun DurationPickerDialog(
             }
         },
         confirmButton = {
-            TextButton(onClick = { onConfirm(total) }) {
+            TextButton(onClick = { onConfirm(total) }, enabled = !isBelowMinimum) {
                 Text(confirmLabel, fontFamily = FontFamily.Serif, fontWeight = FontWeight.Bold)
             }
         },
@@ -1243,6 +1241,8 @@ private fun DurationPickerDialog(
 private const val WHEEL_ITEM_HEIGHT_DP = 44
 private const val WHEEL_VISIBLE_ITEMS = 5
 private const val WHEEL_CENTER_ROW = WHEEL_VISIBLE_ITEMS / 2
+// Values repeat so the wheel can spin endlessly; the middle cycle is the starting point.
+private const val WHEEL_CYCLES = 500
 
 @Composable
 private fun WheelColumn(label: String, wheel: @Composable () -> Unit) {
@@ -1258,7 +1258,7 @@ private fun WheelColumn(label: String, wheel: @Composable () -> Unit) {
     }
 }
 
-// Wheel values sit between two blank items so that any value can be centered.
+// Two blank items sit before and after the values so that any value can be centered.
 @Composable
 private fun WheelPicker(
     range: IntRange,
@@ -1266,22 +1266,31 @@ private fun WheelPicker(
     onSettled: (Int) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val listState = rememberLazyListState()
+    val size = range.count()
+    val totalItems = size * WHEEL_CYCLES
+    val homeIndex = size * (WHEEL_CYCLES / 2)
+    fun indexFor(value: Int) = homeIndex + (value - range.first)
+    fun valueAt(contentIndex: Int) = range.first + contentIndex % size
+
+    val listState = rememberLazyListState(initialFirstVisibleItemIndex = indexFor(selected))
     val currentOnSettled by rememberUpdatedState(onSettled)
-    val centeredValue by remember(range) {
+    val currentSelected by rememberUpdatedState(selected)
+    // Index in the LazyColumn of the item closest to the center, or null if none is visible.
+    val centeredListIndex by remember(range) {
         derivedStateOf {
             val info = listState.layoutInfo
             val viewportCenter = (info.viewportStartOffset + info.viewportEndOffset) / 2
             info.visibleItemsInfo
-                .filter { it.index >= 2 && it.index < range.count() + 2 }
+                .filter { it.index >= 2 && it.index < totalItems + 2 }
                 .minByOrNull { abs(it.offset + it.size / 2 - viewportCenter) }
-                ?.let { range.first + it.index - 2 }
+                ?.index
         }
     }
+    val centeredValue = centeredListIndex?.let { valueAt(it - 2) }
 
     LaunchedEffect(selected) {
         if (centeredValue != selected) {
-            listState.scrollToItem(selected - range.first)
+            listState.scrollToItem(indexFor(selected))
         }
     }
 
@@ -1289,8 +1298,13 @@ private fun WheelPicker(
         snapshotFlow { listState.isScrollInProgress }
             .filter { !it }
             .collect {
-                centeredValue?.let { value ->
-                    if (value != selected) currentOnSettled(value)
+                val listIndex = centeredListIndex ?: return@collect
+                val contentIndex = listIndex - 2
+                val value = valueAt(contentIndex)
+                if (value != currentSelected) currentOnSettled(value)
+                // Re-center before the list edge so the wheel never hits its end.
+                if (contentIndex < size || contentIndex >= totalItems - size) {
+                    listState.scrollToItem(indexFor(value))
                 }
             }
     }
@@ -1317,8 +1331,8 @@ private fun WheelPicker(
             items(2) {
                 Box(Modifier.height(WHEEL_ITEM_HEIGHT_DP.dp).fillMaxWidth())
             }
-            items(range.count()) { offset ->
-                val value = range.first + offset
+            items(totalItems) { contentIndex ->
+                val value = valueAt(contentIndex)
                 Box(
                     contentAlignment = Alignment.Center,
                     modifier = Modifier.height(WHEEL_ITEM_HEIGHT_DP.dp).fillMaxWidth()

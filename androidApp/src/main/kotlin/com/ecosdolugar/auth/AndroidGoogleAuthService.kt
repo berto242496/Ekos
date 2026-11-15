@@ -32,6 +32,10 @@ class AndroidGoogleAuthService(
     private val sessionStorageKey = "encrypted_session"
     private val keystoreAlias = "ecos_google_auth_session"
 
+    init {
+        routesRepository.tokenRefresher = { refreshAccessToken() }
+    }
+
     override suspend fun signInWithGoogle(): GoogleAuthResult {
         val webClientId = context.getString(R.string.google_web_client_id)
         if (webClientId.isBlank()) {

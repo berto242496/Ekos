@@ -21,7 +21,9 @@ import com.ecosdolugar.model.StopTrial
 import com.ecosdolugar.model.TrialType
 import com.ecosdolugar.util.decodePolyline
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
+import java.util.concurrent.ConcurrentHashMap
 import org.json.JSONArray
 import org.json.JSONObject
 import java.net.HttpURLConnection
@@ -667,7 +669,9 @@ class SupabaseRoutesRepository(
 
     private fun persistRouteMedia(route: RouteItem, accessToken: String): RouteItem {
         fun persist(url: String): String = if (url.startsWith("data:")) {
-            persistDataUrl(url, route.guide.id, route.id, accessToken)
+            withTokenRetry(accessToken) { token ->
+                persistDataUrl(url, route.guide.id, route.id, token.orEmpty())
+            }
         } else {
             url
         }
@@ -737,7 +741,49 @@ class SupabaseRoutesRepository(
         }
     }
 
+    /** Renews the stored session and returns a fresh access token. Set by the auth service. */
+    @Volatile
+    var tokenRefresher: (suspend () -> String?)? = null
+
+    private val refreshedTokens = ConcurrentHashMap<String, String>()
+    private val refreshLock = Any()
+
+    private fun latestToken(token: String?): String? {
+        var current = token ?: return null
+        while (true) current = refreshedTokens[current] ?: return current
+    }
+
+    /** Runs an authenticated call and, if the JWT has expired, renews it and retries once. */
+    private fun <T> withTokenRetry(accessToken: String?, block: (String?) -> T): T {
+        val token = latestToken(accessToken)
+        try {
+            return block(token)
+        } catch (error: IllegalStateException) {
+            val refresher = tokenRefresher
+            val expired = error.message.orEmpty().let { it.contains("HTTP 401") || it.contains("JWT expired", true) }
+            if (token.isNullOrBlank() || refresher == null || !expired) throw error
+            val fresh = synchronized(refreshLock) {
+                latestToken(token).takeIf { it != token }
+                    ?: runCatching { runBlocking { refresher() } }.getOrNull()
+                        ?.takeIf { it.isNotBlank() && it != token }
+                        ?.also { refreshedTokens[token] = it }
+            } ?: throw error
+            return block(fresh)
+        }
+    }
+
     private fun request(
+        method: String,
+        path: String,
+        body: String? = null,
+        accessToken: String? = null,
+        contentType: String? = null,
+        prefer: String? = null
+    ): String = withTokenRetry(accessToken) { token ->
+        rawRequest(method, path, body, token, contentType, prefer)
+    }
+
+    private fun rawRequest(
         method: String,
         path: String,
         body: String? = null,

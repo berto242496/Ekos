@@ -28,6 +28,8 @@ sealed interface RouteImageState {
 @Composable
 fun rememberRouteImage(url: String): State<RouteImageState> =
     produceState(initialValue = initialRouteImageState(url), key1 = url) {
+        // Al cambiar la URL, value conserva la imagen anterior: hay que recalcular el estado para la nueva.
+        value = initialRouteImageState(url)
         if (value is RouteImageState.Ready) return@produceState
         value = loadRouteImage(url)?.let { RouteImageState.Ready(it) } ?: RouteImageState.Failed
     }

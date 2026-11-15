@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -23,6 +24,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.KeyboardArrowUp
@@ -97,6 +99,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlin.random.Random
 import com.ecosdolugar.ui.components.RouteMapView
+import com.ecosdolugar.ui.components.RouteCoverImage
 import com.ecosdolugar.ui.components.RouteCoverImagePicker
 import com.ecosdolugar.data.RoutesRepository
 import com.ecosdolugar.localization.AppLanguage
@@ -486,6 +489,26 @@ fun RouteEditorScreen(
                         onImageSelected = { imageUrl = it },
                         onError = { validationMessage = it }
                     )
+                    if (imageUrl.isNotBlank()) {
+                        Box(modifier = Modifier.fillMaxWidth().height(160.dp)) {
+                            RouteCoverImage(
+                                url = imageUrl,
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .clip(RoundedCornerShape(16.dp))
+                            )
+                            IconButton(
+                                onClick = { imageUrl = "" },
+                                modifier = Modifier
+                                    .align(Alignment.TopEnd)
+                                    .padding(8.dp)
+                                    .background(Color.Black.copy(alpha = 0.5f), CircleShape)
+                                    .size(32.dp)
+                            ) {
+                                Icon(Icons.Default.Close, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
+                            }
+                        }
+                    }
                     Text(
                         if (imageUrl.startsWith("data:image/")) {
                             strings.selectedImageHelper

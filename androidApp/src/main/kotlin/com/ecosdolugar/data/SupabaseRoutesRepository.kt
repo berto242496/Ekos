@@ -536,7 +536,7 @@ class SupabaseRoutesRepository(
             val rows = JSONArray(
                 request(
                     method = "GET",
-                    path = "/rest/v1/route_purchases?select=route_id",
+                    path = "/rest/v1/route_purchases?select=route_id&revoked_at=is.null",
                     accessToken = accessToken
                 )
             )
@@ -576,7 +576,7 @@ class SupabaseRoutesRepository(
         productId: String,
         purchaseToken: String,
         accessToken: String
-    ) = withContext(Dispatchers.IO) {
+    ): Boolean = withContext(Dispatchers.IO) {
         requireConfigured()
         require(accessToken.isNotBlank()) { "Inicia sesión para comprar la ruta." }
         val body = JSONObject()
@@ -584,14 +584,14 @@ class SupabaseRoutesRepository(
             .put("productId", productId)
             .put("purchaseToken", purchaseToken)
             .toString()
-        request(
+        val response = request(
             method = "POST",
             path = "/functions/v1/verify-route-purchase",
             body = body,
             accessToken = accessToken,
             contentType = "application/json"
         )
-        Unit
+        JSONObject(response).optBoolean("consumed", true)
     }
 
     override suspend fun saveSavedRouteIds(

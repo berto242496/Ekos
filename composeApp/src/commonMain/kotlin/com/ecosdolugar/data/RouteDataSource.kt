@@ -83,13 +83,16 @@ interface RouteDataSource {
     /** Sales and balance of the routes the signed-in guide owns. Null when unavailable. */
     suspend fun loadGuideSalesSummary(accessToken: String): GuideSalesSummary? = null
 
-    /** Verifies a Google Play purchase on the server, records it for the user and consumes it. */
+    /**
+     * Verifies a Google Play purchase on the server and records it for the user.
+     * Returns false when the access was granted but Google did not confirm the consumption yet.
+     */
     suspend fun verifyRoutePurchase(
         routeId: String,
         productId: String,
         purchaseToken: String,
         accessToken: String
-    ) {
+    ): Boolean {
         throw UnsupportedOperationException("Las compras no están disponibles.")
     }
 

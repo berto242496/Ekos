@@ -600,17 +600,47 @@ class AppViewModel(
             null
         }
 
+    /**
+     * Verifica en el servidor las compras de Google Play que quedaron pendientes
+     * (fallo de red, cierre de la app o pago confirmado después). Los fallos se reintentan en el próximo inicio.
+     */
+    private suspend fun retryUnverifiedPurchases(accessToken: String) {
+        val pending = try {
+            paymentService.unverifiedPurchases()
+        } catch (error: CancellationException) {
+            throw error
+        } catch (error: Exception) {
+            return
+        }
+        pending.forEach { purchase ->
+            try {
+                val consumed = routeDataSource.verifyRoutePurchase(
+                    purchase.routeId, purchase.productId, purchase.purchaseToken, accessToken
+                )
+                // Si Google aún no confirma el consumo, la compra se queda pendiente para reintentarlo.
+                if (consumed) paymentService.markVerified(purchase.purchaseToken)
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Exception) {
+                // Se queda en la lista local y se reintenta en el próximo inicio.
+            }
+        }
+    }
+
     /** Compra la ruta de pago con Google Play y la registra en la cuenta del usuario. */
     fun purchaseRoute(route: RouteItem) {
         val current = _state.value
-        val token = current.accessToken?.takeIf { it.isNotBlank() } ?: return
+        val session = current.session() ?: return
+        val token = session.token
         if (route.priceCents <= 0 || current.isPurchasingRoute || !route.requiresPurchase(current.purchasedRouteIds)) {
             return
         }
         _state.update { it.copy(isPurchasingRoute = true) }
         viewModelScope.launch {
             try {
-                val purchase = paymentService.purchase(RoutePricing.productIdFor(route.priceCents)) ?: return@launch
+                val purchase = paymentService.purchase(
+                    route.id, RoutePricing.productIdFor(route.priceCents), session.userId
+                ) ?: return@launch
                 // Google Play puede tardar: renovamos el token justo antes de verificar la compra.
                 val freshToken = freshAccessTokenOrNull() ?: token
                 routeDataSource.verifyRoutePurchase(route.id, purchase.productId, purchase.purchaseToken, freshToken)
@@ -807,6 +837,7 @@ class AppViewModel(
             val enrichedRoutes = withRoutePaths(routeDataSource, enrichRoutes(visibleRoutes, reviews, profiles), token)
             val completedChallengesCount = orZeroOnFailure { routeDataSource.loadCompletedChallengesCount() }
             val purchasedRouteIds = token?.let {
+                retryUnverifiedPurchases(it)
                 try {
                     routeDataSource.loadPurchasedRouteIds(it)
                 } catch (error: CancellationException) {

@@ -49,7 +49,11 @@ async function googleAccessToken(serviceAccountJson: string): Promise<string> {
   return (await response.json()).access_token;
 }
 
-interface ProductPurchase { purchaseState: number; consumptionState: number }
+interface ProductPurchase {
+  purchaseState: number;
+  consumptionState: number;
+  obfuscatedExternalAccountId?: string;
+}
 
 function purchaseUrl(packageName: string, productId: string, token: string): string {
   return `${PUBLISHER_BASE}/${encodeURIComponent(packageName)}/purchases/products/` +
@@ -119,6 +123,10 @@ Deno.serve(async (request) => {
     const accessToken = await googleAccessToken(serviceAccountJson);
     const purchase = await getProductPurchase(packageName, productId, purchaseToken, accessToken);
     if (purchase.purchaseState !== PURCHASED_STATE) return json({ error: 'El pago no se ha completado' }, 402);
+    // La compra debe haberse hecho con la cuenta que la reclama (evita registrar tokens ajenos).
+    if (purchase.obfuscatedExternalAccountId !== userId) {
+      return json({ error: 'Esta compra pertenece a otra cuenta' }, 403);
+    }
 
     const { data: existing, error: existingError } = await admin
       .from('route_purchases')
@@ -139,14 +147,34 @@ Deno.serve(async (request) => {
         amount_cents: priceCents,
         guide_share_cents: Math.floor(priceCents * 65 / 100)
       });
-      if (insertError) return json({ error: 'No se pudo registrar la compra' }, 500);
+      // 23505 puede ser el mismo token en dos peticiones (se continúa) o una segunda compra de la
+      // misma ruta (doble pago: 409 y sin consumir, así que Google la reembolsa al cabo de 3 días).
+      if (insertError?.code === '23505') {
+        const { data: sameToken } = await admin
+          .from('route_purchases')
+          .select('user_id, route_id')
+          .eq('purchase_token', purchaseToken)
+          .maybeSingle();
+        if (!sameToken || sameToken.user_id !== userId || sameToken.route_id !== routeId) {
+          return json({ error: 'Ya tienes acceso a esta ruta' }, 409);
+        }
+      } else if (insertError) {
+        return json({ error: 'No se pudo registrar la compra' }, 500);
+      }
     }
 
-    // Se consume después de registrar: si falla, el reintento del cliente no duplica la fila.
-    if (purchase.consumptionState === CONSUMPTION_YET_TO_BE_CONSUMED) {
-      await consumePurchase(packageName, productId, purchaseToken, accessToken);
+    // Se consume después de registrar: si falla, el acceso ya está concedido y el cliente
+    // reintenta verificar (idempotente por token) en el próximo inicio, lo que reintenta el consumo.
+    let consumed = purchase.consumptionState !== CONSUMPTION_YET_TO_BE_CONSUMED;
+    if (!consumed) {
+      try {
+        await consumePurchase(packageName, productId, purchaseToken, accessToken);
+        consumed = true;
+      } catch (consumeError) {
+        console.error('verify-route-purchase consume', consumeError);
+      }
     }
-    return json({ ok: true, routeId });
+    return json({ ok: true, routeId, consumed });
   } catch (error) {
     console.error('verify-route-purchase', error);
     return json({ error: 'No se pudo verificar la compra' }, 502);

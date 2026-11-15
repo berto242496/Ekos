@@ -14,6 +14,8 @@ import com.ecosdolugar.model.RouteItem
 import com.ecosdolugar.model.RouteReview
 import com.ecosdolugar.model.RouteStop
 import com.ecosdolugar.model.FieldEnigma
+import com.ecosdolugar.payment.RoutePaymentService
+import com.ecosdolugar.payment.RoutePurchaseToken
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
@@ -40,7 +42,9 @@ class AppViewModelTest {
     @AfterTest
     fun tearDown() = Dispatchers.resetMain()
 
-    private fun viewModel() = AppViewModel(auth, data)
+    private val payments = FakePaymentService()
+
+    private fun viewModel() = AppViewModel(auth, data, payments)
 
     private fun session(
         profileComplete: Boolean = true,
@@ -346,6 +350,73 @@ class AppViewModelTest {
         assertTrue(vm.state.value.routes.isEmpty())
         assertNull(vm.state.value.selectedRoute)
     }
+
+    @Test
+    fun purchaseVerifiesTokenAndUnlocksRoute() {
+        val paid = fixtureRoute("ruta-pago").copy(priceCents = 199)
+        auth.restoreResult = session()
+        data.routes = listOf(paid)
+        payments.purchaseResult = RoutePurchaseToken("ruta-pago", "route_tier_199", "token-compra")
+        val vm = viewModel()
+        data.purchasedIds = setOf("ruta-pago")
+
+        vm.purchaseRoute(paid)
+
+        assertEquals(listOf("token-compra"), data.verifiedTokens)
+        assertTrue("ruta-pago" in vm.state.value.purchasedRouteIds)
+        assertFalse(vm.state.value.isPurchasingRoute)
+    }
+
+    @Test
+    fun cancelledPurchaseDoesNotCallServer() {
+        val paid = fixtureRoute("ruta-pago").copy(priceCents = 199)
+        auth.restoreResult = session()
+        data.routes = listOf(paid)
+        payments.purchaseResult = null
+        val vm = viewModel()
+
+        vm.purchaseRoute(paid)
+
+        assertTrue(data.verifiedTokens.isEmpty())
+        assertFalse(vm.state.value.isPurchasingRoute)
+    }
+
+    @Test
+    fun pendingPurchaseStaysLocalUntilGoogleConfirmsConsumption() {
+        val pending = RoutePurchaseToken("ruta-pago", "route_tier_199", "token-pendiente")
+        payments.pending += pending
+        data.consumeResult = false
+        auth.restoreResult = session()
+
+        viewModel()
+
+        assertEquals(listOf("token-pendiente"), data.verifiedTokens)
+        assertTrue(payments.verified.isEmpty())
+    }
+
+    @Test
+    fun pendingPurchaseIsClearedOnceConsumed() {
+        val pending = RoutePurchaseToken("ruta-pago", "route_tier_199", "token-pendiente")
+        payments.pending += pending
+        data.consumeResult = true
+        auth.restoreResult = session()
+
+        viewModel()
+
+        assertEquals(listOf("token-pendiente"), payments.verified)
+    }
+}
+
+private class FakePaymentService : RoutePaymentService {
+    var purchaseResult: RoutePurchaseToken? = null
+    val pending = mutableListOf<RoutePurchaseToken>()
+    val verified = mutableListOf<String>()
+
+    override suspend fun purchase(routeId: String, productId: String, accountId: String) = purchaseResult
+    override suspend fun unverifiedPurchases(): List<RoutePurchaseToken> = pending.toList()
+    override fun markVerified(purchaseToken: String) {
+        verified += purchaseToken
+    }
 }
 
 private fun stopWithChallenge(id: String, challengeId: String) = RouteStop(
@@ -418,6 +489,21 @@ private class FakeData : RouteDataSource {
     var failRoutes = false
     val syncedSavedIds = mutableListOf<Set<String>>()
     val savedNames = mutableListOf<String>()
+    var purchasedIds: Set<String> = emptySet()
+    var consumeResult = true
+    val verifiedTokens = mutableListOf<String>()
+
+    override suspend fun loadPurchasedRouteIds(accessToken: String): Set<String> = purchasedIds
+
+    override suspend fun verifyRoutePurchase(
+        routeId: String,
+        productId: String,
+        purchaseToken: String,
+        accessToken: String
+    ): Boolean {
+        verifiedTokens += purchaseToken
+        return consumeResult
+    }
 
     override suspend fun loadRoutes(accessToken: String?): List<RouteItem> {
         if (failRoutes) throw IllegalStateException("sin red")

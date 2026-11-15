@@ -237,7 +237,7 @@ fun GuideProfileScreen(
                                         onClick = {
                                             pendingReport = ReportTarget.REVIEW to "${review.routeId}/${review.userId}"
                                         },
-                                        modifier = Modifier.size(28.dp)
+                                        modifier = Modifier.size(28.dp).minimumInteractiveComponentSize()
                                     ) {
                                         Icon(
                                             Icons.Default.Flag,

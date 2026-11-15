@@ -169,6 +169,7 @@ fun InteractiveMapScreen(
                     .padding(12.dp)
                     .statusBarsPadding()
                     .size(44.dp)
+                    .minimumInteractiveComponentSize()
                     .background(PineContainer.copy(alpha = 0.92f), CircleShape)
             ) {
                 Icon(

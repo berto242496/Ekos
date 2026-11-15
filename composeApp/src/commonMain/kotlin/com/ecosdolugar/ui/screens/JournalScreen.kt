@@ -370,7 +370,7 @@ private fun PassportCard(
                             modifier = Modifier.weight(1f, fill = false)
                         )
                         if (canEditName) {
-                            IconButton(onClick = onEditName, modifier = Modifier.size(36.dp)) {
+                            IconButton(onClick = onEditName, modifier = Modifier.size(36.dp).minimumInteractiveComponentSize()) {
                                 Icon(
                                     Icons.Default.Edit,
                                     contentDescription = strings.editName,

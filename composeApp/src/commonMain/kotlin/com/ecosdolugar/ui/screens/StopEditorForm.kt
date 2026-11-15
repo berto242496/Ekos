@@ -21,6 +21,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -130,8 +131,9 @@ internal fun StopEditorForm(
                         .padding(8.dp)
                         .background(Color.Black.copy(alpha = 0.5f), CircleShape)
                         .size(32.dp)
+                        .minimumInteractiveComponentSize()
                 ) {
-                    Icon(Icons.Default.Close, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
+                    Icon(Icons.Default.Close, contentDescription = strings.removeImage, tint = Color.White, modifier = Modifier.size(18.dp))
                 }
             }
         }

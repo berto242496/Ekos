@@ -57,6 +57,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -504,8 +505,9 @@ fun RouteEditorScreen(
                                     .padding(8.dp)
                                     .background(Color.Black.copy(alpha = 0.5f), CircleShape)
                                     .size(32.dp)
+                                    .minimumInteractiveComponentSize()
                             ) {
-                                Icon(Icons.Default.Close, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
+                                Icon(Icons.Default.Close, contentDescription = strings.removeImage, tint = Color.White, modifier = Modifier.size(18.dp))
                             }
                         }
                     }
@@ -572,7 +574,7 @@ fun RouteEditorScreen(
                                 IconButton(
                                     onClick = { moveStop(index, index - 1) },
                                     enabled = index > 0,
-                                    modifier = Modifier.size(32.dp)
+                                    modifier = Modifier.size(32.dp).minimumInteractiveComponentSize()
                                 ) {
                                     Icon(
                                         Icons.Default.KeyboardArrowUp,
@@ -584,7 +586,7 @@ fun RouteEditorScreen(
                                 IconButton(
                                     onClick = { moveStop(index, index + 1) },
                                     enabled = index < stops.size - 1,
-                                    modifier = Modifier.size(32.dp)
+                                    modifier = Modifier.size(32.dp).minimumInteractiveComponentSize()
                                 ) {
                                     Icon(
                                         Icons.Default.KeyboardArrowDown,

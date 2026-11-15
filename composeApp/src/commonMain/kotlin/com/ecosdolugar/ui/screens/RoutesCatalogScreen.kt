@@ -203,7 +203,7 @@ fun RoutesCatalogScreen(
                         onClick = { onlySaved = !onlySaved },
                         shape = CircleShape,
                         color = if (onlySaved) PineDeep else SurfaceContainer,
-                        modifier = Modifier.size(36.dp)
+                        modifier = Modifier.size(36.dp).minimumInteractiveComponentSize()
                     ) {
                         Box(contentAlignment = Alignment.Center) {
                             Icon(
@@ -423,6 +423,7 @@ fun RouteCard(
                         onClick = onToggleSaved,
                         modifier = Modifier
                             .size(36.dp)
+                            .minimumInteractiveComponentSize()
                             .background(Color.Black.copy(alpha = 0.4f), CircleShape)
                     ) {
                         Icon(

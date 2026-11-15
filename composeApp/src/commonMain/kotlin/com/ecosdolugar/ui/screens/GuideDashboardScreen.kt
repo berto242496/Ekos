@@ -520,7 +520,7 @@ private fun GuideIdentityCard(
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.weight(1f, fill = false)
                     )
-                    IconButton(onClick = onEditName, modifier = Modifier.size(32.dp)) {
+                    IconButton(onClick = onEditName, modifier = Modifier.size(32.dp).minimumInteractiveComponentSize()) {
                         Icon(Icons.Default.Edit, contentDescription = strings.editNameAction, modifier = Modifier.size(16.dp))
                     }
                     if (guide.verified) {
@@ -618,7 +618,7 @@ private fun EarningsCard(sales: GuideSalesSummary, strings: GuideDashboardString
                     color = OnSurfaceDark,
                     modifier = Modifier.weight(1f)
                 )
-                IconButton(onClick = { showInfo = true }, modifier = Modifier.size(32.dp)) {
+                IconButton(onClick = { showInfo = true }, modifier = Modifier.size(32.dp).minimumInteractiveComponentSize()) {
                     Icon(
                         imageVector = Icons.Default.Info,
                         contentDescription = strings.earningsInfoTitle,

@@ -136,7 +136,7 @@ fun InteractiveMapScreen(
                     val location = userLocation
                     val isNear = expeditionMode && location != null &&
                         distanceMeters(location.first, location.second, stop.latitude, stop.longitude) <= STOP_REACHED_RADIUS_METERS
-                    if (isNear) onStopReached?.invoke(stop) else selectedStop = stop
+                    if (isNear) onStopReached?.invoke(stop) else if (expeditionMode) selectedStop = stop
                 }
             },
             completedStopIds = solvedStopIds,
@@ -333,7 +333,7 @@ fun InteractiveMapScreen(
             }
         }
 
-        selectedStop?.let { stop ->
+        selectedStop?.takeIf { expeditionMode }?.let { stop ->
             AlertDialog(
                 onDismissRequest = { selectedStop = null },
                 title = {

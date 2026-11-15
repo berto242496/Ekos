@@ -573,7 +573,9 @@ private fun routeMapHtml(): String = """
             }).bindTooltip(String(index + 1)).addTo(pickerLayer);
           });
           if (latitude !== null && longitude !== null) {
-            L.marker([latitude, longitude]).addTo(pickerLayer);
+            L.marker([latitude, longitude], {
+              icon: L.icon({ iconUrl: 'map_parada.png', iconSize: [40, 40], iconAnchor: [20, 40] })
+            }).addTo(pickerLayer);
           }
         };
         map.on('moveend', redrawVisibleStarts);

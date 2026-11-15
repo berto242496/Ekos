@@ -338,10 +338,15 @@ fun App(viewModel: AppViewModel) {
                                 guideSales = state.guideSales,
                                 reviews = state.routeReviews.filter { it.guideId == userProfile.googleId },
                                 isSaving = state.isSavingRoute,
+                                isSavingProfile = state.isSavingDisplayName,
+                                profileError = state.displayNameError,
                                 onBack = { viewModel.navigateTo(NavigationScreen.CATALOG) },
                                 onCreateNewRoute = viewModel::createNewRoute,
                                 onEditRoute = viewModel::editRoute,
-                                onPublishDraft = viewModel::publishDraft
+                                onPublishDraft = viewModel::publishDraft,
+                                onSaveProfile = { name, bio, photo ->
+                                    viewModel.saveGuideProfile(name, bio, photo ?: currentGuide.avatarUrl)
+                                }
                             )
                         }
                         NavigationScreen.ROUTE_EDITOR -> {

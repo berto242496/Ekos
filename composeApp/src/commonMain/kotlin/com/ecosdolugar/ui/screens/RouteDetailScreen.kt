@@ -409,13 +409,6 @@ fun RouteDetailScreen(
                                         )
                                     }
                                 }
-                                Text(
-                                    text = route.guide.title,
-                                    fontSize = 12.sp,
-                                    color = PineMoss,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.spacedBy(4.dp)

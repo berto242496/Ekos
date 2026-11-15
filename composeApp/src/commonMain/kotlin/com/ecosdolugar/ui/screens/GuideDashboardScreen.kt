@@ -1,19 +1,23 @@
 package com.ecosdolugar.ui.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
@@ -24,6 +28,7 @@ import com.ecosdolugar.data.formatRating
 import com.ecosdolugar.localization.AppLanguage
 import com.ecosdolugar.localization.GuideDashboardStrings
 import com.ecosdolugar.localization.guideDashboardStrings
+import com.ecosdolugar.localization.guideOnboardingStrings
 import com.ecosdolugar.model.GuideAuthor
 import com.ecosdolugar.model.GuideSalesSummary
 import com.ecosdolugar.model.RouteItem
@@ -32,7 +37,9 @@ import com.ecosdolugar.model.RouteReview
 import com.ecosdolugar.model.RouteSales
 import com.ecosdolugar.ui.components.GuideAvatar
 import com.ecosdolugar.ui.components.RouteCoverImage
+import com.ecosdolugar.ui.components.RouteCoverImagePicker
 import com.ecosdolugar.ui.theme.*
+import com.ecosdolugar.util.ProfanityFilter
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -42,13 +49,24 @@ fun GuideDashboardScreen(
     guideSales: GuideSalesSummary? = null,
     reviews: List<RouteReview> = emptyList(),
     isSaving: Boolean = false,
+    isSavingProfile: Boolean = false,
+    profileError: String? = null,
     language: AppLanguage = AppLanguage.SPANISH,
     onBack: () -> Unit,
     onCreateNewRoute: () -> Unit,
     onEditRoute: (RouteItem) -> Unit,
-    onPublishDraft: (RouteItem) -> Unit
+    onPublishDraft: (RouteItem) -> Unit,
+    onSaveProfile: (name: String, bio: String, photoDataUrl: String?) -> Unit = { _, _, _ -> }
 ) {
     val strings = guideDashboardStrings(language)
+    var editTarget by remember { mutableStateOf<GuideEditTarget?>(null) }
+    var profileSubmitted by remember { mutableStateOf(false) }
+    LaunchedEffect(isSavingProfile) {
+        if (profileSubmitted && !isSavingProfile) {
+            profileSubmitted = false
+            if (profileError == null) editTarget = null
+        }
+    }
     val publishedRoutes = routes.filter { it.status == "publicada" }
     val pendingRoutes = routes.filter { it.status != "publicada" }
     var selectedTab by remember { mutableStateOf(0) }
@@ -98,7 +116,36 @@ fun GuideDashboardScreen(
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             item {
-                GuideIdentityCard(guide = guide, strings = strings)
+                GuideIdentityCard(
+                    guide = guide,
+                    strings = strings,
+                    onEditName = { editTarget = GuideEditTarget.NAME },
+                    onEditPhoto = { editTarget = GuideEditTarget.PHOTO }
+                )
+            }
+
+            item {
+                GuideBioCard(
+                    bio = guide.bio,
+                    strings = strings,
+                    onEdit = { editTarget = GuideEditTarget.BIO }
+                )
+                editTarget?.let { target ->
+                    GuideProfileEditDialog(
+                        target = target,
+                        initialName = guide.name,
+                        initialBio = guide.bio,
+                        isSaving = isSavingProfile,
+                        errorMessage = profileError,
+                        language = language,
+                        strings = strings,
+                        onDismiss = { editTarget = null },
+                        onSave = { name, bio, photo ->
+                            profileSubmitted = true
+                            onSaveProfile(name, bio, photo)
+                        }
+                    )
+                }
             }
 
             item {
@@ -300,7 +347,150 @@ private fun ReviewStars(label: String, value: Int) {
 }
 
 @Composable
-private fun GuideIdentityCard(guide: GuideAuthor, strings: GuideDashboardStrings) {
+private fun GuideBioCard(bio: String, strings: GuideDashboardStrings, onEdit: () -> Unit) {
+    Surface(
+        shape = RoundedCornerShape(20.dp),
+        color = Color.White,
+        modifier = Modifier.fillMaxWidth(),
+        shadowElevation = 1.dp
+    ) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = strings.bioTitle,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 14.sp,
+                    color = OnSurfaceDark,
+                    modifier = Modifier.weight(1f)
+                )
+                TextButton(onClick = onEdit) {
+                    Icon(Icons.Default.Edit, contentDescription = strings.editBioAction, modifier = Modifier.size(18.dp))
+                }
+            }
+            Text(
+                text = bio.ifBlank { strings.bioEmpty },
+                fontSize = 13.sp,
+                lineHeight = 19.sp,
+                color = if (bio.isBlank()) PineMoss else OnSurfaceDark
+            )
+        }
+    }
+}
+
+private enum class GuideEditTarget { NAME, BIO, PHOTO }
+
+@Composable
+private fun GuideProfileEditDialog(
+    target: GuideEditTarget,
+    initialName: String,
+    initialBio: String,
+    isSaving: Boolean,
+    errorMessage: String?,
+    language: AppLanguage,
+    strings: GuideDashboardStrings,
+    onDismiss: () -> Unit,
+    onSave: (name: String, bio: String, photoDataUrl: String?) -> Unit
+) {
+    val onboarding = guideOnboardingStrings(language)
+    var name by remember { mutableStateOf(initialName) }
+    var bio by remember { mutableStateOf(initialBio) }
+    var photo by remember { mutableStateOf<String?>(null) }
+    var photoError by remember { mutableStateOf<String?>(null) }
+    val nameError = ProfanityFilter.displayNameError(name, language)
+    val bioHasProfanity = ProfanityFilter.containsProfanity(bio)
+    val profanityMessage = onboarding.descriptionProfanity
+    val canSave = when (target) {
+        GuideEditTarget.NAME -> name.isNotBlank() && nameError == null
+        GuideEditTarget.BIO -> !bioHasProfanity
+        GuideEditTarget.PHOTO -> photo != null
+    }
+    val dialogTitle = when (target) {
+        GuideEditTarget.NAME -> strings.editNameAction
+        GuideEditTarget.BIO -> strings.bioTitle
+        GuideEditTarget.PHOTO -> strings.editPhotoAction
+    }
+    AlertDialog(
+        onDismissRequest = { if (!isSaving) onDismiss() },
+        containerColor = SurfaceCream,
+        title = { Text(dialogTitle, color = PineDeep, fontWeight = FontWeight.Bold) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                if (target == GuideEditTarget.NAME) OutlinedTextField(
+                    value = name,
+                    onValueChange = { if (it.length <= 60) name = it },
+                    label = { Text(onboarding.nameLabel) },
+                    singleLine = true,
+                    enabled = !isSaving,
+                    isError = nameError != null && name.isNotEmpty(),
+                    supportingText = { if (nameError != null && name.isNotEmpty()) Text(nameError) },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp)
+                )
+                if (target == GuideEditTarget.PHOTO) Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(
+                        if (photo != null) onboarding.photoSelected else onboarding.photoAdd,
+                        color = PineDeep,
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 14.sp
+                    )
+                    if (!isSaving) {
+                        RouteCoverImagePicker(
+                            onImageSelected = {
+                                photo = it
+                                photoError = null
+                            },
+                            onError = { photoError = it }
+                        )
+                    }
+                    photoError?.let {
+                        Text(it, color = MaterialTheme.colorScheme.error, fontSize = 12.sp)
+                    }
+                }
+                if (target == GuideEditTarget.BIO) OutlinedTextField(
+                    value = bio,
+                    onValueChange = { if (it.length <= 500) bio = it },
+                    enabled = !isSaving,
+                    minLines = 4,
+                    isError = bioHasProfanity,
+                    supportingText = {
+                        Text(if (bioHasProfanity) profanityMessage else "${bio.length}/500 · ${strings.bioHint}")
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp)
+                )
+                errorMessage?.let {
+                    Text(it, color = MaterialTheme.colorScheme.error, fontSize = 12.sp)
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = { if (canSave && !isSaving) onSave(name.trim(), bio.trim(), photo) },
+                enabled = !isSaving,
+                colors = ButtonDefaults.buttonColors(containerColor = PineContainer, contentColor = SurfaceCream)
+            ) {
+                if (isSaving) {
+                    CircularProgressIndicator(modifier = Modifier.size(18.dp), color = SurfaceCream, strokeWidth = 2.dp)
+                } else {
+                    Text(strings.saveBioAction)
+                }
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss, enabled = !isSaving) {
+                Text(strings.cancelAction)
+            }
+        }
+    )
+}
+
+@Composable
+private fun GuideIdentityCard(
+    guide: GuideAuthor,
+    strings: GuideDashboardStrings,
+    onEditName: () -> Unit,
+    onEditPhoto: () -> Unit
+) {
     Surface(
         shape = RoundedCornerShape(20.dp),
         color = Color.White,
@@ -312,7 +502,13 @@ private fun GuideIdentityCard(guide: GuideAuthor, strings: GuideDashboardStrings
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            GuideAvatar(name = guide.name, avatarUrl = guide.avatarUrl, size = 60.dp)
+            Box(
+                modifier = Modifier
+                    .clip(CircleShape)
+                    .clickable(onClick = onEditPhoto)
+            ) {
+                GuideAvatar(name = guide.name, avatarUrl = guide.avatarUrl, size = 60.dp)
+            }
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
@@ -324,6 +520,9 @@ private fun GuideIdentityCard(guide: GuideAuthor, strings: GuideDashboardStrings
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.weight(1f, fill = false)
                     )
+                    IconButton(onClick = onEditName, modifier = Modifier.size(32.dp)) {
+                        Icon(Icons.Default.Edit, contentDescription = strings.editNameAction, modifier = Modifier.size(16.dp))
+                    }
                     if (guide.verified) {
                         Spacer(Modifier.width(6.dp))
                         Icon(

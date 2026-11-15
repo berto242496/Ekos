@@ -16,6 +16,27 @@ fun readLocalEnv(key: String): String =
             .orEmpty()
     }.orEmpty()
 
+fun supabaseConfigValue(gradleKey: String, envKey: String, localKey: String): String =
+    providers.gradleProperty(gradleKey)
+        .orElse(providers.environmentVariable(envKey))
+        .orElse(readLocalEnv(localKey))
+        .get()
+
+gradle.taskGraph.whenReady {
+    val releaseRequested = allTasks.any { it.project == project && it.name.contains("Release") }
+    if (releaseRequested) {
+        val missing = listOf(
+            Triple("SUPABASE_URL", "SUPABASE_URL", "VITE_SUPABASE_URL"),
+            Triple("SUPABASE_PUBLISHABLE_KEY", "SUPABASE_PUBLISHABLE_KEY", "VITE_SUPABASE_ANON_KEY")
+        ).filter { (gradleKey, envKey, localKey) ->
+            supabaseConfigValue(gradleKey, envKey, localKey).isBlank()
+        }.map { it.first }
+        check(missing.isEmpty()) {
+            "Faltan ${missing.joinToString()} para el build de release. Defínelos en .env.local, en gradle.properties o como variables de entorno."
+        }
+    }
+}
+
 android {
     namespace = "com.ecosdolugar"
     compileSdk = 36
@@ -26,6 +47,7 @@ android {
         targetSdk = 36
         versionCode = 3
         versionName = "1.0.0"
+        resourceConfigurations += listOf("es", "gl", "en")
         resValue(
             "string",
             "google_web_client_id",
@@ -33,18 +55,21 @@ android {
                 .filter { it.isNotBlank() }
                 .orElse(providers.gradleProperty("GOOGLE_WEB_CLIENT_ID"))
                 .orElse(providers.environmentVariable("GOOGLE_WEB_CLIENT_ID"))
+                .orElse("")
                 .get()
         )
-        val supabaseUrl = providers.gradleProperty("SUPABASE_URL")
-            .orElse(providers.environmentVariable("SUPABASE_URL"))
-            .orElse(readLocalEnv("VITE_SUPABASE_URL"))
-            .get()
-        val supabaseKey = providers.gradleProperty("SUPABASE_PUBLISHABLE_KEY")
-            .orElse(providers.environmentVariable("SUPABASE_PUBLISHABLE_KEY"))
-            .orElse(readLocalEnv("VITE_SUPABASE_ANON_KEY"))
-            .get()
-        resValue("string", "supabase_url", supabaseUrl)
-        resValue("string", "supabase_publishable_key", supabaseKey)
+        if (readLocalEnv("GOOGLE_WEB_CLIENT_ID").isBlank() &&
+            providers.gradleProperty("GOOGLE_WEB_CLIENT_ID").orNull.isNullOrBlank() &&
+            providers.environmentVariable("GOOGLE_WEB_CLIENT_ID").orNull.isNullOrBlank()
+        ) {
+            logger.warn("GOOGLE_WEB_CLIENT_ID no está definido en .env.local; el inicio de sesión con Google no funcionará.")
+        }
+        resValue("string", "supabase_url", supabaseConfigValue("SUPABASE_URL", "SUPABASE_URL", "VITE_SUPABASE_URL"))
+        resValue(
+            "string",
+            "supabase_publishable_key",
+            supabaseConfigValue("SUPABASE_PUBLISHABLE_KEY", "SUPABASE_PUBLISHABLE_KEY", "VITE_SUPABASE_ANON_KEY")
+        )
     }
 
     buildFeatures {

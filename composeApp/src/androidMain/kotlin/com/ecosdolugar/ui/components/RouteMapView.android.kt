@@ -247,6 +247,8 @@ private fun createRouteMap(
     setBackgroundColor(android.graphics.Color.rgb(221, 232, 226))
     settings.javaScriptEnabled = true
     settings.domStorageEnabled = false
+    settings.allowFileAccess = false
+    settings.allowContentAccess = false
     settings.loadsImagesAutomatically = true
     webViewClient = object : WebViewClient() {
         private val assetLoader = WebViewAssetLoader.Builder()

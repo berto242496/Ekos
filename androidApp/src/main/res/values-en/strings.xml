@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Ecos do Lugar</string>
+    <string name="google_error_client_id_missing">Add GOOGLE_WEB_CLIENT_ID to the .env.local file to enable Google Sign-In.</string>
+    <string name="google_error_no_activity">There is no active screen to sign in with Google.</string>
+    <string name="google_error_invalid_credential">Google did not return a valid credential.</string>
+    <string name="google_error_client_id_mismatch">The Google Client ID included in this app does not match the token. Check GOOGLE_WEB_CLIENT_ID in .env.local and rebuild.</string>
+    <string name="google_error_sign_in_failed">Could not sign in with Google.</string>
+    <string name="google_error_session_check_failed">Could not verify the session with Supabase.</string>
+    <string name="google_error_audience_rejected">Supabase rejected the Google token because its audience is not authorized. In Supabase &gt; Authentication &gt; Providers &gt; Google, add the same GOOGLE_WEB_CLIENT_ID configured for Android as the Client ID. Details: %1$s</string>
+    <string name="google_error_stored_session_unreadable">The stored session could not be recovered securely: %1$s</string>
+    <string name="google_error_refresh_failed">The stored session could not be renewed.</string>
+</resources>

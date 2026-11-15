@@ -39,9 +39,7 @@ class AndroidGoogleAuthService(
     override suspend fun signInWithGoogle(): GoogleAuthResult {
         val webClientId = context.getString(R.string.google_web_client_id)
         if (webClientId.isBlank()) {
-            return GoogleAuthResult.Error(
-                "Añade GOOGLE_WEB_CLIENT_ID al archivo .env.local para habilitar Google Sign-In."
-            )
+            return GoogleAuthResult.Error(context.getString(R.string.google_error_client_id_missing))
         }
 
         val googleOption = GetGoogleIdOption.Builder()
@@ -54,7 +52,7 @@ class AndroidGoogleAuthService(
             .build()
 
         val activity = CurrentActivity.get()
-            ?: return GoogleAuthResult.Error("No hay una pantalla activa para iniciar sesión con Google.")
+            ?: return GoogleAuthResult.Error(context.getString(R.string.google_error_no_activity))
 
         return try {
             val response = credentialManager.getCredential(activity, request)
@@ -62,7 +60,7 @@ class AndroidGoogleAuthService(
             if (credential !is CustomCredential ||
                 credential.type != GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL
             ) {
-                return GoogleAuthResult.Error("Google no devolvió una credencial válida.")
+                return GoogleAuthResult.Error(context.getString(R.string.google_error_invalid_credential))
             }
 
             val googleCredential = GoogleIdTokenCredential.createFrom(credential.data)
@@ -77,10 +75,7 @@ class AndroidGoogleAuthService(
                     }.getOrNull()
                 }
             if (tokenAudience != webClientId) {
-                return GoogleAuthResult.Error(
-                    "El Client ID de Google incluido en esta app no coincide con el del token. " +
-                        "Revisa GOOGLE_WEB_CLIENT_ID en .env.local y vuelve a compilar."
-                )
+                return GoogleAuthResult.Error(context.getString(R.string.google_error_client_id_mismatch))
             }
             val session = routesRepository.exchangeGoogleIdToken(googleCredential.idToken)
             // A session saved by a previous install or key may be unreadable; sign-in must still work.
@@ -109,16 +104,14 @@ class AndroidGoogleAuthService(
         } catch (_: GetCredentialCancellationException) {
             GoogleAuthResult.Cancelled
         } catch (error: GetCredentialException) {
-            GoogleAuthResult.Error(error.message ?: "No se pudo iniciar sesión con Google.")
+            GoogleAuthResult.Error(error.message ?: context.getString(R.string.google_error_sign_in_failed))
         } catch (error: CancellationException) {
             throw error
         } catch (error: Exception) {
-            val message = error.message ?: "No se pudo verificar la sesión con Supabase."
+            val message = error.message ?: context.getString(R.string.google_error_session_check_failed)
             GoogleAuthResult.Error(
                 if (message.contains("unacceptable audience", ignoreCase = true)) {
-                    "Supabase rechazó el token de Google porque su audiencia no está autorizada. " +
-                        "En Supabase > Authentication > Providers > Google, añade como Client ID " +
-                        "el mismo GOOGLE_WEB_CLIENT_ID configurado para Android. Detalle: $message"
+                    context.getString(R.string.google_error_audience_rejected, message)
                 } else {
                     message
                 }
@@ -132,8 +125,10 @@ class AndroidGoogleAuthService(
         } catch (error: Exception) {
             clearStoredSession()
             return GoogleAuthResult.Error(
-                "No se pudo recuperar la sesión guardada de forma segura: " +
-                    (error.message ?: "datos de sesión no válidos.")
+                context.getString(
+                    R.string.google_error_stored_session_unreadable,
+                    error.message ?: ""
+                )
             )
         } ?: return GoogleAuthResult.NoStoredSession
 
@@ -163,7 +158,7 @@ class AndroidGoogleAuthService(
             throw error
         } catch (error: Exception) {
             GoogleAuthResult.Error(
-                error.message ?: "No se pudo renovar la sesión guardada."
+                error.message ?: context.getString(R.string.google_error_refresh_failed)
             )
         }
     }

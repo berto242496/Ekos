@@ -59,7 +59,8 @@ class SupabaseRoutesRepository(
             accessToken = accessToken
         )
         val rows = JSONArray(response)
-        (0 until rows.length()).map { index -> rows.getJSONObject(index).toRoute() }
+        val routes = (0 until rows.length()).map { index -> rows.getJSONObject(index).toRoute() }
+        runCatching { signRouteMediaUrls(routes, accessToken) }.getOrDefault(routes)
     }
 
     override suspend fun loadRouteReviews(accessToken: String?): List<RouteReview> = withContext(Dispatchers.IO) {
@@ -161,7 +162,8 @@ class SupabaseRoutesRepository(
             if (response.isNotBlank() && response != JSONObject.quote(routeWithPersistedImage.id)) {
                 throw IllegalStateException("Supabase devolvió un identificador inesperado al guardar la ruta.")
             }
-            routeWithPersistedImage.copy(status = persistedStatus)
+            val savedRoute = routeWithPersistedImage.copy(status = persistedStatus)
+            runCatching { signRouteMediaUrls(listOf(savedRoute), accessToken).first() }.getOrDefault(savedRoute)
         }
 
     override suspend fun signOut(accessToken: String) = withContext(Dispatchers.IO) {
@@ -667,13 +669,45 @@ class SupabaseRoutesRepository(
         }
     }
 
+    /**
+     * Replaces route-media URLs with short-lived signed URLs. Anything else (external images, data URLs) is kept.
+     * Signing is one batch request per load, so it is fine for the whole catalog.
+     */
+    private fun signRouteMediaUrls(routes: List<RouteItem>, accessToken: String?): List<RouteItem> {
+        val objectPaths = routes.flatMap(::mediaUrlsOf).mapNotNull { it.routeMediaObjectPath() }.distinct()
+        if (objectPaths.isEmpty()) return routes
+        val body = JSONObject()
+            .put("expiresIn", SIGNED_MEDIA_TTL_SECONDS)
+            .put("paths", JSONArray(objectPaths))
+            .toString()
+        val response = request(
+            method = "POST",
+            path = "/storage/v1/object/sign/route-media",
+            body = body,
+            accessToken = accessToken,
+            contentType = "application/json"
+        )
+        val rows = JSONArray(response)
+        val signedByPath = HashMap<String, String>()
+        for (index in 0 until rows.length()) {
+            val row = rows.getJSONObject(index)
+            val signedPath = row.optString("signedURL", "")
+            if (signedPath.isNotBlank()) {
+                signedByPath[row.optString("path")] = "${projectUrl.trimEnd('/')}/storage/v1$signedPath"
+            }
+        }
+        return routes.map { route ->
+            route.mapMediaUrls { url -> url.routeMediaObjectPath()?.let { signedByPath[it] } ?: url }
+        }
+    }
+
     private fun persistRouteMedia(route: RouteItem, accessToken: String): RouteItem {
         fun persist(url: String): String = if (url.startsWith("data:")) {
             withTokenRetry(accessToken) { token ->
                 persistDataUrl(url, route.guide.id, route.id, token.orEmpty())
             }
         } else {
-            url
+            url.withoutSignedQuery()
         }
         return route.copy(
             imageUrl = persist(route.imageUrl),
@@ -831,6 +865,34 @@ class SupabaseRoutesRepository(
 }
 
 private fun encode(value: String): String = URLEncoder.encode(value, "UTF-8")
+
+private const val SIGNED_MEDIA_TTL_SECONDS = 3600
+private val ROUTE_MEDIA_PATH_PATTERN = Regex("/storage/v1/object/(?:public/|sign/)?route-media/([^?]+)")
+
+private fun String.routeMediaObjectPath(): String? = ROUTE_MEDIA_PATH_PATTERN.find(this)?.groupValues?.get(1)
+
+private fun String.withoutSignedQuery(): String =
+    if (contains("/storage/v1/object/sign/route-media/")) substringBefore('?').replace("/object/sign/", "/object/public/") else this
+
+private fun mediaUrlsOf(route: RouteItem): List<String> = buildList {
+    add(route.imageUrl)
+    route.stops.forEach { stop ->
+        add(stop.imageUrl)
+        stop.recordedAudioUrl?.let(::add)
+        stop.trial?.let { add(it.imageUrl) }
+    }
+}
+
+private fun RouteItem.mapMediaUrls(transform: (String) -> String): RouteItem = copy(
+    imageUrl = transform(imageUrl),
+    stops = stops.map { stop ->
+        stop.copy(
+            imageUrl = transform(stop.imageUrl),
+            recordedAudioUrl = stop.recordedAudioUrl?.let(transform),
+            trial = stop.trial?.let { trial -> trial.copy(imageUrl = transform(trial.imageUrl)) }
+        )
+    }
+)
 
 private fun JSONObject.toAuthSession(): SupabaseAuthSession {
     val user = getJSONObject("user")

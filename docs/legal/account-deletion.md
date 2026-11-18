@@ -17,8 +17,15 @@ Escribe a info@bretemahr.com desde el correo de tu cuenta de Google con el asunt
 
 ## Qué se elimina
 
-Se borran de forma permanente tu perfil, tu progreso y puntuaciones, tus rutas guardadas, tus reseñas, las rutas que hayas creado como guía y los archivos (imágenes y audios) que hayas subido, así como los reportes y bloqueos asociados a tu cuenta.
+Se borran de forma permanente tu perfil, tu progreso y puntuaciones, tus rutas guardadas, tus reseñas, las rutas que hayas creado como guía, los archivos (imágenes y audios) que hayas subido, y los reportes y bloqueos asociados a tu cuenta.
 
-No conservamos copias de estos datos tras la eliminación, salvo las copias de seguridad técnicas del proveedor, que se sobrescriben en un plazo máximo de 30 días.
+Las copias de seguridad técnicas del proveedor se sobrescriben en un plazo máximo de 30 días.
+
+## Qué se conserva
+
+- **Registro de compras de rutas** (identificador de la ruta, fecha, importe y parte del guía): se conserva sin tu identidad ni tu token de compra de Google Play, durante 6 años por obligaciones contables y fiscales.
+- **Pagos a guías** (importes ya pagados a guías): se conservan sin vinculación a tu cuenta durante 6 años por obligaciones contables y fiscales.
+
+Tras eliminar tu cuenta, estos registros ya no pueden asociarse a ti.
 
 Más información en la [Política de privacidad](privacy-policy).

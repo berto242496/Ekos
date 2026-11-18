@@ -44,7 +44,7 @@ Tu progreso y tus rutas guardadas son privados. Las reseñas que escribes y el c
 
 ## 5. Conservación
 
-Conservamos tus datos mientras mantengas tu cuenta. Al eliminarla, se borran de forma permanente tu perfil, progreso, reseñas, rutas y archivos subidos. Los reportes que hayas enviado también se eliminan con tu cuenta.
+Conservamos tus datos mientras mantengas tu cuenta. Al eliminarla, se borran de forma permanente tu perfil, progreso, reseñas, rutas y archivos subidos. Los reportes que hayas enviado también se eliminan con tu cuenta. Los registros de compras y los pagos a guías se conservan sin vincularlos a tu identidad durante 6 años por obligaciones contables y fiscales (ver [eliminación de cuenta](account-deletion)).
 
 ## 6. Tus derechos y eliminación de cuenta
 

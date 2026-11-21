@@ -1,0 +1,98 @@
+package com.ecosdolugar.localization
+
+data class GuideOnboardingStrings(
+    val back: String,
+    val welcomeEyebrow: String,
+    val welcomeTitle: String,
+    val welcomeIntro: String,
+    val keyPointCreateTitle: String,
+    val keyPointCreateDescription: String,
+    val keyPointPublishTitle: String,
+    val keyPointPublishDescription: String,
+    val keyPointReachTitle: String,
+    val keyPointReachDescription: String,
+    val keyPointMonetizeTitle: String,
+    val keyPointMonetizeDescription: String,
+    val welcomeCreateProfile: String,
+    val profileTitle: String,
+    val profileSubtitle: String,
+    val nameLabel: String,
+    val descriptionLabel: String,
+    val descriptionProfanity: String,
+    val photoSelected: String,
+    val photoAdd: String,
+    val saveAndContinue: String
+)
+
+fun guideOnboardingStrings(language: AppLanguage): GuideOnboardingStrings =
+    when (language) {
+        AppLanguage.SPANISH -> GuideOnboardingStrings(
+            back = "Volver",
+            welcomeEyebrow = "Para guías y creadores de rutas.",
+            welcomeTitle = "Crea tus rutas y genera nuevos ingresos.",
+            welcomeIntro = "Comparte tu conocimiento local con más visitantes a través de experiencias digitales interactivas.",
+            keyPointCreateTitle = "Crea tus propias rutas",
+            keyPointCreateDescription = "Añade paradas, fotografías e historias de los lugares que mejor conoces.",
+            keyPointPublishTitle = "Hazlas interactivas",
+            keyPointPublishDescription = "Incorpora relatos, audios, pistas y desafíos para crear experiencias únicas.",
+            keyPointReachTitle = "Llega a más visitantes",
+            keyPointReachDescription = "Permite que cualquier persona descubra tus rutas desde su móvil, cuando quiera y a su ritmo.",
+            keyPointMonetizeTitle = "Monetiza tu conocimiento",
+            keyPointMonetizeDescription = "Publica rutas gratuitas o establece un precio y genera ingresos con cada venta.",
+            welcomeCreateProfile = "Crear mi perfil de guía",
+            profileTitle = "Crea tu perfil de guía",
+            profileSubtitle = "Así te verán los visitantes en tus rutas.",
+            nameLabel = "Nombre",
+            descriptionLabel = "Descripción",
+            descriptionProfanity = "La descripción contiene palabras no permitidas.",
+            photoSelected = "Foto seleccionada",
+            photoAdd = "Añade una foto de perfil",
+            saveAndContinue = "Guardar y continuar"
+        )
+        AppLanguage.GALICIAN -> GuideOnboardingStrings(
+            back = "Volver",
+            welcomeEyebrow = "Para guías e creadores de rutas.",
+            welcomeTitle = "Crea as túas rutas e xera novos ingresos.",
+            welcomeIntro = "Comparte o teu coñecemento local con máis visitantes a través de experiencias dixitais interactivas.",
+            keyPointCreateTitle = "Crea as túas propias rutas",
+            keyPointCreateDescription = "Engade paradas, fotografías e historias dos lugares que mellor coñeces.",
+            keyPointPublishTitle = "Fai que sexan interactivas",
+            keyPointPublishDescription = "Incorpora relatos, audios, pistas e desafíos para crear experiencias únicas.",
+            keyPointReachTitle = "Chega a máis visitantes",
+            keyPointReachDescription = "Permite que calquera persoa descubra as túas rutas desde o móbil, cando queira e ao seu ritmo.",
+            keyPointMonetizeTitle = "Monetiza o teu coñecemento",
+            keyPointMonetizeDescription = "Publica rutas gratuítas ou establece un prezo e xera ingresos con cada venda.",
+            welcomeCreateProfile = "Crear o meu perfil de guía",
+            profileTitle = "Crea o teu perfil de guía",
+            profileSubtitle = "Así te verán os visitantes nas túas rutas.",
+            nameLabel = "Nome",
+            descriptionLabel = "Descrición",
+            descriptionProfanity = "A descrición contén palabras non permitidas.",
+            photoSelected = "Foto seleccionada",
+            photoAdd = "Engade unha foto de perfil",
+            saveAndContinue = "Gardar e continuar"
+        )
+        AppLanguage.ENGLISH -> GuideOnboardingStrings(
+            back = "Back",
+            welcomeEyebrow = "For guides and route creators.",
+            welcomeTitle = "Create your routes and generate new income.",
+            welcomeIntro = "Share your local knowledge with more visitors through interactive digital experiences.",
+            keyPointCreateTitle = "Create your own routes",
+            keyPointCreateDescription = "Add stops, photos and stories of the places you know best.",
+            keyPointPublishTitle = "Make them interactive",
+            keyPointPublishDescription = "Include stories, audio, clues and challenges to create unique experiences.",
+            keyPointReachTitle = "Reach more visitors",
+            keyPointReachDescription = "Let anyone discover your routes from their phone, whenever they want and at their own pace.",
+            keyPointMonetizeTitle = "Monetize your knowledge",
+            keyPointMonetizeDescription = "Publish free routes or set a price and earn income from every sale.",
+            welcomeCreateProfile = "Create my guide profile",
+            profileTitle = "Create your guide profile",
+            profileSubtitle = "This is how visitors will see you on your routes.",
+            nameLabel = "Name",
+            descriptionLabel = "Description",
+            descriptionProfanity = "The description contains words that are not allowed.",
+            photoSelected = "Photo selected",
+            photoAdd = "Add a profile photo",
+            saveAndContinue = "Save and continue"
+        )
+    }

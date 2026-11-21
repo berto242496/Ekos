@@ -1,581 +1,536 @@
 package com.ecosdolugar.ui.screens
 
-import androidx.compose.animation.*
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.StarBorder
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.material.icons.filled.Stop
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Button
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.ecosdolugar.data.CharactersRepository
+import com.ecosdolugar.PointsGain
+import com.ecosdolugar.localization.ActiveExpeditionStrings
+import com.ecosdolugar.localization.AppLanguage
+import com.ecosdolugar.localization.activeExpeditionStrings
 import com.ecosdolugar.model.RouteItem
 import com.ecosdolugar.model.RouteStop
+import com.ecosdolugar.model.StopAudioMode
 import com.ecosdolugar.model.UserProfile
-import com.ecosdolugar.ui.theme.*
+import com.ecosdolugar.model.routeScore
+import com.ecosdolugar.platform.PlatformBackHandler
+import androidx.compose.material3.CircularProgressIndicator
+import com.ecosdolugar.ui.components.RouteCoverImage
+import com.ecosdolugar.ui.components.RouteImageState
+import com.ecosdolugar.ui.components.rememberRouteImage
+import com.ecosdolugar.ui.components.rememberAudioClipPlayer
+import com.ecosdolugar.ui.components.rememberVoicePreviewer
+import com.ecosdolugar.ui.theme.MossContainer
+import com.ecosdolugar.ui.theme.PineContainer
+import com.ecosdolugar.ui.theme.SurfaceCream
+import com.ecosdolugar.ui.theme.TerracottaGold
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.runtime.LaunchedEffect
+import kotlinx.coroutines.delay
 
+private enum class ExpeditionPhase { INFO, TRIAL, SUMMARY }
+
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ActiveExpeditionScreen(
     route: RouteItem,
     userProfile: UserProfile,
+    initialStopId: String? = null,
+    pointsGain: PointsGain? = null,
+    onPointsGainShown: () -> Unit = {},
+    routeBonusGain: PointsGain? = null,
+    onRouteBonusShown: () -> Unit = {},
     onBack: () -> Unit,
-    onCheckInStop: (String) -> Unit,
-    onSolveEnigma: (String) -> Unit,
-    onAddNote: (RouteStop) -> Unit,
-    onCompleteRoute: (String) -> Unit
+    onSolveEnigma: (String, Int, Int) -> Unit,
+    onSubmitReview: (routeRating: Int, guideRating: Int, comment: String) -> Unit,
+    language: AppLanguage = AppLanguage.SPANISH
 ) {
-    var currentStopIndex by remember { mutableStateOf(0) }
-    var isPlayingAudio by remember { mutableStateOf(false) }
-    var isDonActive by remember { mutableStateOf(false) }
-    var selectedOptionIndex by remember { mutableStateOf<Int?>(null) }
-    var showExplanation by remember { mutableStateOf(false) }
-    var isAnswerCorrect by remember { mutableStateOf(false) }
-
-    val character = remember(userProfile.characterId) {
-        CharactersRepository.getById(userProfile.characterId)
-    }
-    val charColor = Color(character.accentColorHex)
-
-    val currentStop = route.stops.getOrElse(currentStopIndex) { route.stops.first() }
-    val isVisited = userProfile.visitedStopIds.contains(currentStop.id)
-    val isSolved = userProfile.solvedEnigmaIds.contains(currentStop.id)
-
-    val scrollState = rememberScrollState()
-
-    // Reset trial selections when stop changes
-    LaunchedEffect(currentStopIndex) {
-        isPlayingAudio = false
-        isDonActive = false
-        selectedOptionIndex = null
-        showExplanation = false
-        isAnswerCorrect = false
-    }
-
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(PineDeep)
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .verticalScroll(scrollState)
-        ) {
-            // Top App Bar
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 12.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                IconButton(
-                    onClick = onBack,
-                    colors = IconButtonDefaults.iconButtonColors(contentColor = Color.White)
-                ) {
-                    Icon(Icons.Default.ArrowBack, contentDescription = "Volver")
-                }
-
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(
-                        text = "EXPEDICIÓN EN VIVO",
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = TerracottaFixedDim,
-                        letterSpacing = 1.2.sp
-                    )
-                    Text(
-                        text = route.title,
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = Color.White
-                    )
-                }
-
-                // Companion Avatar Badge
-                Box(
-                    modifier = Modifier
-                        .size(36.dp)
-                        .background(charColor.copy(alpha = 0.2f), CircleShape)
-                        .border(1.dp, charColor, CircleShape)
-                        .clickable { isDonActive = !isDonActive },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(character.avatarEmoji, fontSize = 18.sp)
-                }
-            }
-
-            // Route Stops Stepper Row
-            LazyRow(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 8.dp),
-                contentPadding = PaddingValues(horizontal = 16.dp),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                itemsIndexed(route.stops) { idx, stop ->
-                    val isActive = idx == currentStopIndex
-                    val visited = userProfile.visitedStopIds.contains(stop.id)
-
-                    Surface(
-                        onClick = { currentStopIndex = idx },
-                        shape = RoundedCornerShape(12.dp),
-                        color = if (isActive) charColor.copy(alpha = 0.25f)
-                        else if (visited) PineMoss.copy(alpha = 0.4f)
-                        else Color.Black.copy(alpha = 0.3f),
-                        border = ButtonDefaults.outlinedButtonBorder.copy(
-                            brush = androidx.compose.ui.graphics.SolidColor(
-                                if (isActive) charColor else Color.White.copy(alpha = 0.15f)
-                            )
-                        )
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            Text(
-                                text = "${idx + 1}",
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = if (isActive) charColor else Color.White
-                            )
-                            if (visited) {
-                                Icon(
-                                    Icons.Default.CheckCircle,
-                                    contentDescription = "Completada",
-                                    tint = MossContainer,
-                                    modifier = Modifier.size(14.dp)
-                                )
-                            }
+    val strings = activeExpeditionStrings(language)
+    val stop = route.stops.firstOrNull { it.id == initialStopId } ?: route.stops.firstOrNull()
+    if (stop == null) {
+        PlatformBackHandler(onBack = onBack)
+        Scaffold(
+            topBar = {
+                TopAppBar(
+                    title = { Text(strings.expeditionTitle, color = InkDeep) },
+                    navigationIcon = {
+                        IconButton(onClick = onBack) {
+                            Icon(Icons.Default.ArrowBack, contentDescription = strings.back, tint = InkDeep)
                         }
-                    }
-                }
-            }
-
-            // Stop Info Card
-            Surface(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
-                shape = RoundedCornerShape(20.dp),
-                color = Color(0xFF0F2618),
-                border = ButtonDefaults.outlinedButtonBorder.copy(
-                    brush = Brush.verticalGradient(
-                        listOf(charColor.copy(alpha = 0.4f), Color.White.copy(alpha = 0.05f))
-                    )
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(containerColor = SurfaceCream)
                 )
-            ) {
-                Column(
-                    modifier = Modifier.padding(20.dp),
-                    verticalArrangement = Arrangement.spacedBy(14.dp)
-                ) {
-                    // Header Stop
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            Icon(
-                                Icons.Default.LocationOn,
-                                contentDescription = null,
-                                tint = charColor,
-                                modifier = Modifier.size(18.dp)
-                            )
-                            Text(
-                                text = "PARADA ${currentStopIndex + 1} DE ${route.stops.size}",
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = charColor,
-                                letterSpacing = 1.sp
-                            )
-                        }
+            },
+            containerColor = SurfaceCream
+        ) { padding ->
+            Box(Modifier.padding(padding).fillMaxSize(), contentAlignment = Alignment.Center) {
+                Text(strings.noStops, color = InkMuted)
+            }
+        }
+        return
+    }
 
-                        // Audio button
-                        Button(
-                            onClick = { isPlayingAudio = !isPlayingAudio },
-                            shape = RoundedCornerShape(20.dp),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = if (isPlayingAudio) charColor else Color.White.copy(alpha = 0.12f),
-                                contentColor = if (isPlayingAudio) Color.Black else Color.White
-                            ),
-                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
-                        ) {
-                            Icon(
-                                if (isPlayingAudio) Icons.Default.VolumeUp else Icons.Default.PlayArrow,
-                                contentDescription = null,
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Spacer(Modifier.width(4.dp))
-                            Text(
-                                text = if (isPlayingAudio) "Pausar voz" else "Escuchar",
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                        }
-                    }
+    var phase by remember(stop.id) { mutableStateOf(ExpeditionPhase.INFO) }
+    val isCompleted = stop.id in userProfile.solvedEnigmaIds
+    val completedStops = route.stops.count { it.id in userProfile.solvedEnigmaIds }
+    val isRouteCompleted = completedStops == route.stops.size
+    val stopImage by rememberRouteImage(stop.imageUrl)
+    val trialImage by rememberRouteImage(stop.trial?.imageUrl?.takeIf { it.isNotBlank() } ?: stop.imageUrl)
+    val imagesLoading = stopImage is RouteImageState.Loading || trialImage is RouteImageState.Loading
+    val goBack: () -> Unit = {
+        if (phase == ExpeditionPhase.TRIAL) phase = ExpeditionPhase.INFO else onBack()
+    }
+    PlatformBackHandler(onBack = goBack)
 
-                    Text(
-                        text = currentStop.title,
-                        fontSize = 22.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White
-                    )
-
-                    Text(
-                        text = currentStop.locationName,
-                        fontSize = 12.sp,
-                        color = TerracottaFixedDim
-                    )
-
-                    // Story Narrative
-                    Text(
-                        text = currentStop.story,
-                        fontSize = 14.sp,
-                        lineHeight = 22.sp,
-                        color = SurfaceCream
-                    )
-
-                    // Historical Note
-                    Surface(
-                        shape = RoundedCornerShape(12.dp),
-                        color = Color.Black.copy(alpha = 0.25f),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(12.dp),
-                            horizontalArrangement = Arrangement.spacedBy(10.dp)
-                        ) {
-                            Icon(
-                                Icons.Default.MenuBook,
-                                contentDescription = null,
-                                tint = TerracottaGold,
-                                modifier = Modifier.size(18.dp)
-                            )
-                            Column {
-                                Text(
-                                    text = "NOTA HISTÓRICA DO LUGAR",
-                                    fontSize = 10.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = TerracottaGold
-                                )
-                                Spacer(Modifier.height(4.dp))
-                                Text(
-                                    text = currentStop.historicalNote,
-                                    fontSize = 12.sp,
-                                    color = SurfaceContainerHighest,
-                                    lineHeight = 17.sp
-                                )
-                            }
-                        }
-                    }
-
-                    // Check-in button
-                    if (!isVisited) {
-                        Button(
-                            onClick = { onCheckInStop(currentStop.id) },
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(12.dp),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = MossContainer,
-                                contentColor = PineDeep
-                            )
-                        ) {
-                            Icon(Icons.Default.Check, contentDescription = null)
-                            Spacer(Modifier.width(6.dp))
-                            Text("Registrar llegada a este punto", fontWeight = FontWeight.Bold)
-                        }
-                    } else {
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                actions = {
+                    if (phase != ExpeditionPhase.SUMMARY) {
                         Surface(
-                            shape = RoundedCornerShape(10.dp),
-                            color = MossContainer.copy(alpha = 0.15f),
-                            modifier = Modifier.fillMaxWidth()
+                            modifier = Modifier.padding(end = 12.dp),
+                            shape = RoundedCornerShape(14.dp),
+                            color = PineContainer.copy(alpha = 0.92f),
+                            shadowElevation = 6.dp
                         ) {
                             Row(
-                                modifier = Modifier.padding(10.dp),
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
                                 verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.Center
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
-                                Icon(Icons.Default.CheckCircle, contentDescription = null, tint = MossContainer, modifier = Modifier.size(18.dp))
-                                Spacer(Modifier.width(8.dp))
-                                Text("Punto visitado y registrado", color = MossContainer, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                                Icon(Icons.Default.Star, contentDescription = null, tint = TerracottaGold, modifier = Modifier.size(18.dp))
+                                Text(
+                                    userProfile.routeScore(route).toString(),
+                                    color = Color.White,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 15.sp
+                                )
                             }
                         }
                     }
-                }
-            }
-
-            // Character Companion advice card
-            Surface(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 6.dp),
-                shape = RoundedCornerShape(16.dp),
-                color = Color.Black.copy(alpha = 0.3f),
-                border = ButtonDefaults.outlinedButtonBorder.copy(
-                    brush = androidx.compose.ui.graphics.SolidColor(charColor.copy(alpha = 0.3f))
-                )
-            ) {
-                Row(
-                    modifier = Modifier.padding(14.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    Text(character.avatarEmoji, fontSize = 28.sp)
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = "CONSELLO DE ${character.name.uppercase()}",
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = charColor
-                        )
-                        Text(
-                            text = character.quote,
-                            fontSize = 12.sp,
-                            fontStyle = FontStyle.Italic,
-                            color = SurfaceCream
-                        )
-                    }
-                    IconButton(
-                        onClick = { isDonActive = !isDonActive },
-                        colors = IconButtonDefaults.iconButtonColors(contentColor = charColor)
-                    ) {
-                        Icon(Icons.Default.AutoFixHigh, contentDescription = "Activar Don")
-                    }
-                }
-            }
-
-            // Don Activo Banner
-            AnimatedVisibility(visible = isDonActive) {
-                Surface(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 8.dp),
-                    shape = RoundedCornerShape(14.dp),
-                    color = charColor.copy(alpha = 0.15f),
-                    border = ButtonDefaults.outlinedButtonBorder.copy(
-                        brush = androidx.compose.ui.graphics.SolidColor(charColor)
-                    )
-                ) {
-                    Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Text(
-                            text = "✨ DON ACTIVADO: ${character.abilityName}",
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = charColor
-                        )
-                        Text(
-                            text = "Pista arcana: Observa detenidamente las piedras talladas y las inscripciones del contorno.",
-                            fontSize = 12.sp,
-                            color = Color.White
-                        )
-                    }
-                }
-            }
-
-            // Enigma / Challenge Box
-            Surface(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
-                shape = RoundedCornerShape(20.dp),
-                color = Color(0xFF141F17),
-                border = ButtonDefaults.outlinedButtonBorder.copy(
-                    brush = androidx.compose.ui.graphics.SolidColor(TerracottaGold.copy(alpha = 0.4f))
-                )
-            ) {
-                Column(
-                    modifier = Modifier.padding(20.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Text("🧩", fontSize = 20.sp)
-                        Text(
-                            text = "DESAFÍO RAIA: ENIGMA DO LUGAR",
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = TerracottaGold,
-                            letterSpacing = 1.sp
-                        )
-                    }
-
+                },
+                title = {
                     Text(
-                        text = currentStop.enigma.question,
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = Color.White,
-                        lineHeight = 20.sp
+                        text = when (phase) {
+                            ExpeditionPhase.INFO, ExpeditionPhase.TRIAL -> "${strings.stopWord} ${stop.order} ${strings.ofWord} ${route.stops.size}"
+                            ExpeditionPhase.SUMMARY -> strings.routeFinishedTitle
+                        },
+                        color = InkDeep,
+                        fontFamily = FontFamily.Serif,
+                        fontWeight = FontWeight.Bold
                     )
-
-                    val trial = currentStop.trial
-                    if (trial != null && trial.options.isNotEmpty()) {
-                        trial.options.forEachIndexed { optIndex, optionText ->
-                            val isSelected = selectedOptionIndex == optIndex
-                            val isCorrectOption = optIndex == trial.correctOptionIndex
-
-                            Surface(
-                                onClick = {
-                                    if (!isSolved) {
-                                        selectedOptionIndex = optIndex
-                                        val correct = optIndex == trial.correctOptionIndex
-                                        isAnswerCorrect = correct
-                                        showExplanation = true
-                                        if (correct) {
-                                            onSolveEnigma(currentStop.id)
-                                        }
-                                    }
-                                },
-                                shape = RoundedCornerShape(12.dp),
-                                color = if (isSelected) {
-                                    if (isCorrectOption) MossContainer.copy(alpha = 0.2f)
-                                    else Color(0xFF6B1D1D).copy(alpha = 0.3f)
-                                } else Color.Black.copy(alpha = 0.25f),
-                                border = ButtonDefaults.outlinedButtonBorder.copy(
-                                    brush = androidx.compose.ui.graphics.SolidColor(
-                                        if (isSelected) {
-                                            if (isCorrectOption) MossContainer else Color(0xFFFF6B6B)
-                                        } else Color.White.copy(alpha = 0.1f)
-                                    )
-                                ),
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(14.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                                ) {
-                                    Text(
-                                        text = "${('A' + optIndex)}.",
-                                        fontSize = 13.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = if (isSelected) Color.White else TerracottaFixedDim
-                                    )
-                                    Text(
-                                        text = optionText,
-                                        fontSize = 13.sp,
-                                        color = Color.White,
-                                        modifier = Modifier.weight(1f)
-                                    )
-                                    if (isSelected) {
-                                        Icon(
-                                            if (isCorrectOption) Icons.Default.CheckCircle else Icons.Default.Close,
-                                            contentDescription = null,
-                                            tint = if (isCorrectOption) MossContainer else Color(0xFFFF6B6B)
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    } else {
-                        // Simple fallback enigma
-                        Surface(
-                            shape = RoundedCornerShape(12.dp),
-                            color = Color.Black.copy(alpha = 0.2f),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Column(modifier = Modifier.padding(12.dp)) {
-                                Text("Pista para resolver:", fontSize = 11.sp, color = TerracottaFixedDim, fontWeight = FontWeight.Bold)
-                                Text(currentStop.enigma.hint, fontSize = 12.sp, color = SurfaceCream)
-                            }
-                        }
-
-                        if (!isSolved) {
-                            Button(
-                                onClick = { onSolveEnigma(currentStop.id) },
-                                modifier = Modifier.fillMaxWidth(),
-                                colors = ButtonDefaults.buttonColors(containerColor = TerracottaGold, contentColor = PineDeep)
-                            ) {
-                                Text("Revelar solución y resolver", fontWeight = FontWeight.Bold)
-                            }
-                        }
+                },
+                navigationIcon = {
+                    IconButton(onClick = goBack) {
+                        Icon(Icons.Default.ArrowBack, contentDescription = strings.back, tint = InkDeep)
                     }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = SurfaceCream,
+                    titleContentColor = InkDeep,
+                    navigationIconContentColor = InkDeep
+                )
+            )
+        },
+        containerColor = SurfaceCream
+    ) { padding ->
+        Box(Modifier.padding(padding).fillMaxSize()) {
+            if (imagesLoading) {
+                CircularProgressIndicator(
+                    modifier = Modifier.align(Alignment.Center),
+                    color = TerracottaGold
+                )
+            } else when (phase) {
+                ExpeditionPhase.INFO -> StopInfoContent(
+                    stop = stop,
+                    isCompleted = isCompleted,
+                    onStartTrial = { phase = ExpeditionPhase.TRIAL },
+                    strings = strings
+                )
+                ExpeditionPhase.TRIAL -> StopTrialContent(
+                    stop = stop,
+                    characterId = userProfile.effectiveCharacterId,
+                    isSolved = isCompleted,
+                    onSolved = { attempts, hintsUsed -> onSolveEnigma(stop.id, attempts, hintsUsed) },
+                    onFinish = { if (isRouteCompleted) phase = ExpeditionPhase.SUMMARY else onBack() },
+                    isRouteCompleted = isRouteCompleted,
+                    language = language
+                )
+                ExpeditionPhase.SUMMARY -> RouteSummaryContent(
+                    route = route,
+                    completedStops = completedStops,
+                    points = userProfile.routeScore(route),
+                    onSubmitReview = onSubmitReview,
+                    onDone = onBack,
+                    strings = strings
+                )
+            }
+            PointsGainChip(
+                gain = pointsGain.takeIf { phase != ExpeditionPhase.SUMMARY },
+                onShown = onPointsGainShown,
+                modifier = Modifier.align(Alignment.TopCenter).padding(top = 12.dp)
+            )
+            PointsGainChip(
+                gain = routeBonusGain.takeIf { phase == ExpeditionPhase.SUMMARY },
+                onShown = onRouteBonusShown,
+                modifier = Modifier.align(Alignment.TopCenter).padding(top = 12.dp)
+            )
+        }
+    }
+}
 
-                    if (isSolved || showExplanation) {
-                        Surface(
-                            shape = RoundedCornerShape(12.dp),
-                            color = MossContainer.copy(alpha = 0.15f),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                    Icon(Icons.Default.CheckCircle, contentDescription = null, tint = MossContainer, modifier = Modifier.size(16.dp))
-                                    Text("¡Enigma superado con éxito!", color = MossContainer, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                                }
-                                Text("Respuesta: ${currentStop.enigma.answer}", color = Color.White, fontSize = 12.sp)
-                            }
-                        }
+/** Shows "+X" for a new [gain] for 1.5 s. [onShown] consumes the gain so it never re-appears. */
+@Composable
+private fun PointsGainChip(gain: PointsGain?, onShown: () -> Unit, modifier: Modifier = Modifier) {
+    var shown by remember { mutableStateOf<PointsGain?>(null) }
+    var visible by remember { mutableStateOf(false) }
+    LaunchedEffect(gain?.serial) {
+        if (gain != null) {
+            shown = gain
+            onShown()
+        }
+    }
+    LaunchedEffect(shown?.serial) {
+        if (shown == null) return@LaunchedEffect
+        visible = true
+        delay(1500)
+        visible = false
+    }
+    AnimatedVisibility(
+        visible = visible,
+        modifier = modifier,
+        enter = fadeIn() + slideInVertically(),
+        exit = fadeOut()
+    ) {
+        Surface(shape = RoundedCornerShape(16.dp), color = TerracottaGold) {
+            Text(
+                text = "+${shown?.points ?: 0}",
+                modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
+                color = SurfaceCream,
+                fontWeight = FontWeight.Bold
+            )
+        }
+    }
+}
+
+@Composable
+private fun RouteSummaryContent(
+    route: RouteItem,
+    completedStops: Int,
+    points: Int,
+    onSubmitReview: (routeRating: Int, guideRating: Int, comment: String) -> Unit,
+    onDone: () -> Unit,
+    strings: ActiveExpeditionStrings
+) {
+    var routeRating by remember(route.id) { mutableIntStateOf(0) }
+    var guideRating by remember(route.id) { mutableIntStateOf(0) }
+    var comment by remember(route.id) { mutableStateOf("") }
+    var submitted by remember(route.id) { mutableStateOf(false) }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(20.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        Text(route.title, fontFamily = FontFamily.Serif, fontWeight = FontWeight.Bold, fontSize = 24.sp, color = InkDeep)
+        Surface(
+            shape = RoundedCornerShape(18.dp),
+            color = Color.White,
+            border = BorderStroke(1.dp, FieldBorder)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(18.dp),
+                horizontalArrangement = Arrangement.SpaceAround
+            ) {
+                SummaryStat(label = strings.statStops, value = "$completedStops/${route.stops.size}")
+                SummaryStat(label = strings.routeTotalScore, value = points.toString())
+            }
+        }
+
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(18.dp),
+            color = Color.White,
+            border = BorderStroke(1.dp, FieldBorder)
+        ) {
+            if (submitted) {
+                Text(
+                    strings.thanksForRating,
+                    modifier = Modifier.padding(18.dp),
+                    color = PineContainer,
+                    fontWeight = FontWeight.SemiBold
+                )
+            } else {
+                Column(
+                    modifier = Modifier.padding(18.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    Text(strings.leaveRating, fontWeight = FontWeight.Bold, fontSize = 18.sp, color = InkDeep)
+                    StarRatingRow(label = strings.routeRatingLabel, value = routeRating, strings = strings) { routeRating = it }
+                    StarRatingRow(label = "${strings.guideRatingLabel} (${route.guide.name})", value = guideRating, strings = strings) { guideRating = it }
+                    OutlinedTextField(
+                        value = comment,
+                        onValueChange = { if (it.length <= 500) comment = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        placeholder = { Text(strings.commentPlaceholder) },
+                        minLines = 3,
+                        shape = RoundedCornerShape(12.dp)
+                    )
+                    Button(
+                        onClick = {
+                            onSubmitReview(routeRating, guideRating, comment)
+                            submitted = true
+                        },
+                        enabled = routeRating > 0 && guideRating > 0,
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = PineContainer, contentColor = SurfaceCream)
+                    ) {
+                        Text(strings.submitRating, fontWeight = FontWeight.Bold)
                     }
                 }
             }
+        }
 
-            // Expedition Navigation Bottom Buttons
-            Row(
+        OutlinedButton(
+            onClick = onDone,
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(12.dp)
+        ) {
+            Text(strings.backToMap, color = InkDeep, fontWeight = FontWeight.SemiBold)
+        }
+    }
+}
+
+@Composable
+private fun SummaryStat(label: String, value: String) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(value, fontWeight = FontWeight.Bold, fontSize = 22.sp, color = InkDeep)
+        Text(label.uppercase(), fontSize = 11.sp, color = InkMuted)
+    }
+}
+
+@Composable
+private fun StarRatingRow(label: String, value: Int, strings: ActiveExpeditionStrings, onChange: (Int) -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text(label, fontWeight = FontWeight.SemiBold, color = InkDeep)
+        Row {
+            (1..5).forEach { star ->
+                IconButton(onClick = { onChange(star) }) {
+                    Icon(
+                        imageVector = if (star <= value) Icons.Default.Star else Icons.Default.StarBorder,
+                        contentDescription = "$star ${if (star == 1) strings.starSingular else strings.starPlural}",
+                        tint = TerracottaGold
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun StopInfoContent(
+    stop: RouteStop,
+    isCompleted: Boolean,
+    onStartTrial: () -> Unit,
+    strings: ActiveExpeditionStrings
+) {
+    val voice = rememberVoicePreviewer()
+    val clipPlayer = rememberAudioClipPlayer()
+    var narrating by remember(stop.id) { mutableStateOf(false) }
+    var playingRecording by remember(stop.id) { mutableStateOf(false) }
+    DisposableEffect(stop.id) {
+        onDispose {
+            voice.stop()
+            clipPlayer.stop()
+        }
+    }
+
+    val narrationText = stop.audioNarration?.takeIf { it.isNotBlank() } ?: stop.story
+    val recordedUrl = stop.recordedAudioUrl
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        if (stop.imageUrl.isNotBlank()) {
+            RouteCoverImage(
+                url = stop.imageUrl,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 12.dp),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Button(
-                    onClick = {
-                        if (currentStopIndex > 0) currentStopIndex--
-                    },
-                    enabled = currentStopIndex > 0,
-                    shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color.White.copy(alpha = 0.15f))
-                ) {
-                    Icon(Icons.Default.ChevronLeft, contentDescription = null)
-                    Spacer(Modifier.width(4.dp))
-                    Text("Anterior")
-                }
-
-                if (currentStopIndex < route.stops.size - 1) {
-                    Button(
-                        onClick = { currentStopIndex++ },
-                        shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = charColor, contentColor = Color.Black)
-                    ) {
-                        Text("Siguiente parada", fontWeight = FontWeight.Bold)
-                        Spacer(Modifier.width(4.dp))
-                        Icon(Icons.Default.ChevronRight, contentDescription = null)
-                    }
-                } else {
-                    Button(
-                        onClick = { onCompleteRoute(route.id) },
-                        shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = MossContainer, contentColor = PineDeep)
-                    ) {
-                        Icon(Icons.Default.EmojiEvents, contentDescription = null)
-                        Spacer(Modifier.width(6.dp))
-                        Text("Completar expedición", fontWeight = FontWeight.Bold)
-                    }
-                }
-            }
-
-            Spacer(Modifier.height(40.dp))
+                    .height(220.dp)
+                    .clip(RoundedCornerShape(16.dp))
+            )
         }
+
+        Text(
+            text = stop.title,
+            color = InkDeep,
+            fontFamily = FontFamily.Serif,
+            fontWeight = FontWeight.Bold,
+            fontSize = 26.sp
+        )
+
+        if (stop.locationName.isNotBlank()) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    Icons.Default.LocationOn,
+                    contentDescription = null,
+                    tint = TerracottaGold,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(Modifier.width(6.dp))
+                Text(stop.locationName, color = InkMuted, fontSize = 14.sp)
+            }
+        }
+
+        if (stop.audioMode == StopAudioMode.TTS) {
+            NarrationToggleButton(
+                playing = narrating,
+                label = strings.listenStory,
+                stopLabel = strings.stopPlayback,
+                onClick = {
+                    if (narrating) {
+                        voice.stop()
+                        narrating = false
+                    } else {
+                        clipPlayer.stop()
+                        playingRecording = false
+                        voice.speak(narrationText, stop.narrationVoice)
+                        narrating = true
+                    }
+                }
+            )
+        } else if (stop.audioMode == StopAudioMode.RECORDED && !recordedUrl.isNullOrBlank()) {
+            NarrationToggleButton(
+                playing = playingRecording,
+                label = strings.listenRecording,
+                stopLabel = strings.stopPlayback,
+                onClick = {
+                    if (playingRecording) {
+                        clipPlayer.stop()
+                        playingRecording = false
+                    } else {
+                        voice.stop()
+                        narrating = false
+                        clipPlayer.play(recordedUrl)
+                        playingRecording = true
+                    }
+                }
+            )
+        }
+
+        Surface(
+            shape = RoundedCornerShape(16.dp),
+            color = Color.White,
+            border = BorderStroke(1.dp, FieldBorder),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text(
+                text = stop.story,
+                color = InkDeep,
+                fontSize = 15.sp,
+                lineHeight = 24.sp,
+                modifier = Modifier.padding(18.dp)
+            )
+        }
+
+        Button(
+            onClick = onStartTrial,
+            enabled = !isCompleted,
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(12.dp),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = PineContainer,
+                contentColor = SurfaceCream,
+                disabledContainerColor = MossContainer,
+                disabledContentColor = SurfaceCream
+            )
+        ) {
+            Text(
+                text = if (isCompleted) strings.challengeCompleted else strings.goToChallenge,
+                fontWeight = FontWeight.Bold
+            )
+        }
+    }
+}
+
+@Composable
+private fun NarrationToggleButton(
+    playing: Boolean,
+    label: String,
+    stopLabel: String,
+    onClick: () -> Unit
+) {
+    OutlinedButton(
+        onClick = onClick,
+        shape = RoundedCornerShape(12.dp),
+        border = BorderStroke(1.dp, PineContainer),
+        colors = ButtonDefaults.outlinedButtonColors(contentColor = PineContainer)
+    ) {
+        Icon(
+            if (playing) Icons.Default.Stop else Icons.Default.PlayArrow,
+            contentDescription = null,
+            modifier = Modifier.size(18.dp)
+        )
+        Spacer(Modifier.width(8.dp))
+        Text(
+            text = if (playing) stopLabel else label,
+            fontWeight = FontWeight.SemiBold
+        )
     }
 }

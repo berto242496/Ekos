@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Ecos do Lugar</string>
+    <string name="google_error_client_id_missing">Engade GOOGLE_WEB_CLIENT_ID ao ficheiro .env.local para activar o inicio de sesión con Google.</string>
+    <string name="google_error_no_activity">Non hai unha pantalla activa para iniciar sesión con Google.</string>
+    <string name="google_error_invalid_credential">Google non devolveu unha credencial válida.</string>
+    <string name="google_error_client_id_mismatch">O Client ID de Google incluído nesta app non coincide co do token. Revisa GOOGLE_WEB_CLIENT_ID en .env.local e volve compilar.</string>
+    <string name="google_error_sign_in_failed">Non se puido iniciar sesión con Google.</string>
+    <string name="google_error_session_check_failed">Non se puido verificar a sesión con Supabase.</string>
+    <string name="google_error_audience_rejected">Supabase rexeitou o token de Google porque a súa audiencia non está autorizada. En Supabase &gt; Authentication &gt; Providers &gt; Google, engade como Client ID o mesmo GOOGLE_WEB_CLIENT_ID configurado para Android. Detalle: %1$s</string>
+    <string name="google_error_stored_session_unreadable">Non se puido recuperar a sesión gardada de forma segura: %1$s</string>
+    <string name="google_error_refresh_failed">Non se puido renovar a sesión gardada.</string>
+</resources>

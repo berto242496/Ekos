@@ -14,14 +14,18 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.ecosdolugar.localization.AppLanguage
+import com.ecosdolugar.localization.componentStrings
 
 @Composable
 fun GoogleSignInButton(
     onClick: () -> Unit,
+    language: AppLanguage,
     modifier: Modifier = Modifier,
-    text: String = "Continuar con Google",
+    text: String = componentStrings(language).continueWithGoogle,
     isLoading: Boolean = false
 ) {
+    val strings = componentStrings(language)
     Surface(
         onClick = onClick,
         enabled = !isLoading,
@@ -50,7 +54,7 @@ fun GoogleSignInButton(
                 )
                 Spacer(Modifier.width(12.dp))
                 Text(
-                    text = "Conectando con Google...",
+                    text = strings.connectingWithGoogle,
                     fontSize = 15.sp,
                     fontWeight = FontWeight.SemiBold,
                     color = Color(0xFF3C4043)

@@ -1,5 +1,7 @@
 package com.ecosdolugar.model
 
+import org.jetbrains.compose.resources.DrawableResource
+
 data class CharacterStat(
     val label: String,
     val value: Int // 0 to 100
@@ -20,5 +22,5 @@ data class CharacterItem(
     val element: String,
     val accentColorHex: Long, // e.g. 0xFFC084FC
     val stats: List<CharacterStat>,
-    val avatarEmoji: String
+    val avatarImage: DrawableResource
 )

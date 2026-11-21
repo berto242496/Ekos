@@ -275,8 +275,11 @@ fun App(viewModel: AppViewModel) {
                             }
                         }
                         NavigationScreen.MAP -> {
+                            val mapRoutes = remember(state.routes) {
+                                state.routes.filter { it.status == "publicada" }
+                            }
                             InteractiveMapScreen(
-                                routes = state.routes,
+                                routes = mapRoutes,
                                 language = appLanguage.current,
                                 initialRouteId = state.mapRouteToFocus,
                                 expeditionMode = state.mapIsExpedition,

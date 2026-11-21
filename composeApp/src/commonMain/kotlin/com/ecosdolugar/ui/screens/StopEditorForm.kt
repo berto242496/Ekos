@@ -350,6 +350,12 @@ internal fun StopEditorForm(
         TrialType.ORDENAR_PALABRA -> {
             HelperText(strings.wordHelper)
             RouteEditorTextField(
+                value = form.statement,
+                onValueChange = { form.statement = it },
+                label = strings.wordStatementLabel,
+                minLines = 2
+            )
+            RouteEditorTextField(
                 value = form.word,
                 onValueChange = { form.word = it },
                 label = strings.wordLabel,

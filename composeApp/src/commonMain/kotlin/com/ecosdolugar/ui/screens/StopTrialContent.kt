@@ -114,7 +114,7 @@ internal fun StopTrialContent(
         ?: strings.untitledTrial
     val question = when (type) {
         TrialType.PUZLE_IMAGEN -> strings.puzzleQuestion
-        TrialType.ORDENAR_PALABRA -> strings.wordQuestion
+        TrialType.ORDENAR_PALABRA -> trial?.question?.takeIf { it.isNotBlank() } ?: strings.wordQuestion
         TrialType.COMPLETAR_FRASE -> strings.phraseQuestion
         else -> trial?.question?.takeIf { it.isNotBlank() } ?: stop.enigma.question
     }

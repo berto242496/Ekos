@@ -30,6 +30,7 @@ internal data class StopDraft(
     val puzzleImageUrl: String,
     val puzzleGridSize: Int,
     val word: String,
+    val statement: String = "",
     val sentence: String,
     val missingWord: String,
     val source: RouteStop? = null
@@ -58,6 +59,7 @@ internal data class StopDraft(
                 puzzleImageUrl = trial?.imageUrl.orEmpty(),
                 puzzleGridSize = trial?.puzzleGridSize ?: 3,
                 word = trial?.cipherWord.orEmpty(),
+                statement = trial?.takeIf { it.type == TrialType.ORDENAR_PALABRA }?.question.orEmpty(),
                 sentence = trial?.sentence.orEmpty(),
                 missingWord = trial?.missingWord.orEmpty(),
                 source = stop
@@ -85,6 +87,7 @@ internal class StopFormState {
     var puzzleImageUrl by mutableStateOf("")
     var puzzleGridSize by mutableStateOf(3)
     var word by mutableStateOf("")
+    var statement by mutableStateOf("")
     var sentence by mutableStateOf("")
     var missingWord by mutableStateOf("")
 
@@ -116,6 +119,7 @@ internal class StopFormState {
             TrialType.ORDENAR_PALABRA -> {
                 val cleanWord = word.trim()
                 when {
+                    statement.isBlank() -> strings.wordStatementRequired
                     cleanWord.length !in 4..12 || !cleanWord.all { it.isLetter() } -> strings.wordLengthInvalid
                     cleanWord.toSet().size < 2 -> strings.wordNeedsTwoLetters
                     else -> null
@@ -154,6 +158,7 @@ internal class StopFormState {
         puzzleImageUrl = puzzleImageUrl.trim(),
         puzzleGridSize = puzzleGridSize,
         word = word.trim(),
+        statement = statement.trim(),
         sentence = sentence.trim(),
         missingWord = missingWord.trim()
     )
@@ -177,6 +182,7 @@ internal class StopFormState {
         puzzleImageUrl = draft.puzzleImageUrl
         puzzleGridSize = draft.puzzleGridSize
         word = draft.word
+        statement = draft.statement
         sentence = draft.sentence
         missingWord = draft.missingWord
     }
@@ -200,6 +206,7 @@ internal class StopFormState {
         puzzleImageUrl = ""
         puzzleGridSize = 3
         word = ""
+        statement = ""
         sentence = ""
         missingWord = ""
     }
@@ -250,7 +257,7 @@ internal fun StopDraft.toRouteStop(index: Int, routeId: String, strings: StopEdi
             type = TrialType.ORDENAR_PALABRA,
             title = strings.wordTitle(title),
             loreContext = story,
-            question = strings.wordQuestion,
+            question = statement.ifBlank { strings.wordQuestion },
             cipherWord = word,
             scrambledLetters = scrambleLetters(word),
             cipherClue = hint,
